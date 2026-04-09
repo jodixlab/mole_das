@@ -1,0 +1,26 @@
+{
+  "channel": "CO",
+  "observed": {
+    "raw": 250.0,
+    "units": "ppm"
+  },
+  "limits": [
+    {
+      "pollutant": "CO",
+      "value": 5.0,
+      "units": "g/bhp-hr",
+      "basis": "G/BHP-HR"
+    }
+  ],
+  "context": {
+    "raw_is_wet": false,
+    "apply_o2_correction": false,
+    "qd_dscfh": 100000.0,
+    "bhp": 500.0
+  },
+  "expected": {
+    "display_units": "g/bhp-hr",
+    "status": "PASS",
+    "pass": true
+  }
+}

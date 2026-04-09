@@ -1,0 +1,51 @@
+{
+  "schema": "mole_assets_manifest_v1",
+  "generated_at": "2026-02-04T20:37:31.579394+00:00",
+  "assets": [
+    {
+      "path": "mole_assets/audio/mole_8bit_theme.wav",
+      "bytes": 4233644,
+      "sha256": "529372c23aadc235eaa07929cbc802c41264c915d25558878aa61acb5e9e0964"
+    },
+    {
+      "path": "mole_assets/branding/mole_logo.png",
+      "bytes": 159020,
+      "sha256": "a9766a4303b61074eddb574aa61e8e61a6e0171d7b013ced9172a52db9e390a9"
+    },
+    {
+      "path": "mole_assets/branding/mole_logo_130.png",
+      "bytes": 25396,
+      "sha256": "589f9a1b527e5ed9b4100397155787a0db77b93af3c8c3851409d3ee3cb25b0b"
+    },
+    {
+      "path": "mole_assets/sprites/mole_dig_loop_sheet_128.png",
+      "bytes": 25511,
+      "sha256": "eee76f3a68f7cc89e540cfb5a68e47bc45abe8acce82d688ab491f922a6a84a7"
+    },
+    {
+      "path": "mole_assets/sprites/mole_dig_loop_sheet_192.png",
+      "bytes": 27789,
+      "sha256": "22ec3702c1ef5e8b455a0d4fe8f6d237528a057783ffafafc4e26994a1f0d479"
+    },
+    {
+      "path": "mole_assets/sprites/mole_dig_loop_sheet_64.png",
+      "bytes": 18209,
+      "sha256": "979eba7ad87cae93e7f512078df4bb9482cb132df3f916234329235625d71421"
+    },
+    {
+      "path": "mole_assets/sprites/mole_idle_watch_sheet_128.png",
+      "bytes": 53866,
+      "sha256": "a1ee5af827bbdc6e2fbb687740c86d6e2c5a74d4c3b41fe842bc8e6f434a3686"
+    },
+    {
+      "path": "mole_assets/sprites/mole_idle_watch_sheet_192.png",
+      "bytes": 58108,
+      "sha256": "622a5ea942d0185f597464714fb123bbeef5d4977091ea32ba56583636c19d9a"
+    },
+    {
+      "path": "mole_assets/sprites/mole_idle_watch_sheet_64.png",
+      "bytes": 37674,
+      "sha256": "ce1a25698b154114adc26883c11488d86712a7432b0b95c6da8f69e2f94c2943"
+    }
+  ]
+}

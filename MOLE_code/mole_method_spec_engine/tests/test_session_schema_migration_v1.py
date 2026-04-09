@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+import unittest
+from pathlib import Path
+from typing import Any, Callable, Dict
+
+
+TESTS_DIR = Path(__file__).resolve().parent
+FIXTURES_DIR = TESTS_DIR / "fixtures"
+CODE_DIR = TESTS_DIR.parents[1]
+
+WIZARD_PATH = CODE_DIR / "mole_code_das_2026_01_21_v10_0_22_ARCADE_RELEASE.py"
+RUNNER_PATH = CODE_DIR / "mole_daq_runner_2026_02_03_v10_0_24_ARCADE_RELEASE.py"
+
+
+def _load_module(module_path: Path, module_name: str):
+    if str(CODE_DIR) not in sys.path:
+        sys.path.insert(0, str(CODE_DIR))
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load module spec for {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class SessionSchemaMigrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.wizard_mod = _load_module(WIZARD_PATH, "mole_wizard_schema_test")
+        cls.runner_mod = _load_module(RUNNER_PATH, "mole_runner_schema_test")
+
+    def _fixture(self, name: str) -> Dict[str, Any]:
+        return json.loads((FIXTURES_DIR / name).read_text(encoding="utf-8"))
+
+    def _assert_diag_fixture(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
+        sess = ensure_fn(self._fixture("legacy_diag_session.json"), actor="unit_test")
+        meta = sess["meta"]
+
+        self.assertEqual(sess["schema_version"], "mole_session_config_v2")
+        self.assertEqual(meta["session_schema_version"], "mole_session_config_v2")
+        self.assertEqual(meta["session_schema_revision"], 2)
+        self.assertEqual(meta["session_schema_status"], "MIGRATED")
+        self.assertEqual(meta["session_schema_last_actor"], "unit_test")
+        self.assertIn("normalized to mole_session_config_v2 rev 2", meta["session_schema_summary"])
+        self.assertTrue(meta["schema_migrations"])
+
+        self.assertFalse(sess["session_mode"]["may_support_compliance"])
+        self.assertEqual(sess["site_conditions"]["z_model"], "IDEAL")
+        self.assertNotIn("compressibility_model", sess["site_conditions"])
+        self.assertEqual(sess["fuel"]["dg"]["share_basis"], "SELECTED_HEAT_INPUT_PCT")
+        self.assertNotIn("STATE_PERMIT_GENERAL", sess["regulatory"]["selected_rule_ids"])
+        self.assertNotIn("STATE_PERMIT_GENERAL", sess["regulatory"]["selected_rule_meta"])
+
+        note_blob = " | ".join(meta["session_schema_last_notes"])
+        self.assertIn("may_support_compliance=true", note_blob)
+        self.assertIn("Unsupported compressibility mode", note_blob)
+        self.assertIn("Dual-fuel liquid share semantics", note_blob)
+        self.assertIn("STATE_PERMIT_GENERAL", note_blob)
+
+    def _assert_prod_fixture(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
+        sess = ensure_fn(self._fixture("legacy_prod_session.json"), actor="unit_test")
+        meta = sess["meta"]
+
+        self.assertEqual(sess["schema_version"], "mole_session_config_v2")
+        self.assertEqual(meta["session_schema_status"], "MIGRATED")
+        self.assertEqual(meta["session_schema_migrated_from_version"], "mole_session_config_v1")
+        self.assertNotIn("ui_mode", sess["daq_runner"])
+        self.assertEqual(sess["site_conditions"]["z_model"], "IDEAL")
+        self.assertNotIn("z_basis", sess["site_conditions"])
+
+        note_blob = " | ".join(meta["session_schema_last_notes"])
+        self.assertIn("Stale diagnostics UI mode was cleared", note_blob)
+        self.assertIn("Legacy site_conditions.z_basis key was retired", note_blob)
+
+    def test_wizard_migrates_legacy_diagnostic_session(self) -> None:
+        self._assert_diag_fixture(self.wizard_mod.ensure_session_schema)
+
+    def test_runner_migrates_legacy_diagnostic_session(self) -> None:
+        self._assert_diag_fixture(self.runner_mod.ensure_session_schema)
+
+    def test_wizard_migrates_legacy_production_session(self) -> None:
+        self._assert_prod_fixture(self.wizard_mod.ensure_session_schema)
+
+    def test_runner_migrates_legacy_production_session(self) -> None:
+        self._assert_prod_fixture(self.runner_mod.ensure_session_schema)
+
+
+if __name__ == "__main__":
+    unittest.main()

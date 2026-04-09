@@ -1,0 +1,21 @@
+{
+  "channel": "O2",
+  "step_state": {
+    "step": "POST_ZERO"
+  },
+  "value_series": [0.33, 0.35, 0.37, 0.36],
+  "targets": {
+    "target": 0.0,
+    "units": "%"
+  },
+  "tolerances": {
+    "tol_abs": 0.2,
+    "stability_frac_of_tol": 0.5,
+    "min_stability_abs": 0.05
+  },
+  "expected": {
+    "pass": false,
+    "status": "FAIL",
+    "basis": "ABS"
+  }
+}

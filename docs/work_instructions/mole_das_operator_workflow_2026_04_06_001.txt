@@ -1,0 +1,479 @@
+MOLE-DAS OPERATOR WORKFLOW
+Audience: routine operator / emissions technician
+Scope: standard Wizard setup path, formal runner path, and common reference tabs
+
+Step 1.0 - Open the Wizard
+
+		Launch the Wizard with:
+
+			1. run_wizard.bat
+			2. run_wizard_console.bat (preferred for troubleshooting)
+
+		*The DAQ Runner launch tabs remain disabled until the session is saved/applied.
+
+Step 1.1 - Welcome
+
+		The Welcome tab is a routing tab. Use "Go to Project Configs" to begin the setup workflow.
+
+Step 2.0 - Start New or Load Existing
+
+		For a new project:
+
+			1. go to "Project Configs (Hub)"
+
+		For an existing project:
+
+			1. use "Load Existing Config..."
+			2. review and update the configuration before testing
+
+Step 3.0 - Project Configs (Hub)
+
+		Enter the core project identifiers:
+
+			1. Job ID
+			2. Project Name
+			3. Site / Facility
+			4. Operator
+			5. Asset / Unit ID
+
+Step 3.1 - Session Intent
+
+		Select the session behavior:
+
+			1. Record Data
+			2. Tokenize
+			3. Diagnostics-only
+			4. May Support Compliance
+
+		Operator note:
+
+			1. Diagnostics-only cannot be combined with compliance support.
+
+Step 3.2 - Fuel Category
+
+		Select the fuel family:
+
+			1. NG
+			2. DSL
+			3. DG
+			4. BG
+			5. RFG
+			6. OT
+
+		Optional:
+
+			1. enable "Capture Fuel Analysis"
+
+Step 3.3 - Arcade Soundtrack
+
+		Optional operator preference controls:
+
+			1. Enable
+			2. Auto mode behavior
+			3. Volume
+			4. Track review
+
+Step 4.0 - Job Intake (QA Routing)
+
+		Set the project evidence and routing context.
+
+Step 4.1 - Regulatory Purpose
+
+		Select:
+
+			1. State
+			2. Federal
+			3. Other
+
+		If "Other" is used, provide an explanation.
+
+Step 4.2 - Project Checklist
+
+		For each checklist item, select:
+
+			1. Provided
+			2. Not Available
+			3. enter a reason when Not Available is selected
+
+		Checklist items include:
+
+			1. fuel-gas analysis
+			2. permit information with limits
+			3. manufacturer technical information
+			4. site contact information
+			5. regulatory region
+			6. agency identification number
+			7. coordinates
+			8. elevation
+			9. regulatory-purpose support detail
+
+Step 5.0 - Source Details
+
+		Define the source and the normalization basis.
+
+Step 5.1 - Source Schema
+
+		Complete:
+
+			1. Source Category
+			2. Application
+			3. Service Class
+			4. Output Type
+			5. Engine Cycle
+			6. Cylinder Count
+			7. Notes
+
+Step 5.2 - Equipment Identification
+
+		Complete:
+
+			1. Manufacturer
+			2. Model Number
+			3. Serial Number
+			4. Asset Tag
+
+Step 5.3 - Rating / Capacity
+
+		Enter:
+
+			1. Units
+			2. Nameplate / Max
+			3. Site Rated
+			4. Estimated Operating
+			5. Load Basis
+
+Step 5.4 - Fuel Flow
+
+		Optional source-level entries:
+
+			1. Fuel Flow Basis
+			2. Units
+			3. Typical variation (%)
+			4. run-to-run variation acknowledgement
+
+Step 5.5 - Exhaust Flowrate Determination
+
+		Select the exhaust flow basis for the project:
+
+			1. fuel-flow-driven Method 19-based estimation
+			2. measured stack flow / EPA Method 2
+			3. stoichiometric fuel crosswalk with direct heat input
+			4. stoichiometric fuel crosswalk from power / heat rate
+			5. stoichiometric fuel crosswalk from power / BSFC
+
+Step 5.6 - Stack / Duct Geometry
+
+		Complete the Method 1 / Method 2 geometry entries as needed:
+
+			1. shape
+			2. diameter or width/height
+			3. straight-run distances
+			4. pitot type
+			5. Cp
+			6. traverse points
+
+Step 5.7 - Method 1 Port Layout + Diagram
+
+		Enter:
+
+			1. wall thickness
+			2. number of ports
+			3. angles
+			4. port diameter
+			5. port height AGL
+			6. stack height AGL
+
+		Optional exports:
+
+			1. print diagram PNG
+			2. arcade diagram PNG
+			3. side-view PNG
+
+Step 6.0 - Pollutants
+
+		Select the pollutants to be measured or simulated.
+
+Step 6.1 - Pollutant Selection
+
+		Choose the active analytes and add hand notes if needed.
+
+Step 6.2 - Active Pollutant Prescription
+
+		For each active pollutant, review:
+
+			1. effective method
+			2. effective profile
+			3. NOx converter efficiency handling
+			4. optional converter-efficiency workflow
+
+Step 6.3 - Hardware / Connection / Certificates
+
+		Use as needed:
+
+			1. Apply Active HW Channel
+			2. Modbus Poll
+			3. Connect to Instrument
+			4. upload/open/clear zero certificates
+			5. upload/open/clear mid certificates
+			6. upload/open/clear span certificates
+
+Step 7.0 - QA/QC
+
+		Set the QA/QC behavior used to generate the Test Matrix.
+
+Step 7.1 - QA/QC Profile
+
+		Review or set:
+
+			1. Resolved Profile
+			2. Sig digits
+			3. Portable Track
+			4. Persist calibration events to Master DB
+
+Step 7.2 - Spike Recovery
+
+		When applicable, set:
+
+			1. enable optional spike recovery
+			2. recovery min
+			3. recovery max
+
+Step 7.3 - QA/QC Actions
+
+		Use:
+
+			1. Save QA/QC + Generate Test Matrix
+			2. QA/QC Trending Viewer
+			3. Go to Test Matrix
+
+Step 8.0 - Test Matrix
+
+		Review and refine the generated testing worksteps.
+
+Step 8.1 - Acquisition Plan
+
+		Enter:
+
+			1. sample runs
+			2. minutes per run
+			3. default log interval
+			4. per-run minute overrides
+			5. channel log intervals
+
+Step 8.2 - Proposed Work Steps
+
+		Review:
+
+			1. sequence
+			2. label
+			3. analyte
+			4. method
+			5. default tolerance
+			6. override tolerance
+			7. acknowledgement state
+
+		Optional actions:
+
+			1. Regenerate Steps
+			2. Edit Selected Step
+
+Step 8.3 - Save Test Matrix
+
+		Save the matrix after review. Regenerate from profile only if the pollutant/method basis changed.
+
+Step 9.0 - Site Conditions
+
+		Enter or fetch location and weather context.
+
+Step 9.1 - Coordinates
+
+		Review or enter:
+
+			1. Latitude
+			2. Longitude
+			3. Station ID
+			4. Elevation
+
+		Optional fetch actions:
+
+			1. Fetch Weather
+			2. Fetch Coordinates
+			3. Fetch Elevation
+			4. Open Map
+
+Step 9.2 - Weather Mode + Failover
+
+		Select:
+
+			1. weather mode
+			2. failover policy
+			3. auto-compile weather option
+
+Step 9.3 - Manual Site Conditions
+
+		Optional fallback values:
+
+			1. ambient temperature
+			2. barometric pressure
+			3. relative humidity
+
+Step 9.4 - Z Model + Standard Conditions
+
+		Review:
+
+			1. Z Model
+			2. Fixed Z
+			3. standard temperature
+			4. standard pressure
+			5. standard name
+
+Step 10.0 - Reference / Audit FTIR
+
+		Use only when FTIR reference/audit evidence is part of the project.
+
+Step 10.1 - FTIR Config
+
+		Complete as needed:
+
+			1. Enable MG2000 FTIR ingest
+			2. Provider
+			3. Role
+			4. Method
+			5. PRN path or folder
+			6. Pattern
+			7. Recursive folder scan
+			8. Freshness
+
+Step 10.2 - FTIR Mapping / Worksteps
+
+		Optional FTIR work:
+
+			1. column overrides
+			2. unit overrides
+			3. spike recovery basis
+			4. offset carry-forward
+			5. FTIR method worksteps
+			6. PRN preview
+			7. save FTIR data into session
+
+Step 11.0 - Sample System
+
+		Use the digital twin to review the sample train and gas-cell mappings.
+
+Step 11.1 - Sample System Functions
+
+		The page includes:
+
+			1. active session selection
+			2. connectivity view
+			3. flow mapping
+			4. gas-cell mapping
+			5. animated sample-train view
+			6. print/export preview and PNG export
+
+Step 12.0 - Documents Library
+
+		Use the Documents Library for the latest packaged reference documents.
+
+		Available actions:
+
+			1. Open Selected Document
+			2. Open Selected Folder
+			3. Open Docs Folder
+			4. Refresh Library
+
+Step 13.0 - Fuel Analysis
+
+		Use this tab to capture or confirm the fuel basis used by combustion and Method 19 calculations.
+
+Step 13.1 - Fuel Analysis Profile / Entry
+
+		Review or complete:
+
+			1. profile
+			2. methodology
+			3. source/default basis
+			4. gas composition or liquid properties
+			5. confirmation checkbox
+			6. notes
+
+Step 13.2 - Save Fuel Analysis
+
+		Use "Save Fuel Analysis" after fuel data entry or verification.
+
+Step 14.0 - Regulatory
+
+		Use this tab to document rules and load project emission limits.
+
+Step 14.1 - Regulatory Context
+
+		Review and enter the applicable context fields for the source type, including:
+
+			1. state
+			2. source/service class
+			3. ignition/cycle/cylinders where applicable
+			4. construction/manufacture date
+			5. heat input or rated duty where applicable
+
+Step 14.2 - Suggested Regulations / Custom Rules
+
+		Use the suggestions list to toggle rules into the selected set.
+
+		Optional:
+
+			1. add a custom regulation
+
+Step 14.3 - Limits
+
+		Enter project limits as needed:
+
+			1. pollutant
+			2. type
+			3. units
+			4. value
+			5. average
+			6. basis
+			7. O2 reference
+			8. notes
+
+Step 15.0 - Save + Apply Config
+
+		Use "Save + Apply Config" after the setup is complete.
+
+		This action:
+
+			1. writes the current session configuration
+			2. normalizes the session schema
+			3. prepares runner launch files
+			4. enables the DAQ Runner launch tabs
+
+Step 16.0 - DAQ Runner (Test)
+
+		Use this for the formal production/test runner when diagnostics-only is not selected.
+
+		If Diagnostics-only is selected, this same tab launches the diagnostics-only shell instead.
+
+Step 17.0 - DAQ Runner (SIM)
+
+		Use this for the simulator/training runner when diagnostics-only is not selected.
+
+		If Diagnostics-only is selected, this same tab launches the diagnostics-only training shell instead.
+
+Step 18.0 - Recommended Standard Operator Sequence
+
+		For a typical formal session:
+
+			1. Project Configs (Hub)
+			2. Job Intake
+			3. Source Details
+			4. Pollutants
+			5. QA/QC
+			6. Test Matrix
+			7. Site Conditions
+			8. Reference / Audit FTIR (if applicable)
+			9. Sample System
+			10. Documents Library (reference only)
+			11. Fuel Analysis
+			12. Regulatory
+			13. Save + Apply Config
+			14. DAQ Runner (Test) or DAQ Runner (SIM)

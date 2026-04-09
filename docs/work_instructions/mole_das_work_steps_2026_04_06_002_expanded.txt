@@ -1,0 +1,1098 @@
+Step 1.0 - Open run_wizard.bat
+
+		Use the Wizard as the primary project-authoring interface for MOLE-DAS.
+
+		Recommended launcher options:
+
+			1. run_wizard.bat - standard Wizard launcher.
+			2. run_wizard_console.bat - console-backed Wizard launcher for troubleshooting.
+
+		*The DAQ Runner launch tabs are not enabled until the session is saved/applied.
+
+Step 1.1 - Welcome
+
+		The Welcome tab is a quick-routing tab. It summarizes the recommended setup flow:
+
+			1. Project Configs
+			2. Source Details
+			3. QA/QC
+			4. Test Matrix
+			5. Site Conditions
+			6. Fuel Analysis
+			7. Save + Apply Config
+			8. DAQ Runner
+
+		Use "Go to Project Configs" to begin a new setup.
+
+Step 2.0 - Existing Session vs New Session
+
+		If you are creating a new project instance (emissions source profile), use "Project Configs (Hub)".
+
+		If you are continuing or revising an existing setup, use "Load Existing Config...".
+
+		*When an existing configuration file is loaded, the prior session data is restored into the Wizard. The operator may then update entries such as the test matrix, pollutant selections, QA/QC details, FTIR settings, hardware selections, site/weather values, regulatory limits, or other project-specific changes.
+
+Step 2.1 - Project Configs (Hub)
+
+		In "Project Configs (Hub)", enter the core project identifiers:
+
+			1. Job ID
+			2. Project Name
+			3. Site / Facility
+			4. Operator
+			5. Asset / Unit ID
+
+		These entries define the project/session identity used by downstream tabs and exports.
+
+Step 2.2 - Session Intent
+
+		Session intent controls how the session behaves and what governance logic is applied.
+
+		The available selections are:
+
+			1. Record Data
+			2. Tokenize
+			3. Diagnostics-only
+			4. May Support Compliance
+
+		Intent behavior:
+
+			1. Record Data - session is configured to retain DAQ activities and related evidence.
+			2. Tokenize - session provenance and evidence immutability features are enabled.
+			3. Diagnostics-only - the launch path becomes diagnostics-only; compliance support is disabled.
+			4. May Support Compliance - indicates the project may be used for compliance or compliance support.
+
+		*Diagnostics-only and compliance support are mutually exclusive.
+
+Step 2.3 - Fuel Category
+
+		Fuel category allows the operator to classify the source fuel basis:
+
+			1. NG - Natural Gas
+			2. DSL - Diesel
+			3. DG - Dual Fuel
+			4. BG - Biogas / Digester Gas
+			5. RFG - Refinery Fuel Gas
+			6. OT - Other
+
+		The tab allows:
+
+			1. direct fuel button selection
+			2. fuel dropdown selection
+			3. optional "Capture Fuel Analysis" selection
+
+		*Fuel Analysis is strongly recommended for NG, BG, DG, and any project with site-specific fuel information.
+
+Step 2.4 - Arcade Soundtrack
+
+		MOLE-DAS includes a soundtrack utility. The operator may:
+
+			1. Enable or disable soundtrack playback.
+			2. Choose Auto mode behavior.
+			3. Adjust Volume.
+			4. Review the active track.
+
+Step 3.0 - Job Intake (QA Routing)
+
+		Job Intake is the evidence-readiness and project-routing tab. It is used to establish whether the project has the minimum supporting artifacts needed for formal use.
+
+Step 3.1 - Regulatory Purpose
+
+		Select the high-level regulatory purpose:
+
+			1. State
+			2. Federal
+			3. Other
+
+		If "Other" is selected, the operator must explain the purpose in the provided field.
+
+Step 3.2 - Project Checklist
+
+		The checklist captures whether key project artifacts are provided or unavailable.
+
+		Each checklist item uses:
+
+			1. Provided
+			2. Not Available
+			3. Reason (required when Not Available is selected)
+
+		The checklist covers:
+
+			1. Site-specific fuel-gas analysis
+			2. Permit information with emission limits
+			3. Manufacturer technical information / data sheets
+			4. Site/facility contact information
+			5. Regulatory region (county/parish)
+			6. Agency identification number
+			7. Physical location / coordinates
+			8. Site elevation
+			9. Regulatory purpose support detail
+
+Step 4.0 - Empirical Conditions
+
+		"Empirical Conditions" is an engineering/administrative tab for editable formula registry management.
+
+		The tab includes:
+
+			1. Registry path display
+			2. Category selector
+			3. JSON text editor containing formulas for the selected category
+			4. Save action
+
+		*This tab is intended for controlled edits to the empirical formula registry and is not typically used by routine operators during standard session setup.
+
+Step 5.0 - DB Paths
+
+		"DB Paths" is used to map MOLE-DAS to the correct folders, databases, and artifact locations.
+
+		The tab includes path entries and browse/open actions for:
+
+			1. Global Config
+			2. Core Folders
+			3. Databases
+			4. Asset DBs (JSON)
+
+		Available actions:
+
+			1. Browse
+			2. Open
+			3. Validate
+			4. Reset Defaults
+			5. Apply Paths
+
+		*This tab is primarily for deployment, remapping, or troubleshooting.
+
+Step 6.0 - Catalog Governance
+
+		"Catalog Governance" is the in-app reviewer for master catalog curation and cleanup.
+
+		This tab is intended for controlled catalog maintenance, not routine test setup.
+
+		The tab includes:
+
+			1. Reviewer identity
+			2. Master catalog counts/status
+			3. Pending Queue
+			4. Synonyms management
+			5. Manufacturer merge tools
+			6. Model merge tools
+			7. Audit view
+
+		Pending Queue functions include:
+
+			1. Category filter
+			2. Search
+			3. Limit
+			4. Refresh
+			5. Counts
+			6. Approve as new canonical
+			7. Merge to existing canonical manufacturer/model
+			8. Reject pending item with reason
+
+Step 7.0 - Source Details
+
+		"Source Details" defines the source and the normalization basis used by the runner and regulatory logic.
+
+Step 7.1 - Source Schema
+
+		Complete the source schema fields:
+
+			1. Source Category
+			2. Application
+			3. Service Class
+			4. Output Type
+			5. Engine Cycle
+			6. Cylinder Count
+			7. Notes
+
+		*If a matching inventory instance exists, binding it can prepopulate portions of the source definition.
+
+Step 7.2 - Session Binding / Inventory Link
+
+		The Source tab displays the currently bound inventory instance.
+
+		Available action:
+
+			1. Open Inventory Registry
+
+Step 7.3 - Equipment Identification
+
+		Complete the identity fields:
+
+			1. Manufacturer
+			2. Model Number
+			3. Serial Number
+			4. Asset Tag
+
+		Additional action:
+
+			1. Review Pending
+
+Step 7.4 - Rating / Capacity
+
+		Enter the source rating/capacity basis:
+
+			1. Units
+			2. Nameplate / Max
+			3. Site Rated
+			4. Estimated Operating
+			5. Load Basis
+
+Step 7.5 - Fuel Flow
+
+		This section captures optional fuel-flow information for normalization and crosswalk use.
+
+		Inputs:
+
+			1. Fuel Flow Basis
+			2. Units
+			3. Typical variation (%)
+			4. Acknowledge run-to-run fuel flow variation
+
+Step 7.6 - Exhaust Flowrate Determination
+
+		Select how exhaust flow will be determined.
+
+		The available setup patterns include:
+
+			1. Fuel-flow-driven Method 19-based Qd estimation
+				a. Fuel flow
+				b. Units
+				c. O2 dry % (optional)
+			2. EPA Method 2 / measured stack flow
+				a. EPA Method selection
+			3. Stoichiometric fuel crosswalk with direct heat input
+				a. Basis
+				b. O2 dry % (optional)
+				c. Heat input (MMBtu/hr)
+			4. Stoichiometric fuel crosswalk from rated power and heat rate
+				a. Rated power (hp)
+				b. Load fraction
+				c. Heat rate (Btu/hp-hr)
+			5. Stoichiometric fuel crosswalk from rated power and BSFC
+				a. Rated power (hp)
+				b. Load fraction
+				c. BSFC (lb/hp-hr)
+				d. Fuel LHV (optional)
+
+		*The actual run-level values may be entered or refined later in the DAQ Runner.
+
+Step 7.7 - Stack / Duct Geometry (EPA Method 1/2)
+
+		Complete the stack/duct geometry fields:
+
+			1. Shape
+			2. Diameter (ID, in)
+			3. Width (ID, in) [RECT]
+			4. Height (ID, in) [RECT]
+			5. Upstream straight run (D)
+			6. Downstream straight run (D)
+			7. Pitot type
+			8. Cp
+			9. Traverse points per line
+
+		Additional option:
+
+			1. Unstratified site (EPA 7E 8.2) - default 3-point rake
+
+Step 7.8 - Method 1 Port Layout + Diagram (Printable)
+
+		Enter the port layout fields:
+
+			1. Wall thickness (in)
+			2. Ports (#)
+			3. Angle 1 (deg)
+			4. Angle 2 (deg)
+			5. Port Dia (in)
+			6. Port height AGL (ft)
+			7. Stack height AGL (ft)
+
+		Available actions:
+
+			1. Export Diagram (PNG - Print)
+			2. Export Diagram (PNG - Arcade)
+			3. Export Side View (PNG - Print)
+			4. Export Side View (PNG - Arcade)
+
+Step 8.0 - Pollutants
+
+		"Pollutants" controls the analyte set and the supporting prescription used to auto-populate QA/QC and Test Matrix logic.
+
+Step 8.1 - Pollutant Selection
+
+		Select the pollutants to include in the session.
+
+		The selection drives:
+
+			1. QA/QC profile resolution
+			2. method binding
+			3. cylinder needs
+			4. test matrix generation
+
+		Hand Notes may be entered for additional analyst/operator detail.
+
+Step 8.2 - Active Pollutant Prescription
+
+		For the currently active pollutant, review and/or manage:
+
+			1. Active pollutant
+			2. Resolve Now
+			3. Reload DBs
+			4. Open Instruments DB
+			5. Open Cylinders DB
+			6. Open Methods DB
+			7. Effective Method
+			8. Effective Profile
+			9. NOx Converter Efficiency
+			10. optional CONVERTER_EFF workflow inclusion
+
+Step 8.3 - Hardware / Connection / Certificates
+
+		The pollutant prescription area also supports:
+
+			1. Hardware Mapping
+			2. Apply Active HW Channel
+			3. Modbus Poll
+			4. Connection / Connect to Instrument
+			5. Zero Certificates
+			6. Mid Certificates
+			7. Span Certificates
+			8. Upload
+			9. Open Folder
+			10. Clear
+			11. Resolver Output review
+
+Step 9.0 - QA/QC
+
+		"QA/QC" establishes the quality-control profile and optionally generates/updates the Test Matrix.
+
+Step 9.1 - Policy
+
+		The tab reports whether QA/QC is required by session policy.
+
+		Examples include:
+
+			1. QA/QC REQUIRED
+			2. QA/QC not required by policy
+			3. DIAG + Record+Token opt-in note
+
+Step 9.2 - QA/QC Profile
+
+		Review or set:
+
+			1. Resolved Profile (from Pollutants)
+			2. Significant digits for display
+			3. Portable Track
+			4. Persist calibration events to Master DB
+
+Step 9.3 - Spike Recovery
+
+		Optional spike recovery settings include:
+
+			1. Enable optional spike recovery
+			2. Recovery min (%)
+			3. Recovery max (%)
+
+		*FTIR audit projects may override this with method-specific behavior.
+
+Step 9.4 - QA/QC Actions
+
+		Available actions:
+
+			1. Save QA/QC + Generate Test Matrix
+			2. QA/QC Trending Viewer
+			3. Go to Test Matrix
+
+Step 10.0 - Test Matrix
+
+		"Test Matrix" is the method-aware work-step planner and acquisition plan builder.
+
+Step 10.1 - Matrix Header
+
+		Review the generated summary:
+
+			1. Profile
+			2. Portable state
+			3. Required/Policy state
+			4. Weather auto-compile state
+			5. Lat/Lon
+			6. Station
+
+Step 10.2 - Acquisition Plan
+
+		Complete the acquisition planning fields:
+
+			1. Sample runs
+			2. Minutes per run
+			3. Default log interval (s)
+			4. Per-run minutes overrides
+			5. Channel log intervals by analyte
+
+Step 10.3 - Proposed Work Steps
+
+		The matrix includes the generated step list with:
+
+			1. sequence
+			2. step label
+			3. analyte
+			4. method
+			5. default tolerance
+			6. override tolerance
+			7. acknowledgement state
+
+		Available actions:
+
+			1. Regenerate Steps
+			2. Edit Selected Step
+
+Step 10.4 - Step Edit Dialog
+
+		When editing a step, the dialog includes:
+
+			1. Label
+			2. Analyte
+			3. Method
+			4. Default tolerance
+			5. Override tolerance
+			6. Deviation acknowledgement checkbox
+			7. Deviation note
+
+Step 10.5 - High-Level Tests
+
+		Review governance-level test definitions and point requirements.
+
+Step 10.6 - Test Matrix Actions
+
+		Available actions:
+
+			1. Save Test Matrix
+			2. Regenerate from Profile
+
+Step 11.0 - Site Conditions
+
+		"Site Conditions" is used for coordinates, weather, fallback values, and standard-condition selections.
+
+Step 11.1 - Coordinates (WGS84)
+
+		Enter or review:
+
+			1. Latitude
+			2. Longitude
+			3. Station ID
+			4. Elevation (ft MSL)
+
+		Available actions:
+
+			1. Fetch Weather
+			2. Fetch Coordinates
+			3. Fetch Elevation
+			4. Open Map
+
+Step 11.2 - Weather Mode + Failover
+
+		Configure:
+
+			1. Mode
+			2. On Fetch Fail
+			3. Auto-compile weather data
+
+Step 11.3 - Manual Site Conditions
+
+		Optional fallback values:
+
+			1. T_amb (degF)
+			2. P_bar (psia)
+			3. RH (0-1)
+
+Step 11.4 - Z Model + Standard Conditions
+
+		Complete:
+
+			1. Z Model
+			2. Fixed Z
+			3. T_std (degF)
+			4. P_std (psia)
+			5. Std Name
+
+Step 11.5 - Map Preview
+
+		The tab includes a static site map preview and browser fallback.
+
+Step 12.0 - Reference / Audit FTIR
+
+		"Reference / Audit FTIR" manages optional MG2000 FTIR ingest for reference or audit use.
+
+Step 12.1 - Intent
+
+		Review the intent note explaining that PRN files are parsed as optional reference/audit evidence and mirrored into the DAQ Runner configuration during Save + Apply.
+
+Step 12.2 - FTIR Config
+
+		Complete:
+
+			1. Enable MG2000 FTIR ingest
+			2. Provider
+			3. Role
+			4. Method
+			5. PRN path or folder
+			6. Pattern
+			7. Recursive folder scan
+			8. Freshness (s)
+
+		Available actions:
+
+			1. Browse File
+			2. Browse Folder
+
+Step 12.3 - Column Mapping
+
+		Optional FTIR parser mappings:
+
+			1. Column overrides
+			2. Units overrides
+
+Step 12.4 - Spike Recovery
+
+		FTIR-related spike recovery includes:
+
+			1. ASTM D6348 project accuracy DQO (%)
+			2. method-specific spike requirements in audit mode
+
+Step 12.5 - Channel Offset Carry-Forward
+
+		Options:
+
+			1. Use approved carried-forward FTIR offsets on this project
+			2. Promote this project's latest captured FTIR evaluation as the new future-project default
+
+Step 12.6 - FTIR Method Worksteps
+
+		The tab includes method worksteps with columns for:
+
+			1. Step
+			2. Status
+			3. Updated
+			4. Acceptance / Criterion
+
+		Available actions:
+
+			1. Mark Step Done
+			2. Mark Step Skipped
+			3. Reset FTIR Steps
+
+Step 12.7 - Preview
+
+		Available actions:
+
+			1. Preview PRN
+			2. Save Into Session
+			3. Back: Site Conditions
+			4. Next: Sample System
+
+Step 13.0 - Sample System
+
+		"Sample System" is the live digital twin of the physical sampling train and gas-cell mapping.
+
+Step 13.1 - Active Session / Connectivity
+
+		The tab includes:
+
+			1. Active session selector
+			2. Pick...
+			3. Use latest
+			4. Session Browser
+			5. Open Folder
+			6. Connectivity Map
+
+Step 13.2 - Mappings
+
+		Mapping inputs include:
+
+			1. Flow channel
+			2. Units
+			3. Warn min/max
+			4. Alarm min/max
+			5. Apply
+
+Step 13.3 - Sensors / Sampling Train / Gas Cells
+
+		The page includes:
+
+			1. Sensors (active hardware profile)
+			2. Sampling Train (Conceptual)
+			3. Gas Cells (4 cells x 2 ports)
+			4. Animate
+			5. mapped P-port communication indication
+
+Step 13.4 - Gas Cell Mapping
+
+		For each gas-cell port bus, configure:
+
+			1. channel assignment
+			2. Gas
+			3. Range
+			4. Sensitivity
+
+		Available action:
+
+			1. Apply Gas Cell Mapping
+
+Step 13.5 - Sample System Print / Export
+
+		Available actions:
+
+			1. Refresh Preview
+			2. Export Diagram (PNG)
+			3. Open Export Folder
+			4. Open Last Export
+
+Step 14.0 - Hardware Profiles
+
+		"Hardware Profiles" defines and manages hardware communication profiles and channels.
+
+Step 14.1 - Profile Controls
+
+		Available actions:
+
+			1. Set Default
+			2. Save Config
+			3. New
+			4. Duplicate
+			5. Delete
+			6. Build/Update from cfg.hardware
+			7. Validate
+			8. Export channels.json
+			9. Probe (Commissioning)
+
+		*Probe/Commissioning may be unavailable in a runtime package if the commissioning helper is not shipped.
+
+Step 14.2 - Profile Meta
+
+		Profile meta fields include:
+
+			1. profile_key
+			2. protocol
+			3. timeout_s
+			4. endpoint_role
+			5. host
+			6. port
+			7. description
+			8. serial_port
+			9. baud
+			10. parity
+			11. stopbits
+
+		Action:
+
+			1. Apply Meta
+
+Step 14.3 - Channels
+
+		Each channel may include:
+
+			1. channel_id
+			2. unit_id
+			3. register
+			4. function code
+			5. dtype
+			6. qty
+			7. units
+			8. scale
+			9. offset
+			10. host override
+			11. port
+			12. description
+
+		Available actions:
+
+			1. Apply Channel
+			2. Add Channel
+			3. Delete Channel
+			4. Poll Selected Channel
+			5. List COM Ports
+			6. Probe Matrix
+
+		The tab also includes:
+
+			1. Raw RTU Diagnostics
+
+Step 15.0 - Inventory Registry
+
+		"Inventory Registry" is used to create, search, save, and bind equipment instances.
+
+Step 15.1 - Session Binding
+
+		The tab reports the currently bound instance and provides:
+
+			1. Go to Source Details
+
+Step 15.2 - Instance Builder
+
+		Builder fields include:
+
+			1. instance_id
+			2. Site ID
+			3. Location ID
+			4. Category
+			5. Manufacturer
+			6. Model
+			7. Variant
+			8. Serial Number
+			9. Asset Tag
+			10. Manufacture Date
+			11. Install Date
+			12. Engine Cycle
+			13. Cylinders
+			14. Duty
+			15. Notes
+
+Step 15.3 - Registry Search
+
+		Search fields include:
+
+			1. Category
+			2. Serial
+			3. Asset Tag
+			4. Manufacturer
+			5. Model
+			6. Site ID
+			7. Location ID
+
+Step 15.4 - Inventory Actions
+
+		Available actions:
+
+			1. Save Instance
+			2. Save + Bind Session
+			3. Bind Loaded -> Session
+			4. Clear
+			5. Refresh Search
+
+Step 16.0 - Session Browser
+
+		"Session Browser" is used to review session folders and perform session-level actions.
+
+Step 16.1 - Session Browser Controls
+
+		The tab includes:
+
+			1. Sessions root
+			2. Open
+			3. Filter
+			4. Helper availability status
+
+Step 16.2 - Sessions List / Selected Session
+
+		The browser provides:
+
+			1. Sessions list
+			2. Selected session details
+			3. Open Folder
+			4. Go to Event Console
+
+Step 16.3 - Session Actions
+
+		Available actions may include:
+
+			1. Run RAW->Processed
+			2. Export Session ZIP
+			3. Sync to...
+			4. Import Session ZIP
+			5. Refresh List
+
+		*If required helpers are not shipped with the runtime package, the related buttons may display N/A and remain disabled.
+
+Step 17.0 - Packages Inbox
+
+		"Packages Inbox" is used to scan, review, and ingest package ZIP artifacts.
+
+		The tab includes:
+
+			1. Inbox folder
+			2. Open
+			3. Filter
+			4. Status
+			5. Indexed Packages list
+			6. Selected Package details
+			7. Inbox Actions Output
+
+		Available actions:
+
+			1. Scan / Rescan
+			2. Refresh
+			3. Export CSV
+			4. Open ZIP
+			5. Open Folder
+			6. Ingest to Sessions
+			7. Open Ingested Session
+			8. Go to Session Browser
+
+Step 18.0 - Event Console
+
+		"Event Console" is used to write structured session events and inspect the raw event tail.
+
+Step 18.1 - Active Session
+
+		Available actions:
+
+			1. Open Folder
+			2. Pick from Session Browser
+
+Step 18.2 - Send Event
+
+		Event entry fields include:
+
+			1. Event type
+			2. Scope
+			3. channels (ALL or comma-separated channel IDs)
+			4. Note
+
+		Available actions:
+
+			1. Send Event
+			2. Refresh Tail
+
+Step 19.0 - Documents Library
+
+		"Documents Library" houses the most recent companion and operator-reference documents packaged with MOLE-DAS.
+
+		The tab includes:
+
+			1. Category
+			2. Document
+			3. Current File
+			4. Updated
+			5. Selected Document detail
+
+		Available actions:
+
+			1. Open Selected Document
+			2. Open Selected Folder
+			3. Open Docs Folder
+			4. Refresh Library
+
+Step 20.0 - Fuel Analysis
+
+		"Fuel Analysis" is used to capture or confirm the fuel composition/properties used by the combustion and Method 19 logic.
+
+Step 20.1 - Fuel Analysis Profile
+
+		Review:
+
+			1. Fuel
+			2. Capture Fuel Analysis (operator-entered)
+			3. Profile
+			4. Methodology
+			5. Mode / Source
+
+Step 20.2 - Fuel Analysis Entry
+
+		The operator may:
+
+			1. enter gas composition or liquid properties
+			2. confirm the fuel analysis is entered/verified
+			3. enter notes
+
+Step 20.3 - Computed Panels
+
+		The tab displays computed combustion information including:
+
+			1. combustion attributes
+			2. selected F-factor
+			3. HHV / LHV basis values
+			4. ultimate analysis / products information
+			5. traceability/source notes
+
+Step 20.4 - Fuel Actions
+
+		Available actions:
+
+			1. Save Fuel Analysis
+			2. Next: DAQ Runner
+
+Step 21.0 - Regulatory
+
+		"Regulatory" provides rule suggestions, custom rule capture, and basis-aware emission limit entry.
+
+Step 21.1 - Context
+
+		Context fields vary by source category, but may include:
+
+			1. State (2-letter)
+			2. Detect from Lat/Lon
+			3. Heater class
+			4. Boiler type
+			5. Source class
+			6. Ignition
+			7. Service
+			8. Cycle
+			9. Cylinders
+			10. Construction date
+			11. Manufacture date
+			12. Heat input
+			13. Rated duty
+
+		Available actions:
+
+			1. Check Federal Feeds (online)
+			2. Load State Pack (JSON)
+			3. Export State Template
+
+Step 21.2 - Suggested Regulations
+
+		The tab presents suggested regulations with YES/NO use toggles and columns such as:
+
+			1. Applicability
+			2. Jurisdiction
+			3. Rule
+			4. Citation
+			5. Score
+
+Step 21.3 - Selected Regulations / Custom Regulation
+
+		The tab supports:
+
+			1. Selected Regulations review
+			2. Add Custom Regulation
+				a. Jurisdiction
+				b. Name
+				c. Citation
+				d. Notes
+
+Step 21.4 - Limits (basis-aware)
+
+		Limit entry fields include:
+
+			1. Pollutant
+			2. Type
+			3. Units
+			4. Value
+			5. Averaging basis
+			6. Basis
+			7. O2 reference (% dry)
+			8. Notes
+
+		Available actions:
+
+			1. Add Limit
+			2. Remove Selected Limit(s)
+
+Step 21.5 - Information Pane
+
+		The right-side pane provides:
+
+			1. Context summary
+			2. Selected rule detail
+			3. Library status
+
+Step 22.0 - Save + Apply Config
+
+		Use "Save + Apply Config" after the core setup tabs are complete.
+
+		This action:
+
+			1. persists the session configuration
+			2. normalizes the session schema
+			3. refreshes the runner-facing configuration
+			4. enables DAQ Runner launch tabs
+
+Step 22.1 - Additional footer actions
+
+		The left footer also provides:
+
+			1. Load Existing Config...
+			2. Export Tab CSV...
+			3. Export Full CSV Pack...
+
+Step 23.0 - DAQ Runner (Test)
+
+		"DAQ Runner (Test)" launches the production/test runner using the applied session.
+
+		If "Diagnostics-only" is NOT selected:
+
+			1. this launches the full formal runner
+			2. hardware/plugin acquisition may be used
+
+		If "Diagnostics-only" IS selected:
+
+			1. this launches the diagnostics-only shell
+			2. compliance support is disabled
+			3. report-pack usage is disabled
+			4. QA/QC trending is disabled
+
+Step 24.0 - DAQ Runner (SIM)
+
+		"DAQ Runner (SIM)" launches the simulator/training runner.
+
+		If "Diagnostics-only" is NOT selected:
+
+			1. this launches the formal training/simulation runner
+
+		If "Diagnostics-only" IS selected:
+
+			1. this launches the diagnostics-only training shell
+			2. the session remains sandboxed and excluded from compliance support
+
+Step 24.1 - Diagnostics Verification / Responsibility
+
+		When diagnostics mode is used, the operator/technician is responsible for:
+
+			1. performing pre-test calibration verification / linearity assessment
+			2. performing post-test calibration verification / linearity assessment
+			3. documenting those activities before relying on diagnostics outputs where pollutant limits are in scope
+
+Step 25.0 - Optional / Conditional Tabs
+
+		The following tabs or actions may appear only when the supporting helper or runtime component is included:
+
+			1. Commissioning
+			2. Commissioning probe actions
+			3. Session sync/import/export helper-backed actions
+			4. RAW->Processed helper-backed actions
+
+Step 26.0 - Recommended Standard Workflow
+
+		For a new formal project, the recommended path is:
+
+			1. Welcome
+			2. Project Configs (Hub)
+			3. Job Intake (QA Routing)
+			4. Source Details
+			5. Pollutants
+			6. QA/QC
+			7. Test Matrix
+			8. Site Conditions
+			9. Reference / Audit FTIR (if applicable)
+			10. Sample System
+			11. Hardware Profiles
+			12. Inventory Registry (if binding/creating instance)
+			13. Documents Library (reference only)
+			14. Fuel Analysis
+			15. Regulatory
+			16. Save + Apply Config
+			17. DAQ Runner (Test) or DAQ Runner (SIM)
+
+Step 27.0 - Recommended Standard Workflow for Diagnostics-only
+
+		For diagnostics-only work, the recommended path is:
+
+			1. Project Configs (Hub)
+			2. select Diagnostics-only
+			3. Source Details
+			4. Pollutants
+			5. Site Conditions
+			6. Sample System
+			7. Fuel Analysis
+			8. Regulatory (if pollutant limits will be entered for comparison)
+			9. Save + Apply Config
+			10. DAQ Runner (Test - Diagnostics-only) or DAQ Runner (SIM - Diagnostics-only)
+
+Step 28.0 - Operator Notes
+
+		The operator should expect the following:
+
+			1. Some tabs are engineering/admin oriented and may not be used for every session.
+			2. The Runner launch tabs depend on a valid saved/applied configuration.
+			3. Diagnostics mode is not a compliance support path.
+			4. Method/QA/QC/Test Matrix behavior is driven by pollutant and session selections.
+			5. Fuel Analysis and Site Conditions directly affect combustion and Method 19 outputs.

@@ -1,0 +1,852 @@
+{
+  "meta": {
+    "created_iso": "2026-03-31T12:09:48-05:00",
+    "wizard_version": "2026_01_21_v10_0_22",
+    "splash_acceptance_history": [
+      {
+        "action": "CLOSE",
+        "accepted_iso": "2026-03-31T12:10:00-05:00",
+        "source_category": "",
+        "source_application": "Other",
+        "required_complete": false
+      },
+      {
+        "action": "CONFIRM",
+        "accepted_iso": "2026-03-31T12:10:43-05:00",
+        "source_category": "Engine",
+        "source_application": "Gas Compression",
+        "required_complete": true
+      }
+    ],
+    "splash_acceptance": {
+      "source_details": {
+        "action": "CONFIRM",
+        "accepted_iso": "2026-03-31T12:10:43-05:00",
+        "source_category": "Engine",
+        "source_application": "Gas Compression",
+        "required_complete": true
+      }
+    },
+    "applied_iso": "2026-03-31T13:15:52-05:00"
+  },
+  "project": {
+    "job_id": "2026_03_31_1209",
+    "project_name": "diagnostic_test_002",
+    "site_facility": "katy, texas",
+    "operator": "jodick",
+    "asset_unit_id": "001",
+    "intake": {
+      "schema_version": "mole_job_intake_v1",
+      "status": "INCOMPLETE",
+      "missing": [
+        "FUEL_GAS_ANALYSIS",
+        "PERMIT_LIMITS",
+        "TMI",
+        "SITE_CONTACT",
+        "REGION",
+        "AGENCY_ID",
+        "COORDINATES",
+        "ELEVATION",
+        "REG_PURPOSE"
+      ],
+      "items": {
+        "FUEL_GAS_ANALYSIS": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "PERMIT_LIMITS": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "TMI": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "SITE_CONTACT": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "REGION": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "AGENCY_ID": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "COORDINATES": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "ELEVATION": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        },
+        "REG_PURPOSE": {
+          "provided": false,
+          "not_available": false,
+          "reason": ""
+        }
+      },
+      "regulatory_purpose": {
+        "category": "",
+        "other_reason": ""
+      },
+      "evidence_files": [],
+      "last_updated_iso": "2026-03-31T13:15:52-05:00",
+      "updated_by": "jodick"
+    }
+  },
+  "session_mode": {
+    "install": "TEMPORARY",
+    "mode": "DIAGNOSTICS_SESSION",
+    "diagnostic_only": true,
+    "may_support_compliance": false,
+    "record_data": true,
+    "tokenize": true
+  },
+  "source": {
+    "source_category": "Engine",
+    "application": "Gas Compression",
+    "load_basis": "SITE_RATED",
+    "stack": {
+      "shape": "ROUND",
+      "diameter_in": 18.0,
+      "width_in": null,
+      "height_in": null,
+      "upstream_diameters": 8.0,
+      "downstream_diameters": 2.5,
+      "pitot_type": "TYPE_S",
+      "pitot_cp": 0.84,
+      "traverse_points_per_line": 3,
+      "wall_thickness_in": null,
+      "port_count": 2,
+      "port_angles_deg": [
+        0.0,
+        90.0
+      ],
+      "port_diameter_in": 2.0,
+      "port_height_ft_agl": 18.0,
+      "stack_height_ft_agl": 23.0,
+      "grid_nx": null,
+      "grid_ny": null,
+      "unstratified_7e": true,
+      "hand_notes": "",
+      "m2c_allow_small_stack": true,
+      "traverse_scheme": "7E_3PT"
+    },
+    "fuel_flow": {
+      "basis": "METERED",
+      "units": "scfh",
+      "variation_pct": 10.0,
+      "acknowledged": true
+    },
+    "exhaust_flow": {
+      "method": "STOICH_FUEL",
+      "stoich_fuel": {
+        "fuel_flow_value": null,
+        "fuel_flow_units": "scfh",
+        "o2_dry_pct": null,
+        "deferred": true
+      },
+      "stack_measured": {
+        "epa_method": "EPA_M2",
+        "notes": ""
+      },
+      "manufacturer": {
+        "basis": "HEAT_INPUT",
+        "o2_dry_pct": null,
+        "heat_input_mmbtu_hr": null,
+        "rated_power_hp": null,
+        "load_fraction": null,
+        "heat_rate_btu_hp_hr": null,
+        "bsfc_lb_hp_hr": null,
+        "fuel_lhv_btu_lb": null
+      }
+    },
+    "service_class": "Stationary",
+    "output_type": "Mechanical",
+    "engine_cycle": "4_CYL",
+    "engine_cyl_count": 16,
+    "cyl_count": 16,
+    "manufacturer": "Caterpillar",
+    "model_number": "G3516",
+    "serial_number": "JEFXXXXX",
+    "asset_tag": "001",
+    "instance_id": 3,
+    "manufacture_date": null,
+    "install_date": null,
+    "power_units": "hp",
+    "max_power": 1380.0,
+    "site_rated_power": 1367.0,
+    "estimated_power": 1355.0,
+    "emissions_output_preferences": [],
+    "notes": "",
+    "source_application": "Gas Compression"
+  },
+  "fuel": {
+    "fuel_category": "Natural Gas (NG)",
+    "fuel_button_code": "NG",
+    "capture_fuel_analysis": false,
+    "analysis": {
+      "basis": "MOLE_FRACTION",
+      "components": [],
+      "notes": "",
+      "methodology_basis": "ASTM_D3588_2017",
+      "methodology_label": "ASTM D3588-98 (Reapproved 2017)",
+      "f_factor_basis": "HHV",
+      "captured": false,
+      "profile_id": "NG_PIPELINE",
+      "combustion": {
+        "family": "GAS",
+        "basis_sel": "LHV",
+        "methodology_basis_code": "ASTM_D3588_2017",
+        "methodology_basis_label": "ASTM D3588-98 (Reapproved 2017)",
+        "std": {
+          "T_F": 60.0,
+          "P_psia": 14.696
+        },
+        "site": {
+          "T_F": 80.6,
+          "P_psia": 14.778829
+        },
+        "vol_scale": 1.0338138016341618,
+        "relative_density_air": null,
+        "compressibility_basis": "IDEAL",
+        "compressibility_factor": 1.0,
+        "traceability_note": "ASTM D3588-98 (Reapproved 2017) traceability basis applied to fuel-property reporting.",
+        "MW_mix": null,
+        "HHV_Btu_scf": null,
+        "LHV_Btu_scf": null,
+        "HHV_Btu_lb": null,
+        "LHV_Btu_lb": null,
+        "HHV_Btu_gal": null,
+        "LHV_Btu_gal": null,
+        "Fd_HHV_dscf_per_MMBtu": null,
+        "Fd_LHV_dscf_per_MMBtu": null,
+        "Fd_sel_dscf_per_MMBtu": null,
+        "ultimate_wt_pct": {},
+        "products": [],
+        "note": "No gas composition available."
+      }
+    },
+    "dg": {
+      "liquid_fuel_label": "Diesel",
+      "liquid_fraction_volpct": null
+    }
+  },
+  "site_conditions": {
+    "mode": "AUTO_WEATHER",
+    "on_weather_fail": "PROMPT",
+    "require_operator_choice": true,
+    "allow_stp_override": true,
+    "z_model": "IDEAL",
+    "fixed_z": null,
+    "standard_conditions": {
+      "T_std_F": 60.0,
+      "P_std_psia": 14.696,
+      "basis_name": "US_STANDARD"
+    },
+    "manual_entry": {
+      "T_amb_F": 80.6,
+      "P_bar_psia": 14.778829,
+      "RH_frac": 0.578737,
+      "z": null,
+      "entered_by": "jodick",
+      "timestamp_iso": "2026-03-31T13:15:52-05:00"
+    },
+    "location": {
+      "lat": 29.9368,
+      "lon": -95.3299,
+      "elevation_ft_msl": 60.0,
+      "datum": "WGS84",
+      "source": "IP",
+      "timestamp_iso": "2026-03-31T12:17:27-05:00",
+      "meta": {
+        "provider": "ipinfo",
+        "city": "Houston",
+        "region": "Texas",
+        "country": "US"
+      }
+    },
+    "weather_compile": {
+      "enabled": true,
+      "interval_s": 300,
+      "provider": "NOAA_NWS",
+      "station_id": "KIAH",
+      "last_fetch_iso": "2026-03-31T17:05:00+00:00",
+      "last_fetch": {
+        "T_amb_F": 80.6,
+        "P_bar_psia": 14.778829,
+        "RH_frac": 0.578737
+      }
+    }
+  },
+  "pollutants": {
+    "selected": [
+      "O2",
+      "CO",
+      "NO",
+      "NO2"
+    ],
+    "active": "NO2",
+    "hand_notes": "",
+    "prescriptions": {
+      "O2": {
+        "enabled": true,
+        "expected_max": 20.9,
+        "expected_units": "%",
+        "method_selected": "ASTM_D6522",
+        "cal_points_selected": 2,
+        "lin_points_selected": 2,
+        "instrument_id": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+        "channel_id": "PCM_O2_FLOAT",
+        "instrument_channel": "PCM_O2_FLOAT",
+        "zero_cylinder_id": "0",
+        "span_cylinder_id": "20.9",
+        "mid_cylinder_id": "",
+        "zero_target": 0.0,
+        "span_target": null,
+        "mid_target": null,
+        "cylinder_certificates": {
+          "zero": [],
+          "mid": [],
+          "span": []
+        },
+        "comm": {
+          "protocol": "MODBUS_RTU",
+          "params": {
+            "serial_port": "COM3",
+            "baud": "115200",
+            "parity": "O",
+            "stopbits": "1",
+            "unit_id": "4",
+            "timeout_s": "1.0"
+          },
+          "confirmed": false,
+          "deferred": false,
+          "last_attempt_iso": "",
+          "last_status": "PENDING (config changed)"
+        },
+        "notes": "",
+        "binding_preset": "Portable Combustion Monitor"
+      },
+      "CO": {
+        "enabled": true,
+        "expected_max": 66.0,
+        "expected_units": "ppm",
+        "method_selected": "",
+        "cal_points_selected": 2,
+        "lin_points_selected": 2,
+        "instrument_id": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+        "channel_id": "PCM_CO_FLOAT",
+        "instrument_channel": "PCM_CO_FLOAT",
+        "zero_cylinder_id": "0",
+        "span_cylinder_id": "251",
+        "mid_cylinder_id": "",
+        "zero_target": 0.0,
+        "span_target": null,
+        "mid_target": null,
+        "cylinder_certificates": {
+          "zero": [],
+          "mid": [],
+          "span": []
+        },
+        "comm": {
+          "protocol": "MODBUS_RTU",
+          "params": {
+            "serial_port": "COM3",
+            "baud": "115200",
+            "parity": "N",
+            "stopbits": "1",
+            "unit_id": "3",
+            "timeout_s": "1.0"
+          },
+          "confirmed": false,
+          "deferred": false,
+          "last_attempt_iso": "",
+          "last_status": "PENDING (config changed)"
+        },
+        "notes": "",
+        "binding_preset": "Portable Combustion Monitor"
+      },
+      "NO": {
+        "enabled": true,
+        "expected_max": 44.0,
+        "expected_units": "ppm",
+        "method_selected": "ASTM_D6522",
+        "cal_points_selected": 2,
+        "lin_points_selected": 2,
+        "instrument_id": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+        "channel_id": "PCM_NO_FLOAT",
+        "instrument_channel": "PCM_NO_FLOAT",
+        "zero_cylinder_id": "0",
+        "span_cylinder_id": "102",
+        "mid_cylinder_id": "",
+        "zero_target": 0.0,
+        "span_target": null,
+        "mid_target": null,
+        "cylinder_certificates": {
+          "zero": [],
+          "mid": [],
+          "span": []
+        },
+        "comm": {
+          "protocol": "MODBUS_RTU",
+          "params": {
+            "serial_port": "COM3",
+            "baud": "115200",
+            "parity": "N",
+            "stopbits": "1",
+            "unit_id": "1",
+            "timeout_s": "1.0"
+          },
+          "confirmed": false,
+          "deferred": false,
+          "last_attempt_iso": "",
+          "last_status": "PENDING (config changed)"
+        },
+        "notes": "",
+        "binding_preset": "Portable Combustion Monitor"
+      },
+      "NO2": {
+        "enabled": true,
+        "expected_max": 55.0,
+        "expected_units": "ppm",
+        "method_selected": "ASTM_D6522",
+        "cal_points_selected": 2,
+        "lin_points_selected": 2,
+        "instrument_id": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+        "channel_id": "PCM_NO2_FLOAT",
+        "instrument_channel": "PCM_NO2_FLOAT",
+        "zero_cylinder_id": "0",
+        "span_cylinder_id": "249",
+        "mid_cylinder_id": "",
+        "zero_target": 0.0,
+        "span_target": null,
+        "mid_target": null,
+        "cylinder_certificates": {
+          "zero": [],
+          "mid": [],
+          "span": []
+        },
+        "comm": {
+          "protocol": "MODBUS_RTU",
+          "params": {
+            "serial_port": "COM3",
+            "baud": "115200",
+            "parity": "N",
+            "stopbits": "1",
+            "unit_id": "2",
+            "timeout_s": "1.0"
+          },
+          "confirmed": false,
+          "deferred": false,
+          "last_attempt_iso": "",
+          "last_status": "PENDING (config changed)"
+        },
+        "notes": "",
+        "binding_preset": "Portable Combustion Monitor"
+      }
+    },
+    "resolved": {
+      "track": "DIAG",
+      "profile_effective": "PROFILE:MULTI",
+      "method_map": {
+        "O2": "ASTM_D6522",
+        "CO": "ASTM_D6522",
+        "NO": "ASTM_D6522",
+        "NO2": "ASTM_D6522"
+      },
+      "profile_map": {
+        "O2": "PROFILE:DEFAULT",
+        "CO": "PROFILE:DEFAULT",
+        "NO": "PROFILE:DEFAULT",
+        "NO2": "PROFILE:DEFAULT"
+      },
+      "points_policy": {
+        "portable_track": true,
+        "cal_min_points": 2,
+        "lin_min_points": 2,
+        "cal_points_effective": 2,
+        "lin_points_effective": 2
+      },
+      "secondary_required_tests": [],
+      "secondary_available_tests": [],
+      "nox_converter_eff_applicable": true,
+      "nox_converter_eff_enabled": false,
+      "hardware_preset": {
+        "name": "Portable Combustion Monitor",
+        "profile_key": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+        "channel_ids": {
+          "O2": "PCM_O2_FLOAT",
+          "CO": "PCM_CO_FLOAT",
+          "NO": "PCM_NO_FLOAT",
+          "NO2": "PCM_NO2_FLOAT"
+        }
+      },
+      "warnings": [],
+      "resolved_by_analyte": {
+        "O2": {
+          "expected_max": 20.9,
+          "expected_units": "%",
+          "method_recommended": "ASTM_D6522",
+          "method_selected": "ASTM_D6522",
+          "method_effective": "ASTM_D6522",
+          "profile_id": "PROFILE:DEFAULT",
+          "cal_points_effective": 2,
+          "lin_points_effective": 2,
+          "span_suggestion": 25.0,
+          "mid_fraction": 0.5,
+          "mid_suggestion": 12.5
+        },
+        "CO": {
+          "expected_max": 66.0,
+          "expected_units": "ppm",
+          "method_recommended": "ASTM_D6522",
+          "method_selected": "",
+          "method_effective": "ASTM_D6522",
+          "profile_id": "PROFILE:DEFAULT",
+          "cal_points_effective": 2,
+          "lin_points_effective": 2,
+          "span_suggestion": 250.0,
+          "mid_fraction": 0.5,
+          "mid_suggestion": 125.0
+        },
+        "NO": {
+          "expected_max": 44.0,
+          "expected_units": "ppm",
+          "method_recommended": "ASTM_D6522",
+          "method_selected": "ASTM_D6522",
+          "method_effective": "ASTM_D6522",
+          "profile_id": "PROFILE:DEFAULT",
+          "cal_points_effective": 2,
+          "lin_points_effective": 2,
+          "span_suggestion": 100.0,
+          "mid_fraction": 0.5,
+          "mid_suggestion": 50.0
+        },
+        "NO2": {
+          "expected_max": 55.0,
+          "expected_units": "ppm",
+          "method_recommended": "ASTM_D6522",
+          "method_selected": "ASTM_D6522",
+          "method_effective": "ASTM_D6522",
+          "profile_id": "PROFILE:DEFAULT",
+          "cal_points_effective": 2,
+          "lin_points_effective": 2,
+          "span_suggestion": 250.0,
+          "mid_fraction": 0.5,
+          "mid_suggestion": 125.0
+        }
+      },
+      "resolved_iso": "2026-03-31T13:15:52-05:00"
+    },
+    "binding_contract_version": "1.0",
+    "binding_contract_iso": "2026-03-31T13:15:52-05:00"
+  },
+  "reference_audit": {
+    "enabled": false,
+    "provider": "MG2000_FTIR_PRN",
+    "role": "AUDIT",
+    "prn_path": "",
+    "file_pattern": "*.prn",
+    "recursive": false,
+    "freshness_s": 120.0,
+    "column_overrides": {},
+    "units_overrides": {},
+    "method_standard": "ASTM_D6348_12",
+    "offset_recommendations": {
+      "use_global": false,
+      "promote_latest_for_future_projects": false
+    }
+  },
+  "spike_recovery": {
+    "enabled": false,
+    "mandatory": false,
+    "source": "PROJECT_OPTIONAL",
+    "applies_to_mole": true,
+    "applies_to_ftir": false,
+    "requires_flow_restriction": false,
+    "flow_restriction_pct": 10.0,
+    "flow_restriction_summary": "",
+    "criteria_mode": "RECOVERY_PERCENT_BAND",
+    "recovery_pct_min": 70.0,
+    "recovery_pct_max": 130.0,
+    "project_accuracy_dqo_pct": null,
+    "expected_replicates": 1,
+    "method_standard": "ASTM_D6348_12",
+    "method_label": "ASTM D6348-12",
+    "method_basis": "ASTM D6348-12e1 Sections 11.3.5 and Annex A2.4/A5.",
+    "criterion_summary": "Optional spike recovery disabled.",
+    "notes": "",
+    "channels": {}
+  },
+  "qa_qc": {
+    "secondary_test_options": {
+      "CONVERTER_EFF": false
+    },
+    "method_id": "PROFILE:MULTI",
+    "portable_track": true,
+    "persist_cal_to_master_db": true,
+    "diag_optin_cal_lin": false,
+    "significant_digits": 4,
+    "binding_source": "POLLUTANTS",
+    "track": "DIAG",
+    "required_by_policy": false,
+    "profile_effective": "PROFILE:MULTI",
+    "method_map": {
+      "O2": "ASTM_D6522",
+      "CO": "ASTM_D6522",
+      "NO": "ASTM_D6522",
+      "NO2": "ASTM_D6522"
+    },
+    "profile_map": {
+      "O2": "PROFILE:DEFAULT",
+      "CO": "PROFILE:DEFAULT",
+      "NO": "PROFILE:DEFAULT",
+      "NO2": "PROFILE:DEFAULT"
+    },
+    "points_policy": {
+      "portable_track": true,
+      "cal_min_points": 2,
+      "lin_min_points": 2,
+      "cal_points_effective": 2,
+      "lin_points_effective": 2
+    },
+    "secondary_required_tests": [],
+    "secondary_available_tests": [],
+    "nox_converter_eff_applicable": true,
+    "nox_converter_eff_enabled": false,
+    "saved_iso": "2026-03-31T13:15:52-05:00"
+  },
+  "test_matrix": {
+    "profile": "PROFILE:MULTI",
+    "portable_track": true,
+    "required": true,
+    "generated_iso": "2026-03-31T12:09:49-05:00",
+    "tests": [
+      {
+        "id": "CYLINDER_META",
+        "name": "Cylinder Metadata",
+        "desc": "Record cylinder IDs, expiration dates, and standard concentrations/units.",
+        "required": true,
+        "min_points": 0,
+        "points": 0,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "standard_units": null,
+          "low_cylinder_id": null,
+          "low_expiration": null,
+          "low_concentration": null,
+          "mid_cylinder_id": null,
+          "mid_expiration": null,
+          "mid_concentration": null,
+          "high_cylinder_id": null,
+          "high_expiration": null,
+          "high_concentration": null,
+          "notes": null,
+          "entered_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00"
+        }
+      },
+      {
+        "id": "CAL",
+        "name": "Calibration",
+        "desc": "Minimum capture of calibration points/results (portable: 2-point typical).",
+        "required": true,
+        "min_points": 2,
+        "points": 2,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "performed_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00",
+          "standard_units": null,
+          "low_cylinder_id": null,
+          "low_expiration": null,
+          "low_concentration": null,
+          "mid_cylinder_id": null,
+          "mid_expiration": null,
+          "mid_concentration": null,
+          "high_cylinder_id": null,
+          "high_expiration": null,
+          "high_concentration": null,
+          "points_expected": 2,
+          "points_table": "",
+          "notes": null
+        }
+      },
+      {
+        "id": "LIN",
+        "name": "Linearity",
+        "desc": "Minimum capture of linearity points/results (portable: 2-point typical).",
+        "required": true,
+        "min_points": 2,
+        "points": 2,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "performed_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00",
+          "standard_units": null,
+          "points_expected": 2,
+          "points_table": "",
+          "acceptance_criteria": null,
+          "notes": null
+        }
+      },
+      {
+        "id": "DRIFT",
+        "name": "Zero/Span Drift",
+        "desc": "Pre/post drift check (or periodic) as applicable.",
+        "required": false,
+        "min_points": 0,
+        "points": 0,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "performed_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00",
+          "result": null,
+          "notes": null
+        }
+      },
+      {
+        "id": "LEAK",
+        "name": "Leak Check",
+        "desc": "Sample line / system leak check documentation.",
+        "required": false,
+        "min_points": 0,
+        "points": 0,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "performed_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00",
+          "result": null,
+          "notes": null
+        }
+      },
+      {
+        "id": "WARMUP",
+        "name": "Warmup/Stability",
+        "desc": "Analyzer stabilization confirmation prior to capture.",
+        "required": false,
+        "min_points": 0,
+        "points": 0,
+        "performed": false,
+        "waived": false,
+        "waive_reason": null,
+        "results": [],
+        "capture_fields": {
+          "instrument_id": null,
+          "performed_by": null,
+          "timestamp_iso": "2026-03-31T12:09:49-05:00",
+          "result": null,
+          "notes": null
+        }
+      }
+    ]
+  },
+  "regulatory": {
+    "context": {
+      "state": null,
+      "engine_ignition": "UNKNOWN",
+      "engine_service": "UNKNOWN",
+      "engine_cycle": "UNKNOWN",
+      "construction_date": null
+    },
+    "selected_rule_ids": [],
+    "custom_rules": [],
+    "limits": [],
+    "library": {
+      "last_checked_iso": null,
+      "source": "LOCAL_STARTER_PACK"
+    }
+  },
+  "assets_snapshot": {
+    "methods": {},
+    "cylinders": {},
+    "instruments": {}
+  },
+  "paths": {
+    "config_dir": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\configs",
+    "session_config_path": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\configs\\mole_session_2026_03_31_1209.json",
+    "runner_config_path": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\sessions\\2026-03-31\\2026_03_31_1209__katy_texas__20260331_131523\\runner_config.json",
+    "session_profile_path": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\sessions\\2026-03-31\\2026_03_31_1209__katy_texas__20260331_131523\\session_profile.json",
+    "session_dir": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\sessions\\2026-03-31\\2026_03_31_1209__katy_texas__20260331_131523",
+    "daq_run_dir": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\sessions\\2026-03-31\\2026_03_31_1209__katy_texas__20260331_131523",
+    "db_path": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\db\\mole_master.sqlite",
+    "logs_dir": "D:\\codex_environ\\2026_03_24_002\\2026_03_24_002\\mole_das_data\\logs"
+  },
+  "daq_runner": {
+    "reference_audit": {
+      "enabled": false,
+      "provider": "MG2000_FTIR_PRN",
+      "role": "AUDIT",
+      "prn_path": "",
+      "file_pattern": "*.prn",
+      "recursive": false,
+      "freshness_s": 120.0,
+      "column_overrides": {},
+      "units_overrides": {},
+      "method_standard": "ASTM_D6348_12",
+      "offset_recommendations": {
+        "use_global": false,
+        "promote_latest_for_future_projects": false
+      }
+    },
+    "spike_recovery": {
+      "enabled": false,
+      "mandatory": false,
+      "source": "PROJECT_OPTIONAL",
+      "applies_to_mole": true,
+      "applies_to_ftir": false,
+      "requires_flow_restriction": false,
+      "flow_restriction_pct": 10.0,
+      "flow_restriction_summary": "",
+      "criteria_mode": "RECOVERY_PERCENT_BAND",
+      "recovery_pct_min": 70.0,
+      "recovery_pct_max": 130.0,
+      "project_accuracy_dqo_pct": null,
+      "expected_replicates": 1,
+      "method_standard": "ASTM_D6348_12",
+      "method_label": "ASTM D6348-12",
+      "method_basis": "ASTM D6348-12e1 Sections 11.3.5 and Annex A2.4/A5.",
+      "criterion_summary": "Optional spike recovery disabled.",
+      "notes": "",
+      "channels": {}
+    }
+  },
+  "soundtrack": {
+    "enabled": false,
+    "auto_mode": "ALWAYS",
+    "volume": 0.2,
+    "track_rel": "mole_assets/audio/mole_8bit_theme.wav"
+  }
+}

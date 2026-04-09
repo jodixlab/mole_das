@@ -1,0 +1,115 @@
+MOLE-DAS Portable Package Notes
+===============================
+
+Deployment:
+  - Workspace / package basis: 2026_04_07_001
+  - Package refresh date: 2026-04-07
+  - Runtime lineage basis: 2026_03_24_002
+  - Runtime identity: MOLE DAS v10.0.25A - SIM Training Foundations
+  - Primary code root: MOLE_code\
+
+Package layout that must remain intact:
+  - MOLE_code\
+  - mole_das_data\
+  - mole_assets\
+  - docs\
+  - requirements.txt
+  - requirements_optional.txt
+  - INSTALL_MOLE_DAS.bat
+
+Primary operator launch path:
+  - Start in the Wizard, not the runner.
+  - Recommended:
+      MOLE_code\run_wizard_console.bat
+  - Standard:
+      MOLE_code\run_wizard.bat
+
+Why the Wizard is the primary entrypoint:
+  - It is the authoritative configuration layer.
+  - It now contains the session-intent policy gates.
+  - It now contains the Documents Library tab for operator reference.
+  - DAQ Runner launch behavior depends on the saved Wizard session.
+
+Current runner launch model:
+  - Only two normal operator launch buttons are used:
+      - DAQ Runner (Test)
+      - DAQ Runner (SIM)
+  - Diagnostics-only OFF:
+      launches the full formal DAQ Runner.
+  - Diagnostics-only ON:
+      launches the diagnostics-only shell using the same two buttons.
+
+Current diagnostics standards:
+  - Diagnostics is explicitly non-compliance.
+  - May Support Compliance is automatically disabled when Diagnostics-only is selected.
+  - Diagnostics includes:
+      live pollutant display
+      mass rates
+      live graphs
+      weather/site conditions
+      fuel basis
+      Method 19 operator inputs
+      diagnostics verification
+      diagnostics print panel
+      trim panel
+  - Diagnostics excludes:
+      formal compliance support
+      report pack generation
+      formal QA/QC console use as institutional record
+      Method 2 / STACK_MEASURED input workflow
+  - Diagnostics uses Method 19 only.
+
+Carried-forward runtime surfaces in this package:
+  - FTIR ingest, method-driven spike recovery, and shared method/spec evaluation
+    remain present in the active runtime.
+  - ASTM D3588 fuel-analysis methodology selection and fuel-analysis report-pack
+    outputs remain present.
+  - Runner-derived exports remain active, including `exports\records.csv`,
+    report-pack outputs, and calculation-audit CSV generation.
+  - Live normalization-aware runner state remains active, including O2-corrected
+    display/status handling where the workflow exposes it.
+  - Live mass-rate surfaces remain active, including VOC display on a
+    propane-equivalent basis where configured by the workflow.
+
+Diagnostics responsibility controls:
+  - A startup responsibility notice is shown and requires confirmation.
+  - If project pollutant limits are entered, diagnostics requires:
+      pre-test verification before acquisition
+      post-test verification before final export
+  - Diagnostics FAIL wording is reserved for limit/calibration-limit conditions only.
+
+Runtime install standard:
+  - Validated target: Python 3.12 x64
+  - Installer:
+      INSTALL_MOLE_DAS.bat
+  - The installer creates or repairs:
+      MOLE_code\.venv
+
+Known deployment boundary:
+  - If MOLE_code\.venv points to a removed Python install, launcher batch files will fail
+    until the venv is rebuilt.
+  - Resolution:
+      delete or rename MOLE_code\.venv
+      rerun INSTALL_MOLE_DAS.bat
+
+Current build / release verification standard:
+  - python -m py_compile MOLE_code\mole_code_das_2026_01_21_v10_0_22_ARCADE_RELEASE.py
+  - python -m py_compile MOLE_code\mole_daq_runner_2026_02_03_v10_0_24_ARCADE_RELEASE.py
+  - python MOLE_code\mole_smoketest.py --root .
+  - MOLE_code\run_release_gate.bat
+
+Release metadata standard:
+  - BUILD_MANIFEST.json should be regenerated from the current package contents
+    before a certified runtime ZIP is cut.
+  - The release gate writes certified ZIP artifacts and certificates under
+    RELEASES\.
+
+Operational troubleshooting notes:
+  - Use console launchers first when debugging startup or UI issues.
+  - Logs are written to mole_das_data\logs.
+  - Direct runner launchers are for troubleshooting, replay, or special test flows.
+  - Operator reference documents are available from the Wizard Documents Library tab
+    and from docs\ directly.
+  - Use docs\MOLE_DAS_v10_0_25A_PACKAGE_REFRESH_2026_04_07_RELEASE_BULLETIN.md
+    and docs\FEATURE_PORT_AUDIT_2026_04_07.md for the current package-status
+    summary and the original April 7 audit record.

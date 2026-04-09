@@ -1,0 +1,558 @@
+{
+  "schema_version": "mole_federal_reg_library_cache_v2",
+  "last_sync_iso": "2026-03-12T10:20:11-05:00",
+  "ecfr_title40": {
+    "title": 40,
+    "name": "Protection of Environment",
+    "up_to_date_as_of": "2026-03-10",
+    "latest_issue_date": "2026-03-10",
+    "latest_amended_on": "2026-03-10"
+  },
+  "fr_updates": {
+    "40CFR_Part_60": {
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-04646",
+          "publication_date": "2026-03-10",
+          "type": "Rule",
+          "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+          "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+        },
+        {
+          "document_number": "2026-00677",
+          "publication_date": "2026-01-15",
+          "type": "Rule",
+          "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-23275",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23275/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23275.pdf"
+        },
+        {
+          "document_number": "2025-21788",
+          "publication_date": "2025-12-03",
+          "type": "Rule",
+          "title": "Oil and Natural Gas Sector Climate Review: Extension of Deadlines in Standards of Performance for New, Reconstructed, and Modified Sources and Emissions Guidelines for Existing Sources",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/03/2025-21788/oil-and-natural-gas-sector-climate-review-extension-of-deadlines-in-standards-of-performance-for-new",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-03/pdf/2025-21788.pdf"
+        }
+      ]
+    },
+    "40CFR_Part_63": {
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-04304",
+          "publication_date": "2026-03-04",
+          "type": "Proposed Rule",
+          "title": "National Emission Standards for Marine Tank Vessel Loading Operations: Technology Review",
+          "html_url": "https://www.federalregister.gov/documents/2026/03/04/2026-04304/national-emission-standards-for-marine-tank-vessel-loading-operations-technology-review",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-04/pdf/2026-04304.pdf"
+        },
+        {
+          "document_number": "2026-03891",
+          "publication_date": "2026-02-26",
+          "type": "Proposed Rule",
+          "title": "Approval of Missouri's Request for Partial Program Delegation of Clean Air Act Section 112(r) Prevention of Accidental Release Program",
+          "html_url": "https://www.federalregister.gov/documents/2026/02/26/2026-03891/approval-of-missouris-request-for-partial-program-delegation-of-clean-air-act-section-112r",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-26/pdf/2026-03891.pdf"
+        },
+        {
+          "document_number": "2026-03638",
+          "publication_date": "2026-02-24",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+          "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+        },
+        {
+          "document_number": "2025-24202",
+          "publication_date": "2026-01-02",
+          "type": "Rule",
+          "title": "Congressional Review Act Revocation of 2024 Review of Final Rule Reclassification of Major Sources as Area Sources Under Section 112 of the Clean Air Act",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/02/2025-24202/congressional-review-act-revocation-of-2024-review-of-final-rule-reclassification-of-major-sources",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-02/pdf/2025-24202.pdf"
+        },
+        {
+          "document_number": "2025-24149",
+          "publication_date": "2026-01-02",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/02/2025-24149/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-02/pdf/2025-24149.pdf"
+        }
+      ]
+    }
+  },
+  "fr_rule_updates": {
+    "EPA_NSPS_IIII": {
+      "id": "EPA_NSPS_IIII",
+      "name": "NSPS Subpart IIII \u2014 Stationary Compression Ignition (CI) ICE",
+      "citation": "40 CFR Part 60, Subpart IIII",
+      "part": 60,
+      "subpart": "IIII",
+      "term": "Subpart IIII",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-00677",
+          "publication_date": "2026-01-15",
+          "type": "Rule",
+          "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-23275",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23275/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23275.pdf"
+        },
+        {
+          "document_number": "2025-12520",
+          "publication_date": "2025-07-07",
+          "type": "Proposed Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/07/07/2025-12520/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-07-07/pdf/2025-12520.pdf"
+        },
+        {
+          "document_number": "2024-18766",
+          "publication_date": "2024-08-30",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants: Reciprocating Internal Combustion Engines and New Source Performance Standards: Internal Combustion Engines; Electronic Reporting",
+          "html_url": "https://www.federalregister.gov/documents/2024/08/30/2024-18766/national-emission-standards-for-hazardous-air-pollutants-reciprocating-internal-combustion-engines",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2024-08-30/pdf/2024-18766.pdf"
+        }
+      ]
+    },
+    "EPA_NSPS_JJJJ": {
+      "id": "EPA_NSPS_JJJJ",
+      "name": "NSPS Subpart JJJJ \u2014 Stationary Spark Ignition (SI) ICE",
+      "citation": "40 CFR Part 60, Subpart JJJJ",
+      "part": 60,
+      "subpart": "JJJJ",
+      "term": "Subpart JJJJ",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-04646",
+          "publication_date": "2026-03-10",
+          "type": "Rule",
+          "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+          "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+        },
+        {
+          "document_number": "2026-00677",
+          "publication_date": "2026-01-15",
+          "type": "Rule",
+          "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-23275",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23275/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23275.pdf"
+        },
+        {
+          "document_number": "2025-12520",
+          "publication_date": "2025-07-07",
+          "type": "Proposed Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/07/07/2025-12520/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-07-07/pdf/2025-12520.pdf"
+        }
+      ]
+    },
+    "EPA_NESHAP_ZZZZ": {
+      "id": "EPA_NESHAP_ZZZZ",
+      "name": "NESHAP Subpart ZZZZ \u2014 RICE MACT",
+      "citation": "40 CFR Part 63, Subpart ZZZZ",
+      "part": 63,
+      "subpart": "ZZZZ",
+      "term": "Subpart ZZZZ",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-03638",
+          "publication_date": "2026-02-24",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+          "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+        },
+        {
+          "document_number": "2025-24149",
+          "publication_date": "2026-01-02",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/02/2025-24149/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-02/pdf/2025-24149.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-11265",
+          "publication_date": "2025-06-20",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/06/20/2025-11265/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-06-20/pdf/2025-11265.pdf"
+        },
+        {
+          "document_number": "2024-31226",
+          "publication_date": "2025-01-07",
+          "type": "Rule",
+          "title": "Review of Final Rule Reclassification of Major Sources as Area Sources Under Section 112 of the Clean Air Act; Correction",
+          "html_url": "https://www.federalregister.gov/documents/2025/01/07/2024-31226/review-of-final-rule-reclassification-of-major-sources-as-area-sources-under-section-112-of-the",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-01-07/pdf/2024-31226.pdf"
+        }
+      ]
+    },
+    "EPA_NESHAP_DDDDD": {
+      "id": "EPA_NESHAP_DDDDD",
+      "name": "NESHAP Subpart DDDDD \u2014 Boiler/Process Heater MACT (Major Sources)",
+      "citation": "40 CFR Part 63, Subpart DDDDD",
+      "part": 63,
+      "subpart": "DDDDD",
+      "term": "Subpart DDDDD",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-03638",
+          "publication_date": "2026-02-24",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+          "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+        },
+        {
+          "document_number": "2025-24149",
+          "publication_date": "2026-01-02",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/02/2025-24149/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-02/pdf/2025-24149.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-11265",
+          "publication_date": "2025-06-20",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/06/20/2025-11265/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-06-20/pdf/2025-11265.pdf"
+        },
+        {
+          "document_number": "2024-31226",
+          "publication_date": "2025-01-07",
+          "type": "Rule",
+          "title": "Review of Final Rule Reclassification of Major Sources as Area Sources Under Section 112 of the Clean Air Act; Correction",
+          "html_url": "https://www.federalregister.gov/documents/2025/01/07/2024-31226/review-of-final-rule-reclassification-of-major-sources-as-area-sources-under-section-112-of-the",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-01-07/pdf/2024-31226.pdf"
+        }
+      ]
+    },
+    "EPA_NESHAP_JJJJJJ": {
+      "id": "EPA_NESHAP_JJJJJJ",
+      "name": "NESHAP Subpart JJJJJJ \u2014 Boiler MACT (Area Sources)",
+      "citation": "40 CFR Part 63, Subpart JJJJJJ",
+      "part": 63,
+      "subpart": "JJJJJJ",
+      "term": "Subpart JJJJJJ",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-03638",
+          "publication_date": "2026-02-24",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+          "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+        },
+        {
+          "document_number": "2025-24149",
+          "publication_date": "2026-01-02",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/02/2025-24149/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-02/pdf/2025-24149.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-11265",
+          "publication_date": "2025-06-20",
+          "type": "Rule",
+          "title": "National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/06/20/2025-11265/national-emission-standards-for-hazardous-air-pollutants-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-06-20/pdf/2025-11265.pdf"
+        },
+        {
+          "document_number": "2024-31226",
+          "publication_date": "2025-01-07",
+          "type": "Rule",
+          "title": "Review of Final Rule Reclassification of Major Sources as Area Sources Under Section 112 of the Clean Air Act; Correction",
+          "html_url": "https://www.federalregister.gov/documents/2025/01/07/2024-31226/review-of-final-rule-reclassification-of-major-sources-as-area-sources-under-section-112-of-the",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-01-07/pdf/2024-31226.pdf"
+        }
+      ]
+    },
+    "EPA_NSPS_DB": {
+      "id": "EPA_NSPS_DB",
+      "name": "NSPS Subpart Db \u2014 Industrial-Commercial-Institutional Steam Generating Units",
+      "citation": "40 CFR Part 60, Subpart Db",
+      "part": 60,
+      "subpart": "Db",
+      "term": "Subpart Db",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-04646",
+          "publication_date": "2026-03-10",
+          "type": "Rule",
+          "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+          "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+        },
+        {
+          "document_number": "2026-00677",
+          "publication_date": "2026-01-15",
+          "type": "Rule",
+          "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-23275",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23275/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23275.pdf"
+        },
+        {
+          "document_number": "2025-12520",
+          "publication_date": "2025-07-07",
+          "type": "Proposed Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/07/07/2025-12520/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-07-07/pdf/2025-12520.pdf"
+        }
+      ]
+    },
+    "EPA_NSPS_DC": {
+      "id": "EPA_NSPS_DC",
+      "name": "NSPS Subpart Dc \u2014 Small Industrial-Commercial-Institutional Steam Generating Units",
+      "citation": "40 CFR Part 60, Subpart Dc",
+      "part": 60,
+      "subpart": "Dc",
+      "term": "Subpart Dc",
+      "query_since": null,
+      "count": 5,
+      "top": [
+        {
+          "document_number": "2026-04646",
+          "publication_date": "2026-03-10",
+          "type": "Rule",
+          "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+          "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+        },
+        {
+          "document_number": "2026-00677",
+          "publication_date": "2026-01-15",
+          "type": "Rule",
+          "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+          "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+        },
+        {
+          "document_number": "2025-23284",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards and National Emission Standards for Hazardous Air Pollutants; Delegation of Authority to Louisiana",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23284/new-source-performance-standards-and-national-emission-standards-for-hazardous-air-pollutants",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23284.pdf"
+        },
+        {
+          "document_number": "2025-23275",
+          "publication_date": "2025-12-18",
+          "type": "Rule",
+          "title": "New Source Performance Standards; Delegation of Authority to Oklahoma",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/18/2025-23275/new-source-performance-standards-delegation-of-authority-to-oklahoma",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-18/pdf/2025-23275.pdf"
+        },
+        {
+          "document_number": "2025-21788",
+          "publication_date": "2025-12-03",
+          "type": "Rule",
+          "title": "Oil and Natural Gas Sector Climate Review: Extension of Deadlines in Standards of Performance for New, Reconstructed, and Modified Sources and Emissions Guidelines for Existing Sources",
+          "html_url": "https://www.federalregister.gov/documents/2025/12/03/2025-21788/oil-and-natural-gas-sector-climate-review-extension-of-deadlines-in-standards-of-performance-for-new",
+          "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2025-12-03/pdf/2025-21788.pdf"
+        }
+      ]
+    }
+  },
+  "federal_rule_latest": {
+    "EPA_NSPS_IIII": {
+      "id": "EPA_NSPS_IIII",
+      "name": "NSPS Subpart IIII \u2014 Stationary Compression Ignition (CI) ICE",
+      "citation": "40 CFR Part 60, Subpart IIII",
+      "part": 60,
+      "subpart": "IIII",
+      "document_number": "2026-00677",
+      "publication_date": "2026-01-15",
+      "title": "New Source Performance Standards Review for Stationary Combustion Turbines and Stationary Gas Turbines",
+      "html_url": "https://www.federalregister.gov/documents/2026/01/15/2026-00677/new-source-performance-standards-review-for-stationary-combustion-turbines-and-stationary-gas",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-01-15/pdf/2026-00677.pdf"
+    },
+    "EPA_NSPS_JJJJ": {
+      "id": "EPA_NSPS_JJJJ",
+      "name": "NSPS Subpart JJJJ \u2014 Stationary Spark Ignition (SI) ICE",
+      "citation": "40 CFR Part 60, Subpart JJJJ",
+      "part": 60,
+      "subpart": "JJJJ",
+      "document_number": "2026-04646",
+      "publication_date": "2026-03-10",
+      "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+      "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+    },
+    "EPA_NESHAP_ZZZZ": {
+      "id": "EPA_NESHAP_ZZZZ",
+      "name": "NESHAP Subpart ZZZZ \u2014 RICE MACT",
+      "citation": "40 CFR Part 63, Subpart ZZZZ",
+      "part": 63,
+      "subpart": "ZZZZ",
+      "document_number": "2026-03638",
+      "publication_date": "2026-02-24",
+      "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+      "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+    },
+    "EPA_NESHAP_DDDDD": {
+      "id": "EPA_NESHAP_DDDDD",
+      "name": "NESHAP Subpart DDDDD \u2014 Boiler/Process Heater MACT (Major Sources)",
+      "citation": "40 CFR Part 63, Subpart DDDDD",
+      "part": 63,
+      "subpart": "DDDDD",
+      "document_number": "2026-03638",
+      "publication_date": "2026-02-24",
+      "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+      "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+    },
+    "EPA_NESHAP_JJJJJJ": {
+      "id": "EPA_NESHAP_JJJJJJ",
+      "name": "NESHAP Subpart JJJJJJ \u2014 Boiler MACT (Area Sources)",
+      "citation": "40 CFR Part 63, Subpart JJJJJJ",
+      "part": 63,
+      "subpart": "JJJJJJ",
+      "document_number": "2026-03638",
+      "publication_date": "2026-02-24",
+      "title": "National Emission Standards for Hazardous Air Pollutants: Coal- and Oil-Fired Electric Utility Steam Generating Units: Final Repeal",
+      "html_url": "https://www.federalregister.gov/documents/2026/02/24/2026-03638/national-emission-standards-for-hazardous-air-pollutants-coal--and-oil-fired-electric-utility-steam",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-02-24/pdf/2026-03638.pdf"
+    },
+    "EPA_NSPS_DB": {
+      "id": "EPA_NSPS_DB",
+      "name": "NSPS Subpart Db \u2014 Industrial-Commercial-Institutional Steam Generating Units",
+      "citation": "40 CFR Part 60, Subpart Db",
+      "part": 60,
+      "subpart": "Db",
+      "document_number": "2026-04646",
+      "publication_date": "2026-03-10",
+      "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+      "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+    },
+    "EPA_NSPS_DC": {
+      "id": "EPA_NSPS_DC",
+      "name": "NSPS Subpart Dc \u2014 Small Industrial-Commercial-Institutional Steam Generating Units",
+      "citation": "40 CFR Part 60, Subpart Dc",
+      "part": 60,
+      "subpart": "Dc",
+      "document_number": "2026-04646",
+      "publication_date": "2026-03-10",
+      "title": "Standards of Performance for New Stationary Sources and Emission Guidelines for Existing Sources: Large Municipal Waste Combustors Voluntary Remand Response and Five-Year Review",
+      "html_url": "https://www.federalregister.gov/documents/2026/03/10/2026-04646/standards-of-performance-for-new-stationary-sources-and-emission-guidelines-for-existing-sources",
+      "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-03-10/pdf/2026-04646.pdf"
+    }
+  },
+  "deltas": {}
+}

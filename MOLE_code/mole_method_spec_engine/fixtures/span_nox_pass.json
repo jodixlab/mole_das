@@ -1,0 +1,21 @@
+{
+  "channel": "NOX",
+  "step_state": {
+    "step": "SPAN"
+  },
+  "value_series": [248.8, 249.9, 250.4, 249.7],
+  "targets": {
+    "target": 250.0,
+    "units": "ppm"
+  },
+  "tolerances": {
+    "tol_pct": 2.0,
+    "stability_frac_of_tol": 0.5,
+    "min_stability_abs": 0.5
+  },
+  "expected": {
+    "pass": true,
+    "status": "OK",
+    "basis": "RECOVERY_PCT"
+  }
+}

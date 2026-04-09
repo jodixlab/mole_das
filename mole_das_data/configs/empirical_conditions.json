@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "constants": {
+    "T_STD_F": 60.0,
+    "P_STD_PSIA": 14.696,
+    "Z_STD": 1.0
+  },
+  "formulas": [
+    {
+      "category": "Gas & Thermo",
+      "key": "EXHAUST_STD_FACTOR",
+      "desc": "Std conversion factor for exhaust flow (ACFM\u2192DSCFM)",
+      "expr": "(P_act_psia/P_std_psia)*(T_std_R/T_act_R)*(Z_std/Z_act)",
+      "units": "ratio",
+      "vars": [
+        "P_act_psia",
+        "P_std_psia",
+        "T_std_R",
+        "T_act_R",
+        "Z_act",
+        "Z_std"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Gas & Thermo",
+      "key": "Z_ACT_DEFAULT",
+      "desc": "Compressibility factor at actual conditions (default 1.0)",
+      "expr": "1.0",
+      "units": "-",
+      "vars": [],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Flow",
+      "key": "ACFM_TO_DSCFH",
+      "desc": "ACFM to DSCFH using EXHAUST_STD_FACTOR",
+      "expr": "Q_acfm*60.0*EXHAUST_STD_FACTOR",
+      "units": "dscfh",
+      "vars": [
+        "Q_acfm",
+        "EXHAUST_STD_FACTOR"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Stack Geometry",
+      "key": "AREA_CIRCLE",
+      "desc": "Area of circular stack",
+      "expr": "pi*(D_in/12.0)**2/4.0",
+      "units": "ft^2",
+      "vars": [
+        "D_in"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Stack Geometry",
+      "key": "EQ_DIAM_RECT",
+      "desc": "Equivalent diameter for rectangular duct",
+      "expr": "2.0*(W_in/12.0)*(H_in/12.0)/((W_in/12.0)+(H_in/12.0))",
+      "units": "ft",
+      "vars": [
+        "W_in",
+        "H_in"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Method 1",
+      "key": "M1_IDEAL_UPSTREAM",
+      "desc": "Method 1 ideal upstream distance threshold",
+      "expr": "8.0*D_ft",
+      "units": "ft",
+      "vars": [
+        "D_ft"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Method 1",
+      "key": "M1_IDEAL_DOWNSTREAM",
+      "desc": "Method 1 ideal downstream distance threshold",
+      "expr": "2.0*D_ft",
+      "units": "ft",
+      "vars": [
+        "D_ft"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Deration",
+      "key": "DENSITY_RATIO",
+      "desc": "Air density ratio rho/rho_std using ideal gas + Z",
+      "expr": "(P_act_psia/P_std_psia)*(T_std_R/T_act_R)*(Z_std/Z_act)",
+      "units": "ratio",
+      "vars": [
+        "P_act_psia",
+        "P_std_psia",
+        "T_std_R",
+        "T_act_R",
+        "Z_act",
+        "Z_std"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    },
+    {
+      "category": "Deration",
+      "key": "DERATE_FACTOR",
+      "desc": "Deration factor from density ratio with exponent k",
+      "expr": "DENSITY_RATIO**k",
+      "units": "ratio",
+      "vars": [
+        "DENSITY_RATIO",
+        "k"
+      ],
+      "override_enabled": false,
+      "override_value": null
+    }
+  ]
+}

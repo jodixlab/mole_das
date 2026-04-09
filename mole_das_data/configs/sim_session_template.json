@@ -1,0 +1,95 @@
+{
+  "paths": {
+    "sessions_dir": "../mole_das_data/sessions",
+    "logs_dir": "../mole_das_data/logs"
+  },
+  "project": {
+    "job_id": "SIM_DEMO",
+    "asset_unit_id": "SIM_UNIT"
+  },
+  "session_mode": {
+    "mode": "DIAG",
+    "record_data": true,
+    "tokenize": false,
+    "diagnostic_only": true
+  },
+  "site_conditions": {
+    "mode": "DEFAULT",
+    "T_amb_F": 75.0,
+    "P_bar_psia": 14.7,
+    "RH_frac": 0.5,
+    "z": 1.0,
+    "source": "SIM",
+    "timestamp_iso": null
+  },
+  "fuel": {
+    "fuel_button_code": "NG",
+    "fuel_category": "NATURAL_GAS"
+  },
+  "source": {
+    "source_category": "Engine",
+    "application": "SIM",
+    "manufacturer": "MOLE",
+    "model_number": "SIM",
+    "serial_number": "SIM-0001"
+  },
+  "pollutants": {
+    "selected": [
+      "O2",
+      "CO2",
+      "CH4",
+      "VOC",
+      "NO",
+      "NO2",
+      "NOX"
+    ],
+    "prescriptions": {
+      "O2": {
+        "expected_max": 21.0
+      },
+      "CO2": {
+        "expected_max": 20.0
+      },
+      "CH4": {
+        "expected_max": 10000.0
+      },
+      "VOC": {
+        "expected_max": 5000.0
+      },
+      "NO": {
+        "expected_max": 2000.0
+      },
+      "NO2": {
+        "expected_max": 500.0
+      },
+      "NOX": {
+        "expected_max": 2500.0
+      }
+    }
+  },
+  "qa_qc": {},
+  "daq_driver": {
+    "type": "SIM",
+    "sim": {
+      "seed": 1234,
+      "dt_s": 1.0,
+      "base_ts_iso": "2020-01-01T00:00:00Z",
+      "faults": {
+        "dropout_every": 0,
+        "stuck_after": -1,
+        "drift_per_k": 0.0
+      },
+      "profile": "ENGINE_TRANSIENT",
+      "profile_params": {
+        "tau_s": 2.2,
+        "initial_load": 0.55
+      }
+    }
+  },
+  "daq_runner": {
+    "channel_offsets": {
+      "enabled": false,
+      "channels": {}
+    }
+  }
+}

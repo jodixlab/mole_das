@@ -1,0 +1,69 @@
+Step 1.0 - Open run_wizard.bat "this will likely be a different initiator in the production version of mole-das"
+
+Step 2.0 - If you are creating a new project instance (emissions source profile) - then select "Project Configs (Hub)"; if testing an existing source, select "Load Existing Config..."
+
+*When an existing configurations file is loaded - all of the source data is pulled from the database. You may edit the test matrix, calibration cylinder details, and ny other relevant configurations that may have changed since the last session.
+
+Step 2.1 - In "Project Configs (Hub)" tab, ensure that a Job ID has been created and enter the following:
+
+		1. Project Name (an Operator-generated name which follows a unique naming schema - unique to the Operator's organization).
+		2. Site / Facility (the name of the site and or facility where the source is located).
+		3. Operator (not to be confused with Emissions Technician and/or "Operator") - this is the name of the organization responsible for the emissions project.
+		4. Asset / Unit ID (the asset or unit number associated with the source) - can be operator or vendor-supplied.
+
+Step 2.2 - Session Intent
+
+		Session intent refers to the type of data to be collected. There are four (4) selections:
+
+			1. Record Data - this is selected when the Operator (Emissions Technician) would like to record all aspects of the session (i.e., calibration verification activities, pollutant measurements, associated operational data, etc.).
+			2. Tokenize - blockchain-style approach to session provenance. This is selected when the Operator would like full digital traceability for data collection.
+			3. Diagnostics-only - this routes MOLE-DAS into the diagnostics-only shell for tuning and troubleshooting only. It cannot be used for compliance support.
+			4. May Support Compliance - this is selected whenever the acquired test data will be used for compliance or compliance support. This feature ensures that all data is captured and algorithmically validated.
+
+Step 2.3 - Fuel Category
+
+		Fuel category allows the Operator to select from common fuel types:
+
+			1. NG - Natural Gas
+			2. DSL - Diesel Fuel
+			3. DG - Dual-Fuel (dynamic blend - partially gaseous)
+			4. BG - Biogas Fuel / Digester gas fuel
+			5. RFG - Refinery Fuel Gas
+			6. OT - Other
+
+		*Capture Fuel Analysis (recommended for NG/BG/DG) - a utility that allows the Operator to input site-specific fuel details when a fuel analysis is available.
+
+Step 2.4 - Arcade Soundtrack
+
+		MOLE-DAS has a soundtrack option.To enable sound:
+
+			1. Select "Enable".
+			2. Choose soundtrack to play for:
+				a. ALWAYS (soundtrack plays continuously throughout the session)
+				b. IDLE (soundtrack only plays when the DAQ-RUNNER is not in data collection mode)
+				c. TESTING (soundtrack only plays when the DAQ-RUNNER is in data collection mode - testing)
+				d. OFF (soundtrack is disabled)
+
+Step 3.0 - Job Intake (QA Routing) - an evidence-based utility checklist that provides a qualitative index of data provenance and immutability.
+
+Step 3.1 - Regulatory Purpose
+
+		This section allows the Operator to ascribe site-specific artifacts to the project data. If the test data will be used for compliance and/or compliance support, this section allows for the following:
+
+			1. State - refers to state-level requirements, permit conditions, local cap and trade, and compliance with state implementation planning (SIP) initiatives.
+			2. Federal - refers to new source performance standards (NSPS), national emission standards for hazardous air polluants (NESHAPs), or any other Title V, prevention of significant deterioration (PSD), or other federal air-quality programs.
+			3. Other - refers to any task not related to "State" or "Federal" requirements.
+
+Step 3.2 - Project Checklist
+
+		The Project Checklist Section provides selections and inputs for site-generated artifacts including:
+
+			1. Site-specific fuel-gas analysis - select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field. If "Provided" is selected, the Operator must upload the corresponding fuel-gas analysis.
+			2. Permit information with emission limits (e.g., Table 29) - select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field. If "Provided" is selected, the Operator must upload the corresponding permit information.
+			3. Manufacturer technical data sheets (TMI) - refers to any manufacturer-related publications or process runs; select "Provided" or "Not Available". If "Provided is selected, the Operator must upload the correct TMI artifacts.
+			4. Site/facility contact information (name/phone/email) - refers to the personnel who has ordered and/or coordinated facility operations during the time of testing. Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.
+			5. Regulatory region (county/parish) - refers to the geo-spatial location of the site in the context of regulatory jurisdiction. Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.
+			6. Agency identification number (RN/AI/etc.) - refers to the state/region-specific regulatory identification number (varies by state/region). Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.
+			7. Physical location (coordinates) - refers the the exact geographic location of the source. If unknown, this data can be collected automatically by the "Coordinates Fetch" feature on the "Site Conditions" tab. Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.
+			8. Site elevation (ft AMSL) - refers to the elevation (altitude) of the site where the source is located. Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.
+			9. Regulatory purpose (State/Federal/Other) - refers to ANY regulatory and/or compliance action associated with the testing project (more specific). Select "Provided" or "Not Available". If "Not Available" - a valid reason should be provided in the text field.

@@ -1,0 +1,8 @@
+{
+  "meta": {
+    "schema": "MOLE_CYLINDERS_DB_v1",
+    "created_iso": "2026-02-24T18:49:20+00:00",
+    "notes": "Populate with your certified gas cylinders. Wizard treats as optional for now."
+  },
+  "cylinders": []
+}
