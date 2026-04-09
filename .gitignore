@@ -1,0 +1,38 @@
+.vs/
+~$*
+
+# Python build/runtime noise
+**/__pycache__/
+*.py[cod]
+
+# Embedded environments and local tool output
+MOLE_code/.venv/
+MOLE_code/.venv*/
+MOLE_code/.venv_stale/
+MOLE_code/.venv_stale*/
+MOLE_code/exports/
+
+# Generated release artifacts
+RELEASES/
+BUILD_MANIFEST.json
+*.zip
+
+# Runtime data stores and transient outputs
+mole_das_data/backups/
+mole_das_data/cache/
+mole_das_data/daq_runs/
+mole_das_data/db/
+mole_das_data/exports/
+mole_das_data/inbox_archive/
+mole_das_data/inbox_packages/
+mole_das_data/logs/
+mole_das_data/sessions/
+
+# Keep the training folder scaffold, but not local training data
+mole_das_data/training/*
+!mole_das_data/training/KEEP.txt
+
+# SQLite runtime files anywhere they appear
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

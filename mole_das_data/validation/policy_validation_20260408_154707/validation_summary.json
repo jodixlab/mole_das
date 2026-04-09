@@ -1,0 +1,109 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_154707",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_154707\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [
+    {
+      "kind": "showwarning",
+      "title": "Post-Cal Required",
+      "message": "Post-Cal/Bias check is required after Run 1. Complete POST-ZERO and POST-SPAN before starting the next run."
+    }
+  ],
+  "steps": [
+    "start acquisition",
+    "initiate zero air",
+    "capture pre zero",
+    "initiate span gas",
+    "capture pre span",
+    "start test run1",
+    "end test run1",
+    "initiate post zero air",
+    "capture post zero all",
+    "initiate post span gas",
+    "capture post span all",
+    "start test run2",
+    "stop acquisition",
+    "destroy root"
+  ],
+  "transition_wait_s": 35,
+  "startup_wait_s": 8,
+  "capture_states": [
+    {
+      "step": "zero",
+      "states": [
+        {
+          "code": "O2",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "CO",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "NOX",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "VOC",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        }
+      ]
+    },
+    {
+      "step": "span",
+      "states": [
+        {
+          "code": "O2",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "CO",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "NOX",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        },
+        {
+          "code": "VOC",
+          "states": [
+            "disabled",
+            "disabled"
+          ]
+        }
+      ]
+    }
+  ],
+  "run_ui_shell_rc": 0,
+  "postcal_required": true,
+  "runs": [
+    {
+      "run_no": 1,
+      "start_iso": "2026-04-08T15:48:33-05:00",
+      "end_iso": "2026-04-08T15:48:40-05:00"
+    }
+  ],
+  "promoted": null,
+  "skipped": null,
+  "active_eval": {}
+}

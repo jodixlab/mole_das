@@ -1,0 +1,24 @@
+{
+  "schema": "mole_config_schema_v1",
+  "generated_at": "2026-02-16T16:48:08.949594+00:00",
+  "notes": "High-level schema used by mole_preflight and future migrations. This is intentionally lightweight and permissive.",
+  "required_top_level_keys": [
+    "paths",
+    "sqlite",
+    "release",
+    "hardware",
+    "ui"
+  ],
+  "optional_top_level_keys": [
+    "hardware_profiles",
+    "test_matrix",
+    "qaqc",
+    "soundtrack",
+    "channel_offsets",
+    "provenance"
+  ],
+  "versioning": {
+    "schema_version": "mole_config_v1",
+    "schema_version_int": 1
+  }
+}

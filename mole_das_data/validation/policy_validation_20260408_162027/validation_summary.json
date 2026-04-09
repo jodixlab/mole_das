@@ -1,0 +1,3932 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_162027",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_162027\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [],
+  "trace": [
+    "[16:20:29] click Start Acquisition [state=normal]",
+    "[16:20:29] phase -> wait_live_then_zero",
+    "[16:20:31] click Initiate ZERO AIR [state=normal]",
+    "[16:20:31] phase -> wait_zero_capture",
+    "[16:21:07] click Capture ZERO O2 [state=normal]",
+    "[16:21:08] click Capture ZERO CO [state=normal]",
+    "[16:21:08] click Capture ZERO NOX [state=normal]",
+    "[16:21:09] click Capture ZERO VOC [state=normal]",
+    "[16:21:10] phase -> start_span",
+    "[16:21:11] click Initiate SPAN GAS [state=normal]",
+    "[16:21:12] phase -> wait_span_capture",
+    "[16:22:58] click Capture SPAN O2 [state=normal]",
+    "[16:22:59] click Capture SPAN CO [state=normal]",
+    "[16:23:01] click Capture SPAN NOX [state=normal]",
+    "[16:23:03] click Capture SPAN VOC [state=normal]",
+    "[16:23:05] phase -> start_run1",
+    "[16:23:08] click Start Test Run1 [state=normal]",
+    "[16:23:08] phase -> wait_end_run1",
+    "[16:23:15] click End Test Run1 [state=normal]",
+    "[16:23:15] phase -> start_post_zero",
+    "[16:23:17] click Initiate POST ZERO AIR [state=normal]",
+    "[16:23:17] phase -> wait_post_zero_capture",
+    "[16:23:49] click Capture POST ZERO (all) [state=normal]",
+    "[16:23:51] phase -> start_post_span",
+    "[16:23:53] click Initiate POST SPAN GAS [state=normal]",
+    "[16:23:53] phase -> wait_post_span_capture",
+    "[16:24:28] click Capture POST SPAN (all) [state=normal]",
+    "[16:24:31] phase -> wait_postcal_finalize",
+    "[16:24:31] postcal finalized with pass=True promoted=['CO', 'NOX']",
+    "[16:24:31] click Start Test Run2 [state=normal]",
+    "[16:24:32] phase -> wait_end_run2",
+    "[16:24:36] click End Test Run2 [state=normal]",
+    "[16:24:37] phase -> shutdown",
+    "[16:24:38] click Stop Acquisition [state=normal]",
+    "[16:24:38] destroy root"
+  ],
+  "automation_errors": [],
+  "run_ui_shell_rc": 0,
+  "postcal_required": true,
+  "active_run_index": 1,
+  "runs": [
+    {
+      "run_no": 1,
+      "start_iso": "2026-04-08T16:23:08-05:00",
+      "end_iso": "2026-04-08T16:23:15-05:00",
+      "notes": "AUTO_START_TEST",
+      "target_duration_s": 60,
+      "target_duration_min": 1.0,
+      "target_duration_source": "TEST_MATRIX_RUN"
+    },
+    {
+      "run_no": 2,
+      "start_iso": "2026-04-08T16:24:31-05:00",
+      "end_iso": "2026-04-08T16:24:36-05:00",
+      "notes": "AUTO_START_TEST",
+      "target_duration_s": 60,
+      "target_duration_min": 1.0,
+      "target_duration_source": "TEST_MATRIX_RUN"
+    }
+  ],
+  "capture_unlocks": [
+    {
+      "step": "pre_zero",
+      "gate": "Capture gate: ZERO | Ready (4/4 stable).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "step": "pre_span",
+      "gate": "Capture gate: SPAN | Ready (recommended soak met).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "step": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Ready (4/4 stable).",
+      "button_state": "normal"
+    },
+    {
+      "step": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Ready (4/4 stable).",
+      "button_state": "normal"
+    }
+  ],
+  "capture_state_samples": [
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 15 s fresh-window minimum remaining | 60 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 15 s fresh-window minimum remaining | 60 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 45 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 45 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 45 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 44 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 44 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 43 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 43 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 42 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 42 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 41 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 41 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 41 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 40 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 40 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 39 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 39 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 38 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 38 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 38 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 37 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 37 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 36 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 36 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 35 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 35 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 35 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 34 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 34 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 33 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 33 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 32 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 32 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 32 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 31 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 31 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 30 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 30 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 30 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 29 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 29 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 28 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 28 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 27 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 27 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 26 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 26 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 25 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 25 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Wait: 25 s soak remaining | 3/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_zero",
+      "gate": "Capture gate: ZERO | Ready (4/4 stable).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 15 s fresh-window minimum remaining | 60 s soak remaining | 4/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 45 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 45 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 44 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 44 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 43 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 43 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 42 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 41 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 41 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 40 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 40 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 39 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 38 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 37 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 36 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 36 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 35 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 33 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 31 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 28 s soak remaining | 0/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 26 s soak remaining | 2/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Wait: 23 s soak remaining | 2/4 stable.",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "disabled"
+        },
+        {
+          "code": "CO",
+          "state": "disabled"
+        },
+        {
+          "code": "NOX",
+          "state": "disabled"
+        },
+        {
+          "code": "VOC",
+          "state": "disabled"
+        }
+      ]
+    },
+    {
+      "tag": "pre_span",
+      "gate": "Capture gate: SPAN | Ready (recommended soak met).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 15 s fresh-window minimum remaining | 60 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 45 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 45 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 44 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 44 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 44 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 43 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 43 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 42 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 42 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 41 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 41 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 41 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 40 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 40 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 39 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 39 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 38 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 38 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 37 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 37 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 37 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 36 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 36 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 35 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 35 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 34 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 34 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 34 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 33 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 33 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 32 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 32 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 31 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 31 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 31 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 30 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 30 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 29 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 29 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 29 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Wait: 28 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Ready (4/4 stable).",
+      "button_state": "normal",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 0/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 15 s fresh-window minimum remaining | 60 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 14 s fresh-window minimum remaining | 59 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 13 s fresh-window minimum remaining | 58 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 12 s fresh-window minimum remaining | 57 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 11 s fresh-window minimum remaining | 56 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 10 s fresh-window minimum remaining | 55 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 9 s fresh-window minimum remaining | 54 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 8 s fresh-window minimum remaining | 53 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 7 s fresh-window minimum remaining | 52 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 6 s fresh-window minimum remaining | 51 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 5 s fresh-window minimum remaining | 50 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 4 s fresh-window minimum remaining | 49 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 3 s fresh-window minimum remaining | 48 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 2 s fresh-window minimum remaining | 47 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 1 s fresh-window minimum remaining | 46 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 45 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 45 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 44 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 44 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 43 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 43 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 42 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 42 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 42 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 41 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 41 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 40 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 40 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 39 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 39 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 38 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 37 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 36 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 34 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 33 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 32 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 32 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 31 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 31 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 30 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 30 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 30 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 29 s soak remaining | 0/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 29 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 29 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 28 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 28 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 28 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 27 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 27 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 27 s soak remaining | 1/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 26 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 26 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Wait: 26 s soak remaining | 2/4 stable.",
+      "button_state": "disabled",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    },
+    {
+      "tag": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Ready (4/4 stable).",
+      "button_state": "normal",
+      "post_status": "Post-Cal REQUIRED for Run 1 (zero 4/4, span 0/4)"
+    }
+  ],
+  "promoted": {
+    "CO": {
+      "bias": -0.17231000000000002,
+      "drift_per_hr": -3.7626666666666675,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.17231000000000002,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    },
+    "NOX": {
+      "bias": -0.5270444444444444,
+      "drift_per_hr": -11.63358024691358,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.5270444444444444,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    }
+  },
+  "skipped": {
+    "O2": {
+      "status": "MANUAL_ONLY",
+      "method_effective": "EPA_3A_O2",
+      "profile_id": "PROFILE:EPA_3A_O2",
+      "track": "PROJECT",
+      "reason": "EPA_3A_O2 keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "disabled_existing_auto": false
+    },
+    "VOC": {
+      "status": "MANUAL_ONLY",
+      "method_effective": "EPA_25A_VOC",
+      "profile_id": "PROFILE:EPA_25A_VOC",
+      "track": "PROJECT",
+      "reason": "EPA_25A_VOC keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "disabled_existing_auto": false
+    }
+  },
+  "pollutant_adjustment_channels": {
+    "CO": {
+      "enabled": true,
+      "bias": -0.17231000000000002,
+      "drift_per_hr": -3.7626666666666675,
+      "note": "Auto-promoted from Post-Cal Run 1: bias=0.00, drift/hr=-3.8",
+      "updated_by": "encino_environmental",
+      "updated_iso": "2026-04-08T16:24:30-05:00",
+      "source": "POSTCAL_AUTO",
+      "source_run_no": 1,
+      "effective_after_run_no": 1
+    },
+    "NOX": {
+      "enabled": true,
+      "bias": -0.5270444444444444,
+      "drift_per_hr": -11.63358024691358,
+      "note": "Auto-promoted from Post-Cal Run 1: bias=0.00, drift/hr=-12",
+      "updated_by": "encino_environmental",
+      "updated_iso": "2026-04-08T16:24:30-05:00",
+      "source": "POSTCAL_AUTO",
+      "source_run_no": 1,
+      "effective_after_run_no": 1
+    }
+  },
+  "active_eval": {
+    "CO": {
+      "enabled": true,
+      "source": "POSTCAL_AUTO",
+      "effective_after_run_no": 1,
+      "is_active_now": true
+    },
+    "NOX": {
+      "enabled": true,
+      "source": "POSTCAL_AUTO",
+      "effective_after_run_no": 1,
+      "is_active_now": true
+    }
+  }
+}

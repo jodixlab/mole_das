@@ -1,0 +1,37 @@
+{
+  "channel": "NOX",
+  "observed": {
+    "raw": 40.0,
+    "units": "ppm"
+  },
+  "limits": [
+    {
+      "pollutant": "NOX",
+      "value": 60.0,
+      "units": "ppmvd",
+      "basis": "DRY @15% O2",
+      "o2_ref_pct": 15.0
+    }
+  ],
+  "context": {
+    "raw_is_wet": true,
+    "apply_o2_correction": true,
+    "o2_meas_pct": 10.0,
+    "co2_meas_pct": 8.0,
+    "combustion_model": {
+      "wet_mol_fracs": {
+        "H2O": 0.12,
+        "CO2": 0.08
+      },
+      "dry_mol_fracs": {
+        "CO2": 0.09,
+        "O2": 0.0
+      }
+    }
+  },
+  "expected": {
+    "compare_source": "O2_CORR",
+    "status": "PASS",
+    "pass": true
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_163407",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_163407\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [],
+  "trace": [
+    "[16:34:09] click Start Acquisition [state=normal]",
+    "[16:34:09] phase -> wait_live_then_zero",
+    "[16:34:11] click Initiate ZERO AIR [state=normal]",
+    "[16:34:11] phase -> wait_zero_capture",
+    "[16:34:47] click Capture ZERO O2 [state=normal]",
+    "[16:34:47] click Capture ZERO CO [state=normal]",
+    "[16:34:48] click Capture ZERO NOX [state=normal]",
+    "[16:34:48] click Capture ZERO VOC [state=normal]",
+    "[16:34:48] phase -> start_span",
+    "[16:34:50] click Initiate SPAN GAS [state=normal]",
+    "[16:34:50] phase -> wait_span_capture",
+    "[16:35:28] click Capture SPAN O2 [state=normal]",
+    "[16:35:28] click Capture SPAN CO [state=normal]",
+    "[16:35:29] click Capture SPAN NOX [state=normal]",
+    "[16:35:29] click Capture SPAN VOC [state=normal]",
+    "[16:35:30] phase -> start_run1",
+    "[16:35:31] click Start Test Run1 [state=normal]",
+    "[16:35:31] phase -> wait_end_run1",
+    "[16:35:38] click End Test Run1 [state=normal]",
+    "[16:35:38] phase -> start_post_zero",
+    "[16:35:39] click Initiate POST ZERO AIR [state=normal]",
+    "[16:35:39] phase -> wait_post_zero_capture",
+    "[16:36:12] click Capture POST ZERO (all) [state=normal]",
+    "[16:36:14] phase -> start_post_span",
+    "[16:36:15] click Initiate POST SPAN GAS [state=normal]",
+    "[16:36:15] phase -> wait_post_span_capture",
+    "[16:36:52] click Capture POST SPAN (all) [state=normal]",
+    "[16:36:54] phase -> wait_postcal_finalize",
+    "[16:36:54] click ACKNOWLEDGE decision review [state=normal]",
+    "[16:36:55] postcal finalized with pass=True promoted=['CO', 'NOX']",
+    "[16:36:55] click Start Test Run2 [state=normal]",
+    "[16:36:55] phase -> wait_end_run2",
+    "[16:36:59] click End Test Run2 [state=normal]",
+    "[16:37:00] phase -> shutdown",
+    "[16:37:01] click Stop Acquisition [state=normal]",
+    "[16:37:01] destroy root"
+  ],
+  "automation_errors": [],
+  "run_ui_shell_rc": 0,
+  "postcal_required": true,
+  "runs": [
+    {
+      "run_no": 1,
+      "start_iso": "2026-04-08T16:35:31-05:00",
+      "end_iso": "2026-04-08T16:35:38-05:00",
+      "notes": "AUTO_START_TEST",
+      "target_duration_s": 60,
+      "target_duration_min": 1.0,
+      "target_duration_source": "TEST_MATRIX_RUN"
+    },
+    {
+      "run_no": 2,
+      "start_iso": "2026-04-08T16:36:55-05:00",
+      "end_iso": "2026-04-08T16:36:59-05:00",
+      "notes": "AUTO_START_TEST",
+      "target_duration_s": 60,
+      "target_duration_min": 1.0,
+      "target_duration_source": "TEST_MATRIX_RUN"
+    }
+  ],
+  "capture_unlocks": [
+    {
+      "step": "pre_zero",
+      "gate": "Capture gate: ZERO | Ready (4/4 stable).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "step": "pre_span",
+      "gate": "Capture gate: SPAN | Ready (4/4 stable).",
+      "rows": [
+        {
+          "code": "O2",
+          "state": "normal"
+        },
+        {
+          "code": "CO",
+          "state": "normal"
+        },
+        {
+          "code": "NOX",
+          "state": "normal"
+        },
+        {
+          "code": "VOC",
+          "state": "normal"
+        }
+      ]
+    },
+    {
+      "step": "post_zero_all",
+      "gate": "Capture gate: POST ZERO | Ready (4/4 stable).",
+      "button_state": "normal"
+    },
+    {
+      "step": "post_span_all",
+      "gate": "Capture gate: POST SPAN | Ready (4/4 stable).",
+      "button_state": "normal"
+    }
+  ],
+  "decision_review_seen": true,
+  "decision_review": {
+    "run_no": 1,
+    "overall_pass": true,
+    "postcal_health": "PASS",
+    "headline": "RUN 1 POST-CAL PASS",
+    "message": "Overall: PASS | Health: PASS\nPromoted for next run: CO, NOX\nManual only: O2, VOC\nInvalidated: (none)\n\nO2: PASS | MANUAL_ONLY | manual review only; no auto carry-forward\nCO: PASS | AUTO_ZERO_ONLY | promoted for next run (bias=0.00, drift/hr=-7.3)\nNOX: PASS | AUTO_ZERO_ONLY | promoted for next run (bias=0.00, drift/hr=-22)\nVOC: PASS | MANUAL_ONLY | manual review only; no auto carry-forward\n\nUse Pollutant Bias / Drift for the live adjustment ledger.",
+    "promoted_codes": [
+      "CO",
+      "NOX"
+    ],
+    "manual_only_codes": [
+      "O2",
+      "VOC"
+    ],
+    "invalidated_codes": [],
+    "suspended_codes": [],
+    "rows": [
+      {
+        "code": "O2",
+        "pass": true,
+        "policy_mode": "MANUAL_ONLY",
+        "action": "manual review only; no auto carry-forward"
+      },
+      {
+        "code": "CO",
+        "pass": true,
+        "policy_mode": "AUTO_ZERO_ONLY",
+        "action": "promoted for next run (bias=0.00, drift/hr=-7.3)"
+      },
+      {
+        "code": "NOX",
+        "pass": true,
+        "policy_mode": "AUTO_ZERO_ONLY",
+        "action": "promoted for next run (bias=0.00, drift/hr=-22)"
+      },
+      {
+        "code": "VOC",
+        "pass": true,
+        "policy_mode": "MANUAL_ONLY",
+        "action": "manual review only; no auto carry-forward"
+      }
+    ]
+  },
+  "promoted": {
+    "CO": {
+      "bias": -0.17445,
+      "drift_per_hr": -7.261835294117647,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.17445,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    },
+    "NOX": {
+      "bias": -0.5261111111111112,
+      "drift_per_hr": -22.132705882352944,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.5261111111111112,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    }
+  }
+}

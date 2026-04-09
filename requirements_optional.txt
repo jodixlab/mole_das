@@ -1,0 +1,4 @@
+# Optional extras (soundtrack + enhanced image handling)
+Pillow>=10.0.0
+pygame>=2.5.2
+simpleaudio>=1.0.4

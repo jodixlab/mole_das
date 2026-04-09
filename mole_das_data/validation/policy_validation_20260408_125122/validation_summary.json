@@ -1,0 +1,1044 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_125122",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_125122\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    }
+  ],
+  "steps": [
+    "start acquisition",
+    "initiate zero air",
+    "capture pre zero",
+    "initiate span gas",
+    "capture pre span",
+    "start test run1",
+    "end test run1",
+    "initiate post zero air",
+    "capture post zero all",
+    "initiate post span gas",
+    "capture post span all",
+    "start test run2",
+    "stop acquisition",
+    "destroy root"
+  ],
+  "transition_wait_s": 35,
+  "capture_rows": [
+    {
+      "row": 1,
+      "code": "O2",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 2,
+      "code": "CO",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 3,
+      "code": "NOX",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 4,
+      "code": "VOC",
+      "button_columns": [
+        3,
+        8
+      ]
+    }
+  ],
+  "run_ui_shell_rc": 0,
+  "postcal_required": false,
+  "active_run_index": 1,
+  "runs": [
+    {
+      "run_no": 1,
+      "start_iso": "2026-04-08T12:52:40-05:00",
+      "end_iso": "2026-04-08T12:52:45-05:00",
+      "notes": "AUTO_START_TEST"
+    },
+    {
+      "run_no": 2,
+      "start_iso": "2026-04-08T12:54:02-05:00",
+      "end_iso": "",
+      "notes": "AUTO_START_TEST"
+    }
+  ],
+  "post_run_keys": [
+    "1"
+  ],
+  "post_run_1": {
+    "zero": {
+      "O2": {
+        "ts_iso": "2026-04-08T12:53:22-05:00",
+        "meas": 0.00623,
+        "avg": 0.00623,
+        "std": 0.00599550665081776,
+        "n": 10,
+        "target": 0.0,
+        "tol_abs": 0.2,
+        "pass": true,
+        "pre_meas": 0.01781,
+        "drift_abs": -0.01158,
+        "tolerance": 0.2,
+        "basis": "ABS",
+        "comparison_value": 0.00623,
+        "stable": true,
+        "stability_range": 0.0185,
+        "stability_threshold": 0.1,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Average is within absolute tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 0.2,
+            "avg": 0.00623,
+            "std": 0.00599550665081776,
+            "n": 10,
+            "stability_range": 0.0185,
+            "stability_threshold": 0.1,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.00623,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "O2"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 0.2,
+            "avg": 0.00623,
+            "std": 0.00599550665081776,
+            "n": 10,
+            "stability_range": 0.0185,
+            "stability_threshold": 0.1,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.00623,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "O2"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_abs_per_hr": -0.5146666666666667
+      },
+      "CO": {
+        "ts_iso": "2026-04-08T12:53:22-05:00",
+        "meas": 0.14368888888888887,
+        "avg": 0.14368888888888887,
+        "std": 0.02609812443003198,
+        "n": 9,
+        "target": 0.0,
+        "tol_abs": 2.0,
+        "pass": true,
+        "pre_meas": 0.002588888888888889,
+        "drift_abs": 0.14109999999999998,
+        "tolerance": 2.0,
+        "basis": "ABS",
+        "comparison_value": 0.14368888888888887,
+        "stable": true,
+        "stability_range": 0.07899999999999999,
+        "stability_threshold": 1.0,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Average is within absolute tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.14368888888888887,
+            "std": 0.02609812443003198,
+            "n": 9,
+            "stability_range": 0.07899999999999999,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.14368888888888887,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "CO"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.14368888888888887,
+            "std": 0.02609812443003198,
+            "n": 9,
+            "stability_range": 0.07899999999999999,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.14368888888888887,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "CO"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_abs_per_hr": 6.27111111111111
+      },
+      "NOX": {
+        "ts_iso": "2026-04-08T12:53:22-05:00",
+        "meas": 0.4910777777777777,
+        "avg": 0.4910777777777777,
+        "std": 0.03090472016367504,
+        "n": 9,
+        "target": 0.0,
+        "tol_abs": 2.0,
+        "pass": true,
+        "pre_meas": 0.0033666666666666667,
+        "drift_abs": 0.48771111111111104,
+        "tolerance": 2.0,
+        "basis": "ABS",
+        "comparison_value": 0.4910777777777777,
+        "stable": true,
+        "stability_range": 0.09770000000000006,
+        "stability_threshold": 1.0,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Average is within absolute tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.4910777777777777,
+            "std": 0.03090472016367504,
+            "n": 9,
+            "stability_range": 0.09770000000000006,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.4910777777777777,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "NOX"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.4910777777777777,
+            "std": 0.03090472016367504,
+            "n": 9,
+            "stability_range": 0.09770000000000006,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.4910777777777777,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "NOX"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_abs_per_hr": 21.676049382716048
+      },
+      "VOC": {
+        "ts_iso": "2026-04-08T12:53:23-05:00",
+        "meas": 0.40174444444444446,
+        "avg": 0.40174444444444446,
+        "std": 0.02094124644019873,
+        "n": 9,
+        "target": 0.0,
+        "tol_abs": 2.0,
+        "pass": true,
+        "pre_meas": 0.0022666666666666664,
+        "drift_abs": 0.3994777777777778,
+        "tolerance": 2.0,
+        "basis": "ABS",
+        "comparison_value": 0.40174444444444446,
+        "stable": true,
+        "stability_range": 0.0655,
+        "stability_threshold": 1.0,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Average is within absolute tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.40174444444444446,
+            "std": 0.02094124644019873,
+            "n": 9,
+            "stability_range": 0.0655,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.40174444444444446,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "VOC"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_ZERO",
+            "basis": "ABS",
+            "target": 0.0,
+            "tolerance": 2.0,
+            "avg": 0.40174444444444446,
+            "std": 0.02094124644019873,
+            "n": 9,
+            "stability_range": 0.0655,
+            "stability_threshold": 1.0,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Average is within absolute tolerance.",
+            "comparison_value": 0.40174444444444446,
+            "recovery_pct": null,
+            "units_hint": "",
+            "details": {
+              "channel": "VOC"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_abs_per_hr": 17.75456790123457
+      }
+    },
+    "span": {
+      "O2": {
+        "ts_iso": "2026-04-08T12:53:59-05:00",
+        "meas": 21.01335,
+        "avg": 21.01335,
+        "std": 0.04223039781958026,
+        "n": 10,
+        "target": 21.0,
+        "recovery_pct": 100.06357142857144,
+        "tol_pct": 2.0,
+        "pass": true,
+        "pre_recovery_pct": 99.45285714285716,
+        "drift_recovery_pct": 0.6107142857142804,
+        "tolerance": 2.0,
+        "basis": "RECOVERY_PCT",
+        "comparison_value": 100.06357142857144,
+        "stable": true,
+        "stability_range": 0.1343999999999994,
+        "stability_threshold": 0.21,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Recovery is within tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 21.0,
+            "tolerance": 2.0,
+            "avg": 21.01335,
+            "std": 0.04223039781958026,
+            "n": 10,
+            "stability_range": 0.1343999999999994,
+            "stability_threshold": 0.21,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 100.06357142857144,
+            "recovery_pct": 100.06357142857144,
+            "units_hint": "",
+            "details": {
+              "channel": "O2"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 21.0,
+            "tolerance": 2.0,
+            "avg": 21.01335,
+            "std": 0.04223039781958026,
+            "n": 10,
+            "stability_range": 0.1343999999999994,
+            "stability_threshold": 0.21,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 100.06357142857144,
+            "recovery_pct": 100.06357142857144,
+            "units_hint": "",
+            "details": {
+              "channel": "O2"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_recovery_pct_per_hr": 27.142857142856908
+      },
+      "CO": {
+        "ts_iso": "2026-04-08T12:53:59-05:00",
+        "meas": 250.64514444444447,
+        "avg": 250.64514444444447,
+        "std": 0.3840671385494744,
+        "n": 9,
+        "target": 251.0,
+        "recovery_pct": 99.85862328463922,
+        "tol_pct": 2.0,
+        "pass": true,
+        "pre_recovery_pct": 99.83446657813192,
+        "drift_recovery_pct": 0.02415670650729851,
+        "tolerance": 2.0,
+        "basis": "RECOVERY_PCT",
+        "comparison_value": 99.85862328463922,
+        "stable": true,
+        "stability_range": 1.0324999999999989,
+        "stability_threshold": 2.51,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Recovery is within tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 250.64514444444447,
+            "std": 0.3840671385494744,
+            "n": 9,
+            "stability_range": 1.0324999999999989,
+            "stability_threshold": 2.51,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 99.85862328463922,
+            "recovery_pct": 99.85862328463922,
+            "units_hint": "",
+            "details": {
+              "channel": "CO"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 250.64514444444447,
+            "std": 0.3840671385494744,
+            "n": 9,
+            "stability_range": 1.0324999999999989,
+            "stability_threshold": 2.51,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 99.85862328463922,
+            "recovery_pct": 99.85862328463922,
+            "units_hint": "",
+            "details": {
+              "channel": "CO"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_recovery_pct_per_hr": 1.0736314003243783
+      },
+      "NOX": {
+        "ts_iso": "2026-04-08T12:53:59-05:00",
+        "meas": 253.0233222222222,
+        "avg": 253.0233222222222,
+        "std": 0.8503974192207339,
+        "n": 9,
+        "target": 251.0,
+        "recovery_pct": 100.80610447100486,
+        "tol_pct": 2.0,
+        "pass": true,
+        "pre_recovery_pct": 99.8641655599823,
+        "drift_recovery_pct": 0.9419389110225609,
+        "tolerance": 2.0,
+        "basis": "RECOVERY_PCT",
+        "comparison_value": 100.80610447100486,
+        "stable": false,
+        "stability_range": 2.5970000000000084,
+        "stability_threshold": 2.51,
+        "within_tolerance": true,
+        "status": "UNSTABLE",
+        "reason": "Recovery is in tolerance, but the evaluation window is still unstable.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 253.0233222222222,
+            "std": 0.8503974192207339,
+            "n": 9,
+            "stability_range": 2.5970000000000084,
+            "stability_threshold": 2.51,
+            "stable": false,
+            "within_tolerance": true,
+            "status": "UNSTABLE",
+            "reason": "Recovery is in tolerance, but the evaluation window is still unstable.",
+            "comparison_value": 100.80610447100486,
+            "recovery_pct": 100.80610447100486,
+            "units_hint": "",
+            "details": {
+              "channel": "NOX"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 253.0233222222222,
+            "std": 0.8503974192207339,
+            "n": 9,
+            "stability_range": 2.5970000000000084,
+            "stability_threshold": 2.51,
+            "stable": false,
+            "within_tolerance": true,
+            "status": "UNSTABLE",
+            "reason": "Recovery is in tolerance, but the evaluation window is still unstable.",
+            "comparison_value": 100.80610447100486,
+            "recovery_pct": 100.80610447100486,
+            "units_hint": "",
+            "details": {
+              "channel": "NOX"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_recovery_pct_per_hr": 41.86395160100271
+      },
+      "VOC": {
+        "ts_iso": "2026-04-08T12:54:00-05:00",
+        "meas": 249.79295555555552,
+        "avg": 249.79295555555552,
+        "std": 0.6495032958792624,
+        "n": 9,
+        "target": 251.0,
+        "recovery_pct": 99.51910579902611,
+        "tol_pct": 2.0,
+        "pass": true,
+        "pre_recovery_pct": 100.36742806551572,
+        "drift_recovery_pct": -0.8483222664896175,
+        "tolerance": 2.0,
+        "basis": "RECOVERY_PCT",
+        "comparison_value": 99.51910579902611,
+        "stable": true,
+        "stability_range": 2.0264999999999986,
+        "stability_threshold": 2.51,
+        "within_tolerance": true,
+        "status": "OK",
+        "reason": "Recovery is within tolerance.",
+        "legacy_pass": true,
+        "spec_engine": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 249.79295555555552,
+            "std": 0.6495032958792624,
+            "n": 9,
+            "stability_range": 2.0264999999999986,
+            "stability_threshold": 2.51,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 99.51910579902611,
+            "recovery_pct": 99.51910579902611,
+            "units_hint": "",
+            "details": {
+              "channel": "VOC"
+            },
+            "pass": true
+          }
+        },
+        "spec_engine_shadow": {
+          "formula_version": "spec_engine_v1",
+          "comparison": {
+            "legacy_pass": true,
+            "shadow_pass": true,
+            "match": true
+          },
+          "result": {
+            "step": "POST_SPAN",
+            "basis": "RECOVERY_PCT",
+            "target": 251.0,
+            "tolerance": 2.0,
+            "avg": 249.79295555555552,
+            "std": 0.6495032958792624,
+            "n": 9,
+            "stability_range": 2.0264999999999986,
+            "stability_threshold": 2.51,
+            "stable": true,
+            "within_tolerance": true,
+            "status": "OK",
+            "reason": "Recovery is within tolerance.",
+            "comparison_value": 99.51910579902611,
+            "recovery_pct": 99.51910579902611,
+            "units_hint": "",
+            "details": {
+              "channel": "VOC"
+            },
+            "pass": true
+          }
+        },
+        "drift_rate_recovery_pct_per_hr": -37.703211843983
+      }
+    },
+    "channel_valid": {
+      "O2": true,
+      "CO": true,
+      "NOX": true,
+      "VOC": true
+    },
+    "transitions": {
+      "zero_air": {
+        "start_iso": "2026-04-08T12:52:47-05:00",
+        "start_epoch": 1775670767.0979245,
+        "baseline": {
+          "O2": 16.65745,
+          "CO": 184.24246,
+          "NOX": 195.55257,
+          "VOC": 172.31884
+        }
+      },
+      "span_gas": {
+        "start_iso": "2026-04-08T12:53:24-05:00",
+        "start_epoch": 1775670804.0948398,
+        "baseline": {
+          "O2": 0.0032300000000000002,
+          "CO": 0.13127,
+          "NOX": 0.47668,
+          "VOC": 0.39238
+        }
+      }
+    },
+    "mid": {},
+    "completed_iso": "2026-04-08T12:54:00-05:00",
+    "overall_pass": true,
+    "combined_drift_ratio": {
+      "O2": 0.31079799660531265,
+      "CO": 0.07157645644567728,
+      "NOX": 0.5303562576230251,
+      "VOC": 0.4688371686311659
+    },
+    "health_by_channel": {
+      "O2": "PASS",
+      "CO": "PASS",
+      "NOX": "PASS",
+      "VOC": "PASS"
+    },
+    "auto_apply_policy_by_channel": {
+      "O2": {
+        "mode": "MANUAL_ONLY",
+        "allow_auto_promote": false,
+        "reason": "EPA_3A_O2 keeps post-run bias/drift in validation/manual-adjustment mode.",
+        "method_effective": "EPA_3A_O2",
+        "profile_id": "PROFILE:EPA_3A_O2",
+        "track": "PROJECT"
+      },
+      "CO": {
+        "mode": "AUTO_ZERO_ONLY",
+        "allow_auto_promote": true,
+        "reason": "ASTM_D6522 allows zero-based additive carry-forward after completed post-cal.",
+        "method_effective": "ASTM_D6522",
+        "profile_id": "PROFILE:DEFAULT",
+        "track": "PROJECT"
+      },
+      "NOX": {
+        "mode": "AUTO_ZERO_ONLY",
+        "allow_auto_promote": true,
+        "reason": "ASTM_D6522 allows zero-based additive carry-forward after completed post-cal.",
+        "method_effective": "ASTM_D6522",
+        "profile_id": "PROFILE:DEFAULT",
+        "track": "PROJECT"
+      },
+      "VOC": {
+        "mode": "MANUAL_ONLY",
+        "allow_auto_promote": false,
+        "reason": "EPA_25A_VOC keeps post-run bias/drift in validation/manual-adjustment mode.",
+        "method_effective": "EPA_25A_VOC",
+        "profile_id": "PROFILE:EPA_25A_VOC",
+        "track": "PROJECT"
+      }
+    },
+    "auto_promoted_adjustments": {
+      "CO": {
+        "bias": -0.14368888888888887,
+        "drift_per_hr": -6.27111111111111,
+        "effective_after_run_no": 1,
+        "source_post_zero": 0.14368888888888887,
+        "target_zero": 0.0,
+        "policy_mode": "AUTO_ZERO_ONLY",
+        "method_effective": "ASTM_D6522",
+        "profile_id": "PROFILE:DEFAULT"
+      },
+      "NOX": {
+        "bias": -0.4910777777777777,
+        "drift_per_hr": -21.676049382716048,
+        "effective_after_run_no": 1,
+        "source_post_zero": 0.4910777777777777,
+        "target_zero": 0.0,
+        "policy_mode": "AUTO_ZERO_ONLY",
+        "method_effective": "ASTM_D6522",
+        "profile_id": "PROFILE:DEFAULT"
+      }
+    },
+    "auto_suspended_adjustments": {},
+    "auto_skipped_adjustments": {
+      "O2": {
+        "status": "MANUAL_ONLY",
+        "method_effective": "EPA_3A_O2",
+        "profile_id": "PROFILE:EPA_3A_O2",
+        "track": "PROJECT",
+        "reason": "EPA_3A_O2 keeps post-run bias/drift in validation/manual-adjustment mode.",
+        "disabled_existing_auto": false
+      },
+      "VOC": {
+        "status": "MANUAL_ONLY",
+        "method_effective": "EPA_25A_VOC",
+        "profile_id": "PROFILE:EPA_25A_VOC",
+        "track": "PROJECT",
+        "reason": "EPA_25A_VOC keeps post-run bias/drift in validation/manual-adjustment mode.",
+        "disabled_existing_auto": false
+      }
+    },
+    "postcal_health": "PASS",
+    "_persisted_master_db": true
+  },
+  "policy_by_channel": {
+    "O2": {
+      "mode": "MANUAL_ONLY",
+      "allow_auto_promote": false,
+      "reason": "EPA_3A_O2 keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "method_effective": "EPA_3A_O2",
+      "profile_id": "PROFILE:EPA_3A_O2",
+      "track": "PROJECT"
+    },
+    "CO": {
+      "mode": "AUTO_ZERO_ONLY",
+      "allow_auto_promote": true,
+      "reason": "ASTM_D6522 allows zero-based additive carry-forward after completed post-cal.",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT",
+      "track": "PROJECT"
+    },
+    "NOX": {
+      "mode": "AUTO_ZERO_ONLY",
+      "allow_auto_promote": true,
+      "reason": "ASTM_D6522 allows zero-based additive carry-forward after completed post-cal.",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT",
+      "track": "PROJECT"
+    },
+    "VOC": {
+      "mode": "MANUAL_ONLY",
+      "allow_auto_promote": false,
+      "reason": "EPA_25A_VOC keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "method_effective": "EPA_25A_VOC",
+      "profile_id": "PROFILE:EPA_25A_VOC",
+      "track": "PROJECT"
+    }
+  },
+  "promoted": {
+    "CO": {
+      "bias": -0.14368888888888887,
+      "drift_per_hr": -6.27111111111111,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.14368888888888887,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    },
+    "NOX": {
+      "bias": -0.4910777777777777,
+      "drift_per_hr": -21.676049382716048,
+      "effective_after_run_no": 1,
+      "source_post_zero": 0.4910777777777777,
+      "target_zero": 0.0,
+      "policy_mode": "AUTO_ZERO_ONLY",
+      "method_effective": "ASTM_D6522",
+      "profile_id": "PROFILE:DEFAULT"
+    }
+  },
+  "skipped": {
+    "O2": {
+      "status": "MANUAL_ONLY",
+      "method_effective": "EPA_3A_O2",
+      "profile_id": "PROFILE:EPA_3A_O2",
+      "track": "PROJECT",
+      "reason": "EPA_3A_O2 keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "disabled_existing_auto": false
+    },
+    "VOC": {
+      "status": "MANUAL_ONLY",
+      "method_effective": "EPA_25A_VOC",
+      "profile_id": "PROFILE:EPA_25A_VOC",
+      "track": "PROJECT",
+      "reason": "EPA_25A_VOC keeps post-run bias/drift in validation/manual-adjustment mode.",
+      "disabled_existing_auto": false
+    }
+  },
+  "suspended": {},
+  "pollutant_adjustment_channels": {
+    "CO": {
+      "enabled": true,
+      "bias": -0.14368888888888887,
+      "drift_per_hr": -6.27111111111111,
+      "note": "Auto-promoted from Post-Cal Run 1: bias=0.00, drift/hr=-6.3",
+      "updated_by": "encino_environmental",
+      "updated_iso": "2026-04-08T12:54:00-05:00",
+      "source": "POSTCAL_AUTO",
+      "source_run_no": 1,
+      "effective_after_run_no": 1
+    },
+    "NOX": {
+      "enabled": true,
+      "bias": -0.4910777777777777,
+      "drift_per_hr": -21.676049382716048,
+      "note": "Auto-promoted from Post-Cal Run 1: bias=0.00, drift/hr=-22",
+      "updated_by": "encino_environmental",
+      "updated_iso": "2026-04-08T12:54:00-05:00",
+      "source": "POSTCAL_AUTO",
+      "source_run_no": 1,
+      "effective_after_run_no": 1
+    }
+  },
+  "postcal_completed_runs": {
+    "1": {
+      "completed_iso": "2026-04-08T12:54:00-05:00",
+      "pass": true,
+      "channel_valid": {
+        "O2": true,
+        "CO": true,
+        "NOX": true,
+        "VOC": true
+      }
+    }
+  },
+  "event_count": 0,
+  "event_tail": [],
+  "active_eval": {
+    "CO": {
+      "active_now": true,
+      "effective_after_run_no": 1,
+      "enabled": true,
+      "status": null,
+      "source": "POSTCAL_AUTO",
+      "bias": -0.14368888888888887,
+      "drift_per_hr": -6.27111111111111
+    },
+    "NOX": {
+      "active_now": true,
+      "effective_after_run_no": 1,
+      "enabled": true,
+      "status": null,
+      "source": "POSTCAL_AUTO",
+      "bias": -0.4910777777777777,
+      "drift_per_hr": -21.676049382716048
+    }
+  }
+}

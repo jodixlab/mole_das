@@ -1,0 +1,52 @@
+{
+  "ENGINE_TRANSIENT": {
+    "description": "Fast load steps with brief transient spikes; correlated O2/CO2/NOx/CH4/VOC trends. Good for engines and control demos.",
+    "defaults": {
+      "tau_s": 2.2,
+      "initial_load": 0.55
+    },
+    "notes": [
+      "Load changes every ~4-14s",
+      "Occasional large swings",
+      "NOx increases with load; CH4/VOC spike during transients"
+    ]
+  },
+  "BOILER_STEADY": {
+    "description": "Slow ramps with tight noise; stable combustion trends. Good for boilers/heaters and steady-state QA/QC.",
+    "defaults": {
+      "tau_s": 18.0,
+      "initial_load": 0.65
+    },
+    "notes": [
+      "Load changes every ~18-60s",
+      "Less transient spiking",
+      "O2/CO2 vary smoothly"
+    ]
+  },
+  "FLARE_SPIKY": {
+    "description": "Low baseline with intermittent spikes to mimic flare events or unstable venting.",
+    "defaults": {
+      "tau_s": 6.0,
+      "initial_load": 0.05
+    },
+    "notes": [
+      "Baseline near 0.02-0.08",
+      "Spikes last ~1-4s every ~8-22s",
+      "Spikes drive NOx/CO2 bursts and CH4/VOC disturbances"
+    ]
+  },
+  "CAL_CYCLE": {
+    "description": "Structured zero/span plateaus bracketing a transient test window; useful for QA/QC and training.",
+    "defaults": {
+      "tau_s": 3.0,
+      "initial_load": 0.5
+    },
+    "notes": [
+      "0-25s ZERO",
+      "25-50s SPAN",
+      "50-110s TEST",
+      "110-135s POST ZERO",
+      "135-160s POST SPAN"
+    ]
+  }
+}

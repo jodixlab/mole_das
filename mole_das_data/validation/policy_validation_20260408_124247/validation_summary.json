@@ -1,0 +1,132 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_124247",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_124247\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_ZERO'. Expected ZERO. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    },
+    {
+      "kind": "askyesno",
+      "title": "Training Coach",
+      "message": "SIM gas mode is 'POST_SPAN'. Expected SPAN. Capture anyway?"
+    }
+  ],
+  "steps": [
+    "start acquisition",
+    "initiate zero air",
+    "capture pre zero",
+    "initiate span gas",
+    "capture pre span",
+    "start test run1",
+    "end test run1",
+    "initiate post zero air",
+    "capture post zero all",
+    "initiate post span gas",
+    "capture post span all",
+    "start test run2",
+    "stop acquisition",
+    "destroy root"
+  ],
+  "selected_codes": [],
+  "capture_rows": [
+    {
+      "row": 1,
+      "code": "O2",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 2,
+      "code": "CO",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 3,
+      "code": "NOX",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 4,
+      "code": "VOC",
+      "button_columns": [
+        3,
+        8
+      ]
+    }
+  ],
+  "step_errors": [
+    {
+      "step": "capture pre zero",
+      "error": "invalid command name \".!frame2.!frame2.!canvas.!frame.!labelframe6.!frame.!frame3.!button11\""
+    },
+    {
+      "step": "capture pre span",
+      "error": "invalid command name \".!frame2.!frame2.!canvas.!frame.!labelframe6.!frame.!frame3.!button28\""
+    }
+  ],
+  "run_ui_shell_rc": 0,
+  "postcal_required": false,
+  "active_run_index": 1,
+  "runs": [
+    {
+      "run_no": 1,
+      "phase": null,
+      "status": null,
+      "start_ts": null,
+      "end_ts": null
+    },
+    {
+      "run_no": 2,
+      "phase": null,
+      "status": null,
+      "start_ts": null,
+      "end_ts": null
+    }
+  ],
+  "post_run_1": null,
+  "pollutant_adjustment_channels": {},
+  "policy_by_channel": null,
+  "promoted": null,
+  "skipped": null,
+  "active_eval": {}
+}

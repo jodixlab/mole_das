@@ -1,0 +1,602 @@
+{
+  "meta": {
+    "schema": "MOLE_METHODS_DB_v1",
+    "created_iso": "2026-02-24T18:49:20+00:00",
+    "notes": "Edit to expand methods, track rules, QA/QC criteria, and analyzer/unit offerings."
+  },
+  "catalog": {
+    "analytes": [
+      "O2",
+      "CO2",
+      "CO",
+      "NO",
+      "NO2",
+      "NOX",
+      "VOC",
+      "CH4"
+    ],
+    "units_by_analyte": {
+      "O2": [
+        "%"
+      ],
+      "CO2": [
+        "%"
+      ],
+      "CO": [
+        "ppm"
+      ],
+      "NO": [
+        "ppm"
+      ],
+      "NO2": [
+        "ppm"
+      ],
+      "NOX": [
+        "ppm"
+      ],
+      "VOC": [
+        "ppmC",
+        "ppm"
+      ],
+      "CH4": [
+        "ppm",
+        "%"
+      ]
+    },
+    "span_offerings_by_analyte": {
+      "O2": [
+        5,
+        10,
+        15,
+        20,
+        25
+      ],
+      "CO2": [
+        2,
+        5,
+        10,
+        15
+      ],
+      "CO": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000
+      ],
+      "NO": [
+        25,
+        50,
+        100,
+        250,
+        500,
+        1000
+      ],
+      "NO2": [
+        10,
+        25,
+        50,
+        100,
+        250
+      ],
+      "NOX": [
+        25,
+        50,
+        100,
+        250,
+        500,
+        1000
+      ],
+      "VOC": [
+        25,
+        50,
+        100,
+        250,
+        500
+      ],
+      "CH4": [
+        25,
+        50,
+        100,
+        250,
+        500,
+        1000
+      ]
+    }
+  },
+  "methods": [
+    {
+      "method_id": "ASTM_D6522",
+      "name": "ASTM D6522 (Field gas analysis \u2014 DIAG default)",
+      "wizard_profile_id": "PROFILE:DEFAULT",
+      "analytes_supported": [
+        "O2",
+        "CO2",
+        "CO",
+        "NO",
+        "NO2",
+        "NOX",
+        "VOC",
+        "CH4"
+      ],
+      "track_rules": {
+        "DIAG": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PROJECT": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "COMPLIANCE": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PERM": {
+          "cal_min_points": 3,
+          "lin_min_points": 3,
+          "allowed_points": [
+            3
+          ],
+          "override_allowed": false
+        }
+      },
+      "qaqc_criteria": {
+        "source": "MOLE starter QA/QC criteria catalog",
+        "tracks": {
+          "DEFAULT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "DIAG": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PROJECT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "COMPLIANCE": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PERM": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          }
+        }
+      },
+      "calibration_guidance": {
+        "three_point": {
+          "mid_fraction_of_span": 0.5,
+          "label": "Midpoint (default 50% of span)"
+        }
+      }
+    },
+    {
+      "method_id": "EPA_3A_O2",
+      "name": "EPA Method 3A (O2 / CO2)",
+      "wizard_profile_id": "PROFILE:EPA_3A_O2",
+      "analytes_supported": [
+        "O2",
+        "CO2"
+      ],
+      "track_rules": {
+        "DIAG": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PROJECT": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "COMPLIANCE": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PERM": {
+          "cal_min_points": 3,
+          "lin_min_points": 3,
+          "allowed_points": [
+            3
+          ],
+          "override_allowed": false
+        }
+      },
+      "qaqc_criteria": {
+        "source": "MOLE starter QA/QC criteria catalog",
+        "tracks": {
+          "DEFAULT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "DIAG": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "PROJECT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "COMPLIANCE": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "PERM": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          }
+        }
+      },
+      "calibration_guidance": {
+        "three_point": {
+          "mid_fraction_of_span": 0.5,
+          "label": "Midpoint (default 50% of span)"
+        }
+      }
+    },
+    {
+      "method_id": "EPA_10_CO",
+      "name": "EPA Method 10 (CO)",
+      "wizard_profile_id": "PROFILE:EPA_10_CO",
+      "analytes_supported": [
+        "CO"
+      ],
+      "track_rules": {
+        "DIAG": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PROJECT": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "COMPLIANCE": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PERM": {
+          "cal_min_points": 3,
+          "lin_min_points": 3,
+          "allowed_points": [
+            3
+          ],
+          "override_allowed": false
+        }
+      },
+      "qaqc_criteria": {
+        "source": "MOLE starter QA/QC criteria catalog",
+        "tracks": {
+          "DEFAULT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "DIAG": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PROJECT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "COMPLIANCE": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PERM": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          }
+        }
+      },
+      "calibration_guidance": {
+        "three_point": {
+          "mid_fraction_of_span": 0.5,
+          "label": "Midpoint (default 50% of span)"
+        }
+      }
+    },
+    {
+      "method_id": "EPA_25A_VOC",
+      "name": "EPA Method 25A (VOC as carbon)",
+      "wizard_profile_id": "PROFILE:EPA_25A_VOC",
+      "analytes_supported": [
+        "VOC",
+        "CH4"
+      ],
+      "track_rules": {
+        "DIAG": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PROJECT": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "COMPLIANCE": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PERM": {
+          "cal_min_points": 3,
+          "lin_min_points": 3,
+          "allowed_points": [
+            3
+          ],
+          "override_allowed": false
+        }
+      },
+      "qaqc_criteria": {
+        "source": "MOLE starter QA/QC criteria catalog",
+        "tracks": {
+          "DEFAULT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "DIAG": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PROJECT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "COMPLIANCE": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          },
+          "PERM": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 3.0 }
+          }
+        }
+      },
+      "calibration_guidance": {
+        "three_point": {
+          "mid_fraction_of_span": 0.5,
+          "label": "Midpoint (default 50% of span)"
+        }
+      }
+    },
+    {
+      "method_id": "EPA_7E_NOX",
+      "name": "EPA Method 7E (NOx)",
+      "wizard_profile_id": "PROFILE:EPA_7E_NOX",
+      "analytes_supported": [
+        "NO",
+        "NO2",
+        "NOX"
+      ],
+      "track_rules": {
+        "DIAG": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true
+        },
+        "PROJECT": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true,
+          "secondary_required_tests": [
+            "CONVERTER_EFF"
+          ]
+        },
+        "COMPLIANCE": {
+          "cal_min_points": 2,
+          "lin_min_points": 2,
+          "allowed_points": [
+            2,
+            3
+          ],
+          "override_allowed": true,
+          "secondary_required_tests": [
+            "CONVERTER_EFF"
+          ]
+        },
+        "PERM": {
+          "cal_min_points": 3,
+          "lin_min_points": 3,
+          "allowed_points": [
+            3
+          ],
+          "override_allowed": false,
+          "secondary_required_tests": [
+            "CONVERTER_EFF"
+          ]
+        }
+      },
+      "qaqc_criteria": {
+        "source": "MOLE starter QA/QC criteria catalog",
+        "tracks": {
+          "DEFAULT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "DIAG": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "PROJECT": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "COMPLIANCE": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          },
+          "PERM": {
+            "zero": { "type": "%SPAN", "value": 2.0 },
+            "span": { "type": "%SPAN", "value": 2.0 },
+            "cal_error": { "type": "%SPAN", "value": 2.0 },
+            "drift": { "type": "%SPAN", "value": 2.0 }
+          }
+        }
+      },
+      "calibration_guidance": {
+        "three_point": {
+          "mid_fraction_of_span": 0.5,
+          "label": "Midpoint (default 50% of span)"
+        }
+      }
+    }
+  ],
+  "recommendations": {
+    "DIAG": {
+      "O2": "ASTM_D6522",
+      "CO2": "ASTM_D6522",
+      "CO": "ASTM_D6522",
+      "NO": "ASTM_D6522",
+      "NO2": "ASTM_D6522",
+      "NOX": "ASTM_D6522",
+      "VOC": "ASTM_D6522",
+      "CH4": "ASTM_D6522"
+    },
+    "PROJECT": {
+      "O2": "EPA_3A_O2",
+      "CO2": "EPA_3A_O2",
+      "CO": "EPA_10_CO",
+      "NOX": "EPA_7E_NOX",
+      "NO": "EPA_7E_NOX",
+      "NO2": "EPA_7E_NOX",
+      "VOC": "EPA_25A_VOC",
+      "CH4": "EPA_25A_VOC"
+    },
+    "COMPLIANCE": {
+      "O2": "EPA_3A_O2",
+      "CO2": "EPA_3A_O2",
+      "CO": "EPA_10_CO",
+      "NOX": "EPA_7E_NOX",
+      "NO": "EPA_7E_NOX",
+      "NO2": "EPA_7E_NOX",
+      "VOC": "EPA_25A_VOC",
+      "CH4": "EPA_25A_VOC"
+    },
+    "PERM": {
+      "O2": "EPA_3A_O2",
+      "CO2": "EPA_3A_O2",
+      "CO": "EPA_10_CO",
+      "NOX": "EPA_7E_NOX",
+      "NO": "EPA_7E_NOX",
+      "NO2": "EPA_7E_NOX",
+      "VOC": "EPA_25A_VOC",
+      "CH4": "EPA_25A_VOC"
+    }
+  }
+}

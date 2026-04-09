@@ -1,0 +1,86 @@
+{
+  "validation_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_154043",
+  "config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\validation\\policy_validation_20260408_154043\\mole_session_2026_03_02_2316.json",
+  "messageboxes": [
+    {
+      "kind": "showwarning",
+      "title": "No live data",
+      "message": "No live frame yet. Start acquisition (UI) and wait for data."
+    },
+    {
+      "kind": "showwarning",
+      "title": "Post-Cal Required",
+      "message": "Post-Cal/Bias check is required after Run 1. Complete POST-ZERO and POST-SPAN before starting the next run."
+    }
+  ],
+  "steps": [
+    "start acquisition",
+    "initiate zero air",
+    "capture pre zero",
+    "initiate span gas",
+    "capture pre span",
+    "start test run1",
+    "end test run1",
+    "initiate post zero air",
+    "capture post zero all",
+    "initiate post span gas",
+    "capture post span all",
+    "start test run2",
+    "stop acquisition",
+    "destroy root"
+  ],
+  "transition_wait_s": 35,
+  "capture_rows": [
+    {
+      "row": 1,
+      "code": "O2",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 2,
+      "code": "CO",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 3,
+      "code": "NOX",
+      "button_columns": [
+        3,
+        8
+      ]
+    },
+    {
+      "row": 4,
+      "code": "VOC",
+      "button_columns": [
+        3,
+        8
+      ]
+    }
+  ],
+  "run_ui_shell_rc": 0,
+  "postcal_required": true,
+  "active_run_index": 0,
+  "runs": [
+    {
+      "run_no": 1,
+      "start_iso": "2026-04-08T15:42:47-05:00",
+      "end_iso": "2026-04-08T15:42:52-05:00",
+      "notes": "AUTO_START_TEST"
+    }
+  ],
+  "post_run_keys": [
+    "1"
+  ],
+  "policy_by_channel": null,
+  "promoted": null,
+  "skipped": null,
+  "pollutant_adjustment_channels": {},
+  "active_eval": {}
+}

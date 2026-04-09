@@ -1,0 +1,281 @@
+MOLE-DAS DIAGNOSTICS-ONLY APPENDIX
+Audience: operator / technician using diagnostics-only mode
+Scope: Diagnostics-only session behavior, launch paths, restrictions, verification, and artifact handling
+
+Step 1.0 - Enable Diagnostics-only
+
+		In "Project Configs (Hub)", select:
+
+			1. Diagnostics-only
+
+		When Diagnostics-only is selected:
+
+			1. compliance support is disabled
+			2. the diagnostics-only shell becomes the runner target
+			3. the diagnostics workflow is separated from the formal compliance support workflow
+
+Step 1.1 - Compliance Lockout
+
+		Diagnostics-only sessions cannot be used for compliance support.
+
+		Operational effect:
+
+			1. "May Support Compliance" is cleared/disabled
+			2. diagnostics outputs are excluded from formal QA/QC trending and compliance support use
+
+Step 2.0 - Recommended Diagnostics Setup Path
+
+		The standard diagnostics-only setup path is:
+
+			1. Project Configs (Hub)
+			2. Source Details
+			3. Pollutants
+			4. Site Conditions
+			5. Sample System
+			6. Fuel Analysis
+			7. Regulatory, if comparison limits will be entered
+			8. Save + Apply Config
+			9. DAQ Runner (Test - Diagnostics-only) or DAQ Runner (SIM - Diagnostics-only)
+
+Step 3.0 - Diagnostics Runner Launch Paths
+
+		Use the same two DAQ Runner launch tabs as the formal workflow:
+
+			1. DAQ Runner (Test)
+			2. DAQ Runner (SIM)
+
+		When Diagnostics-only is selected:
+
+			1. Test launches the diagnostics-only shell
+			2. SIM launches the diagnostics-only training shell
+
+Step 3.1 - Diagnostics Splash / Confirmation
+
+		On diagnostics launch, the operator/technician must acknowledge the responsibility notice before proceeding.
+
+		The notice requires confirmation that:
+
+			1. the operator/technician is responsible for performing pre-test and post-test calibration verification and linearity assessment
+			2. diagnostics outputs are predicated on those steps being performed
+
+Step 4.0 - Diagnostics Verification
+
+		The diagnostics runner includes a dedicated verification/attestation section.
+
+Step 4.1 - Verification Fields
+
+		Complete as applicable:
+
+			1. Technician / Operator
+			2. Worksheet / Form Ref
+			3. Calibration Gas IDs
+			4. Attachment Path
+			5. Verification Notes
+
+Step 4.2 - Pre-test and Post-test Attestation
+
+		Use:
+
+			1. Mark Pre-Test Verified
+			2. Clear Pre-Test
+			3. Mark Post-Test Verified
+			4. Clear Post-Test
+
+Step 4.3 - Limit-Triggered Gate
+
+		If project pollutant limits are entered:
+
+			1. pre-test verification is required before acquisition start
+			2. post-test verification is required before final diagnostics export
+
+		If project pollutant limits are not entered:
+
+			1. diagnostics verification remains advisory
+
+Step 5.0 - Diagnostics Runner Content
+
+		The diagnostics-only shell is intentionally simplified and focused on operational troubleshooting.
+
+		The diagnostics view includes:
+
+			1. live pollutant measurements
+			2. live mass-rate outputs
+			3. weather / site conditions
+			4. fuel basis / Method 19 reference
+			5. Method 19 operator inputs
+			6. Method 19 derived outputs
+			7. diagnostics verification
+			8. calculation audit / provenance
+			9. live graphs
+			10. trim panel
+			11. diagnostics print panel
+
+Step 5.1 - Diagnostics Mode Restrictions
+
+		Diagnostics-only mode is not treated as institutional truth.
+
+		Operational restrictions include:
+
+			1. no compliance support
+			2. no formal report-pack path
+			3. no formal QA/QC trending contribution
+			4. diagnostics artifacts marked as non-compliance
+			5. Method 2 stack-measured flow excluded from diagnostics mode
+			6. Method 19 basis used for diagnostics crosswalk outputs
+
+Step 6.0 - Diagnostics SIM
+
+		Diagnostics SIM is intended to emulate source behavior and sample-system behavior in a sandboxed environment.
+
+		Current simulation intent:
+
+			1. source/fuel-aware pollutant behavior
+			2. engine-exhaust-like O2/CO2 coupling
+			3. training-only environment isolation
+
+Step 7.0 - Calculation Audit / Provenance
+
+		The diagnostics runner includes a dedicated calculation audit panel.
+
+		It shows:
+
+			1. provenance keys
+			2. pollutant calculation chains
+			3. active assumptions/flags
+			4. crosswalk notes
+			5. basis and source information for Method 19 computations
+
+Step 7.1 - Calculation Chain Visibility
+
+		The audit is intended to show the full calculation sequence for troubleshooting:
+
+			1. raw
+			2. dry
+			3. corrected
+			4. Qd
+			5. heat input R
+			6. fuel-flow basis
+			7. mass-rate result
+
+Step 8.0 - Trim Panel
+
+		The diagnostics-only shell includes a Trim Panel for operator guidance.
+
+		Important diagnostics-specific behavior:
+
+			1. unavailable signals are blanked
+			2. diagnostics-only unavailable windows are not shown as active guidance
+			3. the panel is advisory, not a direct control system
+
+Step 9.0 - Diagnostics Print Panel
+
+		The diagnostics print/export panel creates a non-compliance diagnostics artifact.
+
+		Available actions:
+
+			1. Refresh Preview
+			2. Save Text Snapshot
+			3. Export PDF Snapshot
+			4. Open Snapshot Folder
+
+Step 9.1 - Diagnostics Artifact Content
+
+		The diagnostics artifact includes:
+
+			1. runner status
+			2. calibration / linearity condition-of-use
+			3. diagnostics verification record
+			4. live pollutants
+			5. mass rates
+			6. site conditions
+			7. fuel / Method 19 basis
+			8. combustion check
+			9. Method 19 inputs
+			10. Method 19 derived outputs
+			11. Method 19 rollup
+			12. calculation audit / provenance
+
+Step 9.2 - Machine-Readable Sidecars
+
+		Diagnostics export also writes calculation audit sidecars:
+
+			1. JSON
+			2. CSV
+
+		These are saved beside the primary text/PDF artifact.
+
+Step 9.3 - Schema Trace in Export
+
+		The diagnostics export also carries session schema / migration trace so normalization history survives outside the live UI.
+
+		Exported schema details include:
+
+			1. schema status
+			2. schema version
+			3. schema revision
+			4. migration summary
+			5. migration notice
+			6. migrated-from version/revision
+			7. normalization notes
+
+Step 10.0 - Sample System in Diagnostics Context
+
+		The Sample System tab remains useful for diagnostics projects because it provides:
+
+			1. active path visualization
+			2. gas-cell mappings
+			3. comm-state visualization
+			4. print/export of the sampling train concept
+
+Step 11.0 - Fuel Analysis in Diagnostics Context
+
+		Diagnostics outputs still depend heavily on the configured fuel basis.
+
+		Operator recommendation:
+
+			1. verify fuel category
+			2. confirm fuel analysis when available
+			3. review F-factor basis before relying on Method 19 rollups
+
+Step 12.0 - Regulatory Tab in Diagnostics Context
+
+		The Regulatory tab may still be used in diagnostics-only sessions for comparison purposes.
+
+		Typical use:
+
+			1. enter project limits for comparison
+			2. review rule/limit context
+
+		Important:
+
+			1. entering limits may trigger calibration/verification gating in diagnostics export
+			2. diagnostics artifacts remain non-compliance even when limits are entered
+
+Step 13.0 - Diagnostics-only Recommended Operator Sequence
+
+		Recommended sequence:
+
+			1. set Diagnostics-only in Project Configs
+			2. complete Source Details
+			3. select Pollutants
+			4. complete Site Conditions
+			5. review Sample System
+			6. confirm Fuel Analysis
+			7. enter Regulatory limits only if comparison against limits is needed
+			8. Save + Apply Config
+			9. launch diagnostics Test or diagnostics SIM
+			10. complete diagnostics verification
+			11. run acquisition or simulation
+			12. review Calculation Audit / Provenance
+			13. export diagnostics artifact and sidecars
+
+Step 14.0 - Core Diagnostics Warnings
+
+		Diagnostics-only mode should be treated as an engineering/troubleshooting path.
+
+		Key reminders:
+
+			1. not for compliance support
+			2. not for institutional record
+			3. the operator/technician is responsible for calibration verification / linearity assessment
+			4. artifact quality is contingent on those checks being performed and documented

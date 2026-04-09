@@ -1,0 +1,86 @@
+{
+  "generated_utc": "2026-02-18T20:08:05Z",
+  "source_workbooks": [
+    "Historical Emissions Testing Data - CENTRALIZED 10.05.2022 v1.xlsx",
+    "Historical Emissions Testing Data - CENTRALIZED 10.04.2022 v1.xlsx",
+    "Historical Emissions Testing Data - CENTRALIZED 08.24.2022 v1.xlsx"
+  ],
+  "notes": "Derived from uploaded 'Historical Emissions Testing Data - CENTRALIZED' workbooks. Used by SIM_TRAINING to generate realistic SAMPLE values.",
+  "pollutants": {
+    "CO": {
+      "units": "ppm",
+      "n": 981,
+      "min": 0.0,
+      "p05": 3.33,
+      "p10": 6.27,
+      "p25": 16.06116333,
+      "p50": 41.73,
+      "p75": 111.43,
+      "p90": 420.5,
+      "p95": 528.0,
+      "p99": 692.6,
+      "max": 965.1,
+      "mean": 117.87350441046893
+    },
+    "NOX": {
+      "units": "ppm",
+      "n": 981,
+      "min": 0.0,
+      "p05": 40.1,
+      "p10": 50.6,
+      "p25": 64.1,
+      "p50": 80.37,
+      "p75": 128.97,
+      "p90": 230.4,
+      "p95": 268.67,
+      "p99": 370.1,
+      "max": 578.6,
+      "mean": 110.52823390410805
+    },
+    "VOC": {
+      "units": "ppm",
+      "n": 981,
+      "min": 0.0,
+      "p05": 0.0,
+      "p10": 0.8,
+      "p25": 5.1,
+      "p50": 34.67,
+      "p75": 65.67,
+      "p90": 92.9,
+      "p95": 109.27,
+      "p99": 150.3,
+      "max": 389.77,
+      "mean": 41.18921551274211
+    },
+    "O2": {
+      "units": "%",
+      "n": 981,
+      "min": 0.0,
+      "p05": 0.01,
+      "p10": 0.23,
+      "p25": 8.0,
+      "p50": 8.41,
+      "p75": 8.79,
+      "p90": 9.33,
+      "p95": 12.12,
+      "p99": 12.702000000000009,
+      "max": 17.26,
+      "mean": 7.843241590214068
+    },
+    "CO2": {
+      "units": "%",
+      "n": 39,
+      "min": 7.27333,
+      "p05": 7.27333,
+      "p10": 7.416,
+      "p25": 7.64,
+      "p50": 7.68,
+      "p75": 7.69,
+      "p90": 8.13,
+      "p95": 12.53,
+      "p99": 12.53,
+      "max": 12.53,
+      "mean": 8.018122564102566
+    }
+  }
+}

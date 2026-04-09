@@ -1,0 +1,2 @@
+This folder is intentionally empty in the portable redeploy package.
+MOLE will create runtime artifacts here as needed.

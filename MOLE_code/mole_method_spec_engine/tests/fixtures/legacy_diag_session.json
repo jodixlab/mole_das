@@ -1,0 +1,31 @@
+{
+  "session_mode": {
+    "diagnostic_only": true,
+    "may_support_compliance": true
+  },
+  "site_conditions": {
+    "compressibility_model": "AGA8_DETAIL"
+  },
+  "fuel": {
+    "dg": {
+      "liquid_fraction_volpct": 25.0
+    }
+  },
+  "regulatory": {
+    "selected_rule_ids": [
+      "STATE_PERMIT_GENERAL",
+      "FED_RULE_OK"
+    ],
+    "selected_rule_meta": {
+      "STATE_PERMIT_GENERAL": {
+        "name": "placeholder"
+      },
+      "FED_RULE_OK": {
+        "name": "real"
+      }
+    }
+  },
+  "meta": {
+    "session_schema_revision": 1
+  }
+}

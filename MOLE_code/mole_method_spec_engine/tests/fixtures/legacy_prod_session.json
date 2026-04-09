@@ -1,0 +1,21 @@
+{
+  "schema_version": "mole_session_config_v1",
+  "meta": {
+    "session_schema_version": "mole_session_config_v1",
+    "session_schema_revision": 1
+  },
+  "session_mode": {
+    "diagnostic_only": false
+  },
+  "daq_runner": {
+    "ui_mode": "DIAGNOSTICS"
+  },
+  "site_conditions": {
+    "z_basis": "AGA8_GROSS"
+  },
+  "regulatory": {
+    "selected_rule_ids": [
+      "FED_RULE_OK"
+    ]
+  }
+}
