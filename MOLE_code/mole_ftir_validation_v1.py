@@ -142,6 +142,42 @@ def _normalize_manual_windows(value: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def _normalize_exclusions(value: Any) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    if isinstance(value, dict):
+        for k, v in value.items():
+            key = str(k or "").strip()
+            if not key or not isinstance(v, dict):
+                continue
+            out[key] = {
+                "reason": str(v.get("reason") or "").strip(),
+                "reviewer": str(v.get("reviewer") or "").strip(),
+                "updated_iso": str(v.get("updated_iso") or "").strip(),
+            }
+    elif isinstance(value, list):
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("row_key") or "").strip()
+            if not key:
+                continue
+            out[key] = {
+                "reason": str(item.get("reason") or "").strip(),
+                "reviewer": str(item.get("reviewer") or "").strip(),
+                "updated_iso": str(item.get("updated_iso") or "").strip(),
+            }
+    return out
+
+
+def _row_key(run_no: Any, analyte: Any, start_iso: Any, end_iso: Any) -> str:
+    return "|".join([
+        str(run_no or "").strip(),
+        str(analyte or "").strip().upper(),
+        str(start_iso or "").strip(),
+        str(end_iso or "").strip(),
+    ])
+
+
 def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = None) -> Dict[str, Any]:
     block = dict(cfg or {}) if isinstance(cfg, dict) else {}
     mode = str(block.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
@@ -174,6 +210,9 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "column_map": column_map,
         "manual_windows": manual_windows,
         "notes": str(block.get("notes") or "").strip(),
+        "review_notes": str(block.get("review_notes") or "").strip(),
+        "reviewer": str(block.get("reviewer") or "").strip(),
+        "exclusions": _normalize_exclusions(block.get("exclusions")),
     }
 
 
@@ -392,6 +431,7 @@ def align_windows(
                 "window_start_iso": window.get("window_start_iso"),
                 "window_end_iso": window.get("window_end_iso"),
                 "analyte": code,
+                "row_key": _row_key(window.get("run_no"), code, window.get("window_start_iso"), window.get("window_end_iso")),
                 "mole_count": len(mole_vals),
                 "ftir_count": len(ftir_vals),
                 "mole_avg": mole_avg,
@@ -412,7 +452,8 @@ def compute_method301_stats(cfg: Dict[str, Any], aligned_rows: Iterable[Dict[str
     analytes = sorted({str(row.get("analyte") or "").strip().upper() for row in aligned_rows if str(row.get("analyte") or "").strip()})
     out: List[Dict[str, Any]] = []
     for code in analytes:
-        pairs = [row for row in aligned_rows if str(row.get("analyte") or "").strip().upper() == code and bool(row.get("paired"))]
+        pairs_all = [row for row in aligned_rows if str(row.get("analyte") or "").strip().upper() == code and bool(row.get("paired"))]
+        pairs = [row for row in pairs_all if not bool(row.get("excluded"))]
         mole_vals = [float(row.get("mole_avg")) for row in pairs if row.get("mole_avg") is not None]
         ftir_vals = [float(row.get("ftir_avg")) for row in pairs if row.get("ftir_avg") is not None]
         diffs = [float(row.get("difference")) for row in pairs if row.get("difference") is not None]
@@ -478,6 +519,7 @@ def compute_method301_stats(cfg: Dict[str, Any], aligned_rows: Iterable[Dict[str
             "analyte": code,
             "mode": mode,
             "paired_window_count": n,
+            "excluded_window_count": len([row for row in pairs_all if bool(row.get("excluded"))]),
             "mole_mean": mole_mean,
             "ftir_mean": ftir_mean,
             "mean_difference": diff_mean,
@@ -523,6 +565,32 @@ def build_validation_package(
     actual_runs = run_aggregation.get("actual_runs") if isinstance(run_aggregation.get("actual_runs"), list) else []
     windows = build_windows(normalized, actual_runs)
     aligned_rows = align_windows(normalized, windows.get("rows") or [], mole.get("rows") or [], ftir.get("rows") or [])
+    exclusions = normalized.get("exclusions") if isinstance(normalized.get("exclusions"), dict) else {}
+    excluded_rows: List[Dict[str, Any]] = []
+    for row in aligned_rows:
+        if not isinstance(row, dict):
+            continue
+        row_key = str(row.get("row_key") or "").strip()
+        exc = exclusions.get(row_key) if row_key else None
+        if isinstance(exc, dict):
+            row["excluded"] = True
+            row["exclusion_reason"] = str(exc.get("reason") or "").strip()
+            row["reviewer"] = str(exc.get("reviewer") or "").strip()
+            row["updated_iso"] = str(exc.get("updated_iso") or "").strip()
+            excluded_rows.append({
+                "row_key": row_key,
+                "run_no": row.get("run_no"),
+                "label": row.get("label"),
+                "analyte": row.get("analyte"),
+                "reason": row.get("exclusion_reason"),
+                "reviewer": row.get("reviewer"),
+                "updated_iso": row.get("updated_iso"),
+            })
+        else:
+            row["excluded"] = False
+            row["exclusion_reason"] = ""
+            row["reviewer"] = ""
+            row["updated_iso"] = ""
     method301 = compute_method301_stats(normalized, aligned_rows)
 
     statuses = [str(row.get("overall_status") or "") for row in method301]
@@ -552,9 +620,12 @@ def build_validation_package(
         "mole_source": mole.get("summary") or {},
         "windows": windows,
         "aligned_rows": aligned_rows,
+        "excluded_rows": excluded_rows,
         "method301": method301,
         "coverage_note": coverage_note,
         "overall_status": overall,
         "paired_window_count": len([row for row in aligned_rows if bool(row.get("paired"))]),
+        "excluded_count": len(excluded_rows),
+        "review_notes": str(normalized.get("review_notes") or "").strip(),
+        "reviewer": str(normalized.get("reviewer") or "").strip(),
     }
-

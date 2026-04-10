@@ -92,6 +92,73 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("paired_window_count"), 0)
             self.assertEqual(payload.get("method301"), [])
 
+    def test_excluded_window_is_removed_from_method301_counts_and_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_lines = ["timestamp,NO"]
+            raw_lines = []
+            actual_runs = []
+
+            for idx in range(6):
+                start = base + timedelta(minutes=idx * 25)
+                end = start + timedelta(minutes=20)
+                actual_runs.append({
+                    "run_no": idx + 1,
+                    "start_ts_iso": start.isoformat().replace("+00:00", "Z"),
+                    "end_ts_iso": end.isoformat().replace("+00:00", "Z"),
+                })
+                for step in range(4):
+                    ts = start + timedelta(minutes=(step * 5) + 1)
+                    value = 60.0 + idx
+                    ts_iso = ts.isoformat().replace("+00:00", "Z")
+                    ftir_lines.append(f"{ts_iso},{value}")
+                    raw_lines.append(json.dumps({
+                        "ts_utc": ts_iso,
+                        "channel_id": "NO",
+                        "value_eng": value,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }))
+
+            ftir_csv.write_text("\n".join(ftir_lines) + "\n", encoding="utf-8")
+            raw_samples.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+
+            excluded_key = "1|NO|2026-04-10T12:00:00Z|2026-04-10T12:20:00Z"
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_FORMAL",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "ftir_delimiter": "CSV",
+                "analytes": ["NO"],
+                "review_notes": "Reviewer excluded first window.",
+                "reviewer": "peer_scientist",
+                "exclusions": {
+                    excluded_key: {
+                        "reason": "startup stabilization",
+                        "reviewer": "peer_scientist",
+                        "updated_iso": "2026-04-10T18:00:00Z",
+                    }
+                },
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples,
+            )
+
+            self.assertEqual(payload.get("excluded_count"), 1)
+            self.assertEqual(len(payload.get("excluded_rows") or []), 1)
+            self.assertEqual((payload.get("excluded_rows") or [])[0].get("reason"), "startup stabilization")
+            self.assertEqual(payload.get("review_notes"), "Reviewer excluded first window.")
+            row = (payload.get("method301") or [])[0]
+            self.assertEqual(row.get("paired_window_count"), 5)
+            self.assertEqual(row.get("excluded_window_count"), 1)
+            self.assertEqual(row.get("overall_status"), "INSUFFICIENT_FORMAL_WINDOWS")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10033,6 +10033,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_offset_s = tk.StringVar(value="0")
     var_ftir_validation_analytes = tk.StringVar(value="")
     var_ftir_validation_master_clock = tk.StringVar(value="SESSION_MASTER_CLOCK")
+    var_ftir_validation_exclusion_reason = tk.StringVar(value="")
 
     tk.Checkbutton(
         report_builder_ftir_form,
@@ -10111,6 +10112,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         height=3,
         note="Document alignment assumptions, file provenance, or Method 301 interpretation notes.",
     )
+    txt_ftir_validation_review_notes = _report_builder_labeled_text(
+        report_builder_ftir_wrap,
+        "FTIR Validation Reviewer Notes",
+        height=3,
+        note="Session-level reviewer annotation carried into the FTIR validation summary and final report.",
+    )
 
     report_builder_btns = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_btns.pack(fill="x", pady=(0, 8))
@@ -10184,7 +10191,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     ftir_windows_vscroll.pack(side="right", fill="y")
     ftir_windows_hscroll = tk.Scrollbar(ftir_windows_body, orient="horizontal")
     ftir_windows_hscroll.pack(side="bottom", fill="x")
-    ftir_windows_cols = ("run_no", "label", "analyte", "status", "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference")
+    ftir_windows_cols = ("run_no", "label", "analyte", "status", "review", "reason", "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference")
     ftir_windows_tree = ttk.Treeview(ftir_windows_body, columns=ftir_windows_cols, show="headings", height=8)
     ftir_windows_tree.pack(side="left", fill="both", expand=True)
     ftir_windows_tree.configure(yscrollcommand=ftir_windows_vscroll.set, xscrollcommand=ftir_windows_hscroll.set)
@@ -10195,6 +10202,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ("label", "Label", 160),
         ("analyte", "Analyte", 80),
         ("status", "Status", 120),
+        ("review", "Review", 90),
+        ("reason", "Reason", 220),
         ("mole_count", "MOLE N", 70),
         ("ftir_count", "FTIR N", 70),
         ("mole_avg", "MOLE Avg", 100),
@@ -10202,7 +10211,19 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ("difference", "Diff", 100),
     ]:
         ftir_windows_tree.heading(col, text=txt)
-        ftir_windows_tree.column(col, width=width, stretch=(col in ("label", "status")))
+        ftir_windows_tree.column(col, width=width, stretch=(col in ("label", "status", "reason")))
+
+    ftir_review_ctrls = tk.Frame(report_builder_validation_wrap, bg=BG)
+    ftir_review_ctrls.pack(fill="x", pady=(6, 0))
+    tk.Label(ftir_review_ctrls, text="Selected-row exclusion reason:", fg=FG, bg=BG, font=("Consolas", 9)).pack(side="left")
+    ent_ftir_validation_exclusion_reason = tk.Entry(ftir_review_ctrls, textvariable=var_ftir_validation_exclusion_reason, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9), width=42)
+    ent_ftir_validation_exclusion_reason.pack(side="left", padx=(8, 8))
+    btn_ftir_validation_exclude = tk.Button(ftir_review_ctrls, text="Exclude Selected", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_exclude.pack(side="left")
+    btn_ftir_validation_include = tk.Button(ftir_review_ctrls, text="Include Selected", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_include.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_clear_exclusions = tk.Button(ftir_review_ctrls, text="Clear All Exclusions", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_clear_exclusions.pack(side="left", padx=(8, 0))
 
     report_builder_text_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_text_wrap.pack(fill="both", expand=True)
@@ -14667,6 +14688,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             pass
 
+    ftir_validation_preview_rows: Dict[str, Dict[str, Any]] = {}
+
     def _report_builder_actual_runs(sess_local: Dict[str, Any]) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         try:
@@ -14689,7 +14712,83 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return []
         return out
 
+    def _selected_ftir_validation_row() -> Optional[Dict[str, Any]]:
+        try:
+            sel = list(ftir_windows_tree.selection() or [])
+            if not sel:
+                return None
+            return ftir_validation_preview_rows.get(str(sel[0]))
+        except Exception:
+            return None
+
+    def _set_ftir_validation_exclusion(selected_row: Dict[str, Any], exclude: bool) -> None:
+        nonlocal sess
+        sess = _report_builder_save_to_session(show_message=False)
+        _ensure_daq_schema(sess)
+        blk = _ftir_validation_block(sess)
+        exclusions = dict(blk.get("exclusions") or {}) if isinstance(blk.get("exclusions"), dict) else {}
+        row_key = str(selected_row.get("row_key") or "").strip()
+        if not row_key:
+            raise ValueError("Selected FTIR validation row does not have a stable row key.")
+        if exclude:
+            reason = str(var_ftir_validation_exclusion_reason.get() or "").strip()
+            if not reason:
+                raise ValueError("Exclusion reason is required.")
+            exclusions[row_key] = {
+                "reason": reason,
+                "reviewer": _report_builder_actor(sess),
+                "updated_iso": now_iso(),
+            }
+        else:
+            exclusions.pop(row_key, None)
+        blk["exclusions"] = exclusions
+        blk["review_notes"] = _report_builder_text_get(txt_ftir_validation_review_notes)
+        blk["reviewer"] = _report_builder_actor(sess)
+        sess["ftir_validation"] = blk
+        _save_session(sess)
+        _refresh_ftir_validation_preview(sess)
+        _refresh_report_builder_status(sess)
+
+    def _exclude_selected_ftir_validation_row() -> None:
+        row = _selected_ftir_validation_row()
+        if not isinstance(row, dict):
+            messagebox.showinfo("FTIR Validation Review", "Select an aligned FTIR validation row first.")
+            return
+        try:
+            _set_ftir_validation_exclusion(row, True)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
+    def _include_selected_ftir_validation_row() -> None:
+        row = _selected_ftir_validation_row()
+        if not isinstance(row, dict):
+            messagebox.showinfo("FTIR Validation Review", "Select an aligned FTIR validation row first.")
+            return
+        try:
+            _set_ftir_validation_exclusion(row, False)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
+    def _clear_all_ftir_validation_exclusions() -> None:
+        nonlocal sess
+        if not messagebox.askyesno("FTIR Validation Review", "Clear all FTIR validation exclusions for this session?"):
+            return
+        try:
+            sess = _report_builder_save_to_session(show_message=False)
+            _ensure_daq_schema(sess)
+            blk = _ftir_validation_block(sess)
+            blk["exclusions"] = {}
+            blk["review_notes"] = _report_builder_text_get(txt_ftir_validation_review_notes)
+            blk["reviewer"] = _report_builder_actor(sess)
+            sess["ftir_validation"] = blk
+            _save_session(sess)
+            _refresh_ftir_validation_preview(sess)
+            _refresh_report_builder_status(sess)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
     def _refresh_ftir_validation_preview(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        ftir_validation_preview_rows.clear()
         _report_builder_tree_clear(ftir_stats_tree)
         _report_builder_tree_clear(ftir_windows_tree)
         try:
@@ -14722,7 +14821,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     f"Mode: {cfg.get('validation_mode') or '(n/a)'}",
                     f"Paired windows: {int(preview.get('paired_window_count') or 0)}",
                     f"Aligned rows: {len(aligned_rows)}",
-                    f"Exclusions: {len(excluded_rows)}",
+                    f"Excluded rows: {int(preview.get('excluded_count') or 0)}",
+                    f"Unpaired/excluded candidates: {len(excluded_rows)}",
                     f"FTIR records: {int((ftir_src.get('record_count') or 0) if isinstance(ftir_src, dict) else 0)}",
                     f"MOLE rows: {int((mole_src.get('record_count') or 0) if isinstance(mole_src, dict) else 0)}",
                     str(preview.get("coverage_note") or "").strip(),
@@ -14749,7 +14849,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             for row in aligned_rows:
                 if not isinstance(row, dict):
                     continue
-                ftir_windows_tree.insert(
+                iid = ftir_windows_tree.insert(
                     "",
                     "end",
                     values=(
@@ -14757,6 +14857,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         str(row.get("label") or ""),
                         str(row.get("analyte") or ""),
                         str(row.get("status") or ""),
+                        "EXCLUDED" if bool(row.get("excluded")) else "INCLUDED",
+                        str(row.get("exclusion_reason") or ""),
                         int(row.get("mole_count") or 0),
                         int(row.get("ftir_count") or 0),
                         _fmt_num(row.get("mole_avg"), 4, ""),
@@ -14764,8 +14866,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         _fmt_num(row.get("difference"), 4, ""),
                     ),
                 )
+                ftir_validation_preview_rows[str(iid)] = dict(row)
             if not aligned_rows:
-                ftir_windows_tree.insert("", "end", values=("", "", "", "NO ALIGNED WINDOWS", 0, 0, "", "", ""))
+                ftir_windows_tree.insert("", "end", values=("", "", "", "NO ALIGNED WINDOWS", "", "", 0, 0, "", "", ""))
             if not list(preview.get("method301") or []):
                 ftir_stats_tree.insert("", "end", values=("", 0, "", "", "", "", "", "", "NO STATS"))
         except Exception as e:
@@ -14862,6 +14965,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ]),
             )
             _report_builder_text_set(txt_ftir_validation_notes, ftir_validation.get("notes"))
+            _report_builder_text_set(txt_ftir_validation_review_notes, ftir_validation.get("review_notes"))
+            var_ftir_validation_exclusion_reason.set("")
         except Exception:
             pass
 
@@ -15048,6 +15153,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 else []
             ),
             "notes": _report_builder_text_get(txt_ftir_validation_notes),
+            "review_notes": _report_builder_text_get(txt_ftir_validation_review_notes),
+            "reviewer": _report_builder_actor(sess),
         })
         meta.update({
             "updated_by": _report_builder_actor(sess),
@@ -15163,6 +15270,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
                 lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
+                lines.append(f"- FTIR validation excluded rows: {ftir_blk.get('excluded_count') or 0}")
                 lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
             tpl = _ftir_validation_template_paths()
             lines.extend([
@@ -15304,6 +15412,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         btn_ftir_validation_open_templates.configure(command=_open_ftir_validation_template_folder)
         btn_ftir_validation_open_import_template.configure(command=_open_ftir_validation_import_template)
         btn_ftir_validation_open_alignment.configure(command=_open_ftir_validation_alignment)
+        btn_ftir_validation_exclude.configure(command=_exclude_selected_ftir_validation_row)
+        btn_ftir_validation_include.configure(command=_include_selected_ftir_validation_row)
+        btn_ftir_validation_clear_exclusions.configure(command=_clear_all_ftir_validation_exclusions)
         btn_report_builder_save.configure(command=lambda: _report_builder_save_to_session(show_message=True))
         btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
         btn_report_builder_build.configure(command=build_formal_report_ui)
@@ -15317,6 +15428,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_report_builder_save.configure(state="disabled")
             btn_report_builder_build.configure(state="disabled")
             btn_ftir_validation_preview.configure(state="disabled")
+            btn_ftir_validation_exclude.configure(state="disabled")
+            btn_ftir_validation_include.configure(state="disabled")
+            btn_ftir_validation_clear_exclusions.configure(state="disabled")
             btn_report_builder_open_final.configure(state="disabled")
             btn_report_builder_open_final_dir.configure(state="disabled")
             btn_report_builder_open_pack_dir.configure(state="disabled")

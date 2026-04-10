@@ -3383,7 +3383,11 @@ def _build_report_context(
                     "validation_mode": ((ftir_validation.get("config") or {}).get("validation_mode") if isinstance(ftir_validation.get("config"), dict) else None),
                     "comparator_method": ((ftir_validation.get("config") or {}).get("comparator_method") if isinstance(ftir_validation.get("config"), dict) else None),
                     "paired_window_count": ftir_validation.get("paired_window_count"),
+                    "excluded_count": ftir_validation.get("excluded_count"),
                     "coverage_note": ftir_validation.get("coverage_note"),
+                    "review_notes": ftir_validation.get("review_notes"),
+                    "reviewer": ftir_validation.get("reviewer"),
+                    "excluded_rows": ftir_validation.get("excluded_rows"),
                     "method301": ftir_validation.get("method301"),
                 } if ftir_validation else None,
                 "summary.ftir_validation",
@@ -3847,7 +3851,10 @@ def _write_final_report_markdown(
     lines.append(f"- Validation mode: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('validation_mode')))}")
     lines.append(f"- Comparator method: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('comparator_method')))}")
     lines.append(f"- Paired window count: {_md_scalar((ftir_validation_summary.get('paired_window_count') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Excluded row count: {_md_scalar((ftir_validation_summary.get('excluded_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Coverage note: {_md_scalar((ftir_validation_summary.get('coverage_note') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Reviewer: {_md_scalar((ftir_validation_summary.get('reviewer') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Reviewer notes: {_md_scalar((ftir_validation_summary.get('review_notes') if isinstance(ftir_validation_summary, dict) else None))}")
     method301_rows = []
     for row in list((ftir_validation_summary.get("method301") if isinstance(ftir_validation_summary, dict) else []) or []):
         if not isinstance(row, dict):
@@ -3855,6 +3862,7 @@ def _write_final_report_markdown(
         method301_rows.append([
             row.get("analyte"),
             row.get("paired_window_count"),
+            row.get("excluded_window_count"),
             _fmt_num(row.get("relative_bias_pct"), 3, ""),
             _fmt_num(row.get("t_statistic"), 3, ""),
             _fmt_num(row.get("f_statistic"), 3, ""),
@@ -3863,9 +3871,30 @@ def _write_final_report_markdown(
             row.get("overall_status"),
         ])
     lines.append(_md_table(
-        ["Analyte", "Paired windows", "Relative bias %", "t-stat", "F-stat", "Bias", "Precision", "Overall"],
+        ["Analyte", "Paired windows", "Excluded", "Relative bias %", "t-stat", "F-stat", "Bias", "Precision", "Overall"],
         method301_rows,
     ))
+    excluded_rows = list((ftir_validation_summary.get("excluded_rows") if isinstance(ftir_validation_summary, dict) else []) or [])
+    if excluded_rows:
+        lines.append("")
+        lines.append("#### Excluded FTIR Validation Rows")
+        lines.append("")
+        exclusion_table_rows = []
+        for row in excluded_rows:
+            if not isinstance(row, dict):
+                continue
+            exclusion_table_rows.append([
+                row.get("run_no"),
+                row.get("label"),
+                row.get("analyte"),
+                row.get("reason"),
+                row.get("reviewer"),
+                row.get("updated_iso"),
+            ])
+        lines.append(_md_table(
+            ["Run", "Label", "Analyte", "Reason", "Reviewer", "Updated"],
+            exclusion_table_rows,
+        ))
     lines.append("")
     lines.append("## 4. Sampling and Analytical Procedures")
     lines.append("")
@@ -4643,6 +4672,9 @@ def generate_report_pack_v1(
             "overall_status": ftir_validation_summary.get("overall_status"),
             "coverage_note": ftir_validation_summary.get("coverage_note"),
             "paired_window_count": ftir_validation_summary.get("paired_window_count"),
+            "excluded_count": ftir_validation_summary.get("excluded_count"),
+            "review_notes": ftir_validation_summary.get("review_notes"),
+            "reviewer": ftir_validation_summary.get("reviewer"),
             "config": ftir_validation_summary.get("config"),
             "ftir_source": ftir_validation_summary.get("ftir_source"),
             "mole_source": ftir_validation_summary.get("mole_source"),
@@ -4652,6 +4684,7 @@ def generate_report_pack_v1(
                 "count": len(((ftir_validation_summary.get("windows") or {}).get("rows") if isinstance(ftir_validation_summary.get("windows"), dict) else []) or []),
                 "note": ((ftir_validation_summary.get("windows") or {}).get("note") if isinstance(ftir_validation_summary.get("windows"), dict) else None),
             },
+            "excluded_rows": ftir_validation_summary.get("excluded_rows"),
             "summary_json": str(paths.ftir_validation_json),
             "window_alignment_csv": str(paths.ftir_validation_windows_csv),
             "method301_csv": str(paths.ftir_validation_method301_csv),
