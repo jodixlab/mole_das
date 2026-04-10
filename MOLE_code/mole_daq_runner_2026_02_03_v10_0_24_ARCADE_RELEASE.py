@@ -102,6 +102,11 @@ except Exception:
     mole_modbus_acq_driver = None
 
 try:
+    import mole_ftir_validation_v1 as mole_ftir_validation
+except Exception:
+    mole_ftir_validation = None
+
+try:
     import mole_method_spec_engine as mole_spec_engine
 except Exception:
     mole_spec_engine = None
@@ -9999,6 +10004,108 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         note="Summarize NOI, agency coordination, ERT/CEDRI status, and related correspondence context.",
     )
 
+    report_builder_ftir_wrap = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_ftir_wrap.pack(fill="x", pady=(0, 8))
+    tk.Label(
+        report_builder_ftir_wrap,
+        text="FTIR Side-by-Side Validation",
+        fg=ACC,
+        bg=BG,
+        font=("Consolas", 10, "bold"),
+    ).pack(anchor="w")
+    tk.Label(
+        report_builder_ftir_wrap,
+        text="Configure the comparator dataset and alignment settings used for FTIR/MOLE side-by-side validation exports.",
+        fg=FG_DIM,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(2, 6))
+
+    report_builder_ftir_form = tk.Frame(report_builder_ftir_wrap, bg=BG)
+    report_builder_ftir_form.pack(fill="x", pady=(0, 6))
+    _configure_runner_form_grid(report_builder_ftir_form, minspec="runner_two_pair")
+
+    var_ftir_validation_enabled = tk.BooleanVar(value=False)
+    var_ftir_validation_mode = tk.StringVar(value="METHOD_301_INFORMED_COMPARISON")
+    var_ftir_validation_file = tk.StringVar(value="")
+    var_ftir_validation_timestamp_col = tk.StringVar(value="timestamp")
+    var_ftir_validation_delimiter = tk.StringVar(value="AUTO")
+    var_ftir_validation_offset_s = tk.StringVar(value="0")
+    var_ftir_validation_analytes = tk.StringVar(value="")
+    var_ftir_validation_master_clock = tk.StringVar(value="SESSION_MASTER_CLOCK")
+
+    tk.Checkbutton(
+        report_builder_ftir_form,
+        text="Enable FTIR validation package",
+        variable=var_ftir_validation_enabled,
+        bg=BG,
+        fg=FG,
+        selectcolor=BG,
+        activebackground=BG,
+        activeforeground=FG,
+        font=("Consolas", 9),
+    ).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Validation mode:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ttk.Combobox(
+        report_builder_ftir_form,
+        textvariable=var_ftir_validation_mode,
+        values=("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON"),
+        state="readonly",
+        font=("Consolas", 9),
+    ).grid(row=0, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="FTIR data file:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_file = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_file, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_file.grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Timestamp column:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_timestamp_col, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=1, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="Delimiter:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ttk.Combobox(
+        report_builder_ftir_form,
+        textvariable=var_ftir_validation_delimiter,
+        values=("AUTO", "CSV", "TSV"),
+        state="readonly",
+        font=("Consolas", 9),
+    ).grid(row=2, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Time offset (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_offset_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=2, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="Analytes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_analytes, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Master clock:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ttk.Combobox(
+        report_builder_ftir_form,
+        textvariable=var_ftir_validation_master_clock,
+        values=("SESSION_MASTER_CLOCK", "FTIR_FILE_CLOCK", "FIELD_NOTE_CLOCK"),
+        state="readonly",
+        font=("Consolas", 9),
+    ).grid(row=3, column=3, sticky="ew", pady=(0, 6))
+
+    report_builder_ftir_btns = tk.Frame(report_builder_ftir_wrap, bg=BG)
+    report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
+    btn_ftir_validation_browse = tk.Button(report_builder_ftir_btns, text="Browse FTIR File", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_browse.pack(side="left")
+
+    txt_ftir_validation_column_map = _report_builder_labeled_text(
+        report_builder_ftir_wrap,
+        "FTIR Column Map",
+        height=3,
+        note="Optional. One mapping per line in the form ANALYTE=COLUMN_NAME. Leave blank when FTIR columns already match analyte codes.",
+    )
+    txt_ftir_validation_manual_windows = _report_builder_labeled_text(
+        report_builder_ftir_wrap,
+        "Manual Comparison Windows",
+        height=3,
+        note="Optional. One window per line as run_no,start_ts_iso,end_ts_iso,label. Leave blank to use session actual-run windows.",
+    )
+    txt_ftir_validation_notes = _report_builder_labeled_text(
+        report_builder_ftir_wrap,
+        "FTIR Validation Notes",
+        height=3,
+        note="Document alignment assumptions, file provenance, or Method 301 interpretation notes.",
+    )
+
     report_builder_btns = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_btns.pack(fill="x", pady=(0, 8))
     btn_report_builder_save = tk.Button(report_builder_btns, text="Save Report Metadata", bg=BTN_BG, fg=FG, relief="flat")
@@ -14409,6 +14516,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 blk[key] = {}
         return blk
 
+    def _ftir_validation_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        blk = sess_local.get("ftir_validation")
+        if not isinstance(blk, dict):
+            blk = {}
+        analytes_default = sorted([str(code or "").strip().upper() for code in list((_pollutant_prescriptions(sess_local) or {}).keys()) if str(code or "").strip()])
+        if mole_ftir_validation is not None:
+            blk = mole_ftir_validation.normalize_config(blk, analytes_default=analytes_default)
+        else:
+            blk = {
+                "enabled": bool(blk.get("enabled")),
+                "validation_mode": str(blk.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper() or "METHOD_301_INFORMED_COMPARISON",
+                "comparator_method": str(blk.get("comparator_method") or "FTIR_VALIDATED_METHOD").strip(),
+                "timestamp_master_clock": str(blk.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK").strip(),
+                "ftir_file_path": str(blk.get("ftir_file_path") or "").strip(),
+                "ftir_timestamp_column": str(blk.get("ftir_timestamp_column") or "").strip(),
+                "ftir_delimiter": str(blk.get("ftir_delimiter") or "AUTO").strip().upper() or "AUTO",
+                "time_offset_seconds": _parse_float(blk.get("time_offset_seconds"), default=0.0),
+                "analytes": analytes_default,
+                "column_map": dict(blk.get("column_map") or {}) if isinstance(blk.get("column_map"), dict) else {},
+                "manual_windows": list(blk.get("manual_windows") or []) if isinstance(blk.get("manual_windows"), list) else [],
+                "notes": str(blk.get("notes") or "").strip(),
+            }
+        sess_local["ftir_validation"] = blk
+        return blk
+
     def _report_builder_text_get(widget: Any) -> str:
         try:
             return str(widget.get("1.0", "end-1c") or "").strip()
@@ -14457,6 +14589,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
             deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
             correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+            ftir_validation = _ftir_validation_block(sess_use)
             project = sess_use.get("project") if isinstance(sess_use.get("project"), dict) else {}
             source = sess_use.get("source") if isinstance(sess_use.get("source"), dict) else {}
 
@@ -14495,6 +14628,32 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _report_builder_text_set(txt_report_alt_approvals, "\n".join(_report_builder_split_list(deviations.get("alternative_method_approvals"))))
             _report_builder_text_set(txt_report_impact_statement, deviations.get("impact_statement"))
             _report_builder_text_set(txt_report_correspondence_notes, correspondence.get("notes"))
+            var_ftir_validation_enabled.set(bool(ftir_validation.get("enabled")))
+            var_ftir_validation_mode.set(str(ftir_validation.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON"))
+            var_ftir_validation_file.set(str(ftir_validation.get("ftir_file_path") or ""))
+            var_ftir_validation_timestamp_col.set(str(ftir_validation.get("ftir_timestamp_column") or ""))
+            var_ftir_validation_delimiter.set(str(ftir_validation.get("ftir_delimiter") or "AUTO"))
+            var_ftir_validation_offset_s.set(_fmt_num(ftir_validation.get("time_offset_seconds"), 3, "0"))
+            var_ftir_validation_analytes.set("; ".join([str(item) for item in list(ftir_validation.get("analytes") or []) if str(item or "").strip()]))
+            var_ftir_validation_master_clock.set(str(ftir_validation.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK"))
+            _report_builder_text_set(
+                txt_ftir_validation_column_map,
+                "\n".join([f"{k}={v}" for k, v in sorted((ftir_validation.get("column_map") or {}).items())]),
+            )
+            _report_builder_text_set(
+                txt_ftir_validation_manual_windows,
+                "\n".join([
+                    ",".join([
+                        str(item.get("run_no") or ""),
+                        str(item.get("start_ts_iso") or ""),
+                        str(item.get("end_ts_iso") or ""),
+                        str(item.get("label") or ""),
+                    ]).rstrip(",")
+                    for item in list(ftir_validation.get("manual_windows") or [])
+                    if isinstance(item, dict)
+                ]),
+            )
+            _report_builder_text_set(txt_ftir_validation_notes, ftir_validation.get("notes"))
         except Exception:
             pass
 
@@ -14504,6 +14663,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
         deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
         correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+        ftir_validation = _ftir_validation_block(sess_local)
 
         sections: List[Dict[str, Any]] = []
 
@@ -14591,6 +14751,21 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ]
         sections.append({"label": "Regulatory correspondence", **corr_eval})
 
+        ftir_eval = _status(
+            [
+                ("FTIR data file", ftir_validation.get("ftir_file_path") if bool(ftir_validation.get("enabled")) else "disabled"),
+                ("Analytes", ftir_validation.get("analytes") if bool(ftir_validation.get("enabled")) else ["disabled"]),
+            ],
+            [
+                ("Timestamp column", ftir_validation.get("ftir_timestamp_column")),
+                ("Manual windows", ftir_validation.get("manual_windows")),
+                ("Column map", ftir_validation.get("column_map")),
+            ],
+        )
+        if not bool(ftir_validation.get("enabled")):
+            ftir_eval = {"status": "Available", "missing": []}
+        sections.append({"label": "FTIR validation", **ftir_eval})
+
         counts = {"Available": 0, "Partial": 0, "Gap": 0}
         for item in sections:
             status = str(item.get("status") or "")
@@ -14616,6 +14791,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
         correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
         meta = blk.get("meta") if isinstance(blk.get("meta"), dict) else {}
+        ftir_validation = _ftir_validation_block(sess)
 
         parties.update({
             "client_name": str(var_report_client_name.get() or "").strip(),
@@ -14644,6 +14820,27 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "submission_status": str(var_report_submission_status.get() or "").strip(),
             "notes": _report_builder_text_get(txt_report_correspondence_notes),
         })
+        ftir_validation.update({
+            "enabled": bool(var_ftir_validation_enabled.get()),
+            "validation_mode": str(var_ftir_validation_mode.get() or "METHOD_301_INFORMED_COMPARISON").strip().upper() or "METHOD_301_INFORMED_COMPARISON",
+            "ftir_file_path": str(var_ftir_validation_file.get() or "").strip(),
+            "ftir_timestamp_column": str(var_ftir_validation_timestamp_col.get() or "").strip(),
+            "ftir_delimiter": str(var_ftir_validation_delimiter.get() or "AUTO").strip().upper() or "AUTO",
+            "time_offset_seconds": _parse_float(var_ftir_validation_offset_s.get(), default=0.0),
+            "analytes": _report_builder_split_list(var_ftir_validation_analytes.get()),
+            "timestamp_master_clock": str(var_ftir_validation_master_clock.get() or "SESSION_MASTER_CLOCK").strip(),
+            "column_map": (
+                mole_ftir_validation._normalize_column_map(_report_builder_text_get(txt_ftir_validation_column_map))
+                if mole_ftir_validation is not None
+                else {}
+            ),
+            "manual_windows": (
+                mole_ftir_validation._normalize_manual_windows(_report_builder_text_get(txt_ftir_validation_manual_windows))
+                if mole_ftir_validation is not None
+                else []
+            ),
+            "notes": _report_builder_text_get(txt_ftir_validation_notes),
+        })
         meta.update({
             "updated_by": _report_builder_actor(sess),
             "updated_iso": now_iso(),
@@ -14654,6 +14851,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         blk["correspondence"] = correspondence
         blk["meta"] = meta
         sess["report_builder"] = blk
+        sess["ftir_validation"] = ftir_validation
         _save_session(sess)
         _refresh_report_builder_status(sess)
         if show_message:
@@ -14668,8 +14866,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             pths = _report_builder_paths(sess_use)
             summary = _read_json(pths["summary_json"]) if pths["summary_json"].exists() else {}
             final_blk: Dict[str, Any] = {}
+            ftir_blk: Dict[str, Any] = {}
             if isinstance(summary, dict):
                 final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
+                ftir_blk = summary.get("ftir_validation") if isinstance(summary.get("ftir_validation"), dict) else {}
                 rc_blk = summary.get("report_context") if isinstance(summary.get("report_context"), dict) else {}
                 if str(final_blk.get("markdown_path") or "").strip():
                     pths["final_report_md"] = Path(str(final_blk.get("markdown_path")))
@@ -14751,6 +14951,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 lines.append(f"- PDF render status: {(pdf_row.get('status') if isinstance(pdf_row, dict) else None) or '(n/a)'}")
                 if isinstance(pdf_row, dict) and str(pdf_row.get("reason") or "").strip():
                     lines.append(f"  reason: {pdf_row.get('reason')}")
+            if isinstance(ftir_blk, dict) and ftir_blk:
+                lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
+                lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
+                lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
+                lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
 
             report_builder_text.configure(state="normal")
             report_builder_text.delete("1.0", "end")
@@ -14765,6 +14970,25 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 report_builder_text.configure(state="disabled")
             except Exception:
                 pass
+
+    def _browse_ftir_validation_file() -> None:
+        try:
+            initial_dir = str((cfg_path.parent if cfg_path else Path.cwd()).resolve())
+        except Exception:
+            initial_dir = str(Path.cwd())
+        chosen = filedialog.askopenfilename(
+            title="Select FTIR Validation Data File",
+            initialdir=initial_dir,
+            filetypes=[
+                ("Delimited data", "*.csv;*.tsv;*.txt;*.jsonl"),
+                ("CSV", "*.csv"),
+                ("TSV/TXT", "*.tsv;*.txt"),
+                ("JSONL", "*.jsonl"),
+                ("All files", "*.*"),
+            ],
+        )
+        if chosen:
+            var_ftir_validation_file.set(str(chosen))
 
     def build_formal_report_ui() -> None:
         nonlocal sess
@@ -14845,6 +15069,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         _open_fs_target(_report_builder_paths(sess_use).get("report_pack_dir"), title="Open Report Pack Folder Failed")
 
     try:
+        btn_ftir_validation_browse.configure(command=_browse_ftir_validation_file)
         btn_report_builder_save.configure(command=lambda: _report_builder_save_to_session(show_message=True))
         btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
         btn_report_builder_build.configure(command=build_formal_report_ui)
