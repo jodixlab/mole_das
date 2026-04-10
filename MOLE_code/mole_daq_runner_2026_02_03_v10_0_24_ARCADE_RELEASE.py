@@ -10120,12 +10120,89 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_report_builder_build.pack(side="left", padx=(8, 0))
     btn_report_builder_refresh = tk.Button(report_builder_btns, text="Refresh Status", bg=BTN_BG, fg=FG, relief="flat")
     btn_report_builder_refresh.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_preview = tk.Button(report_builder_btns, text="Refresh FTIR Validation Preview", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_preview.pack(side="left", padx=(8, 0))
     btn_report_builder_open_final = tk.Button(report_builder_btns, text="Open Final Report", bg=BTN_BG, fg=FG, relief="flat")
     btn_report_builder_open_final.pack(side="left", padx=(8, 0))
     btn_report_builder_open_final_dir = tk.Button(report_builder_btns, text="Open Final Report Folder", bg=BTN_BG, fg=FG, relief="flat")
     btn_report_builder_open_final_dir.pack(side="left", padx=(8, 0))
     btn_report_builder_open_pack_dir = tk.Button(report_builder_btns, text="Open Report Pack Folder", bg=BTN_BG, fg=FG, relief="flat")
     btn_report_builder_open_pack_dir.pack(side="left", padx=(8, 0))
+
+    report_builder_validation_wrap = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_validation_wrap.pack(fill="both", expand=True, pady=(0, 8))
+    var_ftir_validation_review_status = tk.StringVar(value="FTIR validation preview not run for this session.")
+    tk.Label(
+        report_builder_validation_wrap,
+        text="FTIR Validation Review",
+        fg=ACC,
+        bg=BG,
+        font=("Consolas", 10, "bold"),
+    ).pack(anchor="w")
+    tk.Label(
+        report_builder_validation_wrap,
+        textvariable=var_ftir_validation_review_status,
+        fg=FG_DIM,
+        bg=BG,
+        font=("Consolas", 9),
+        justify="left",
+        wraplength=1200,
+    ).pack(anchor="w", pady=(2, 6))
+
+    ftir_stats_wrap = tk.Frame(report_builder_validation_wrap, bg=BG)
+    ftir_stats_wrap.pack(fill="x", pady=(0, 8))
+    tk.Label(ftir_stats_wrap, text="Per-Analyte Validation Statistics", fg=FG, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w")
+    ftir_stats_body = tk.Frame(ftir_stats_wrap, bg=BG)
+    ftir_stats_body.pack(fill="x")
+    ftir_stats_scroll = tk.Scrollbar(ftir_stats_body, orient="vertical")
+    ftir_stats_scroll.pack(side="right", fill="y")
+    ftir_stats_cols = ("analyte", "pairs", "rel_bias_pct", "corr_factor", "t_stat", "f_stat", "bias_status", "precision_status", "overall_status")
+    ftir_stats_tree = ttk.Treeview(ftir_stats_body, columns=ftir_stats_cols, show="headings", height=6)
+    ftir_stats_tree.pack(side="left", fill="x", expand=True)
+    ftir_stats_scroll.configure(command=ftir_stats_tree.yview)
+    ftir_stats_tree.configure(yscrollcommand=ftir_stats_scroll.set)
+    for col, txt, width in [
+        ("analyte", "Analyte", 80),
+        ("pairs", "Pairs", 60),
+        ("rel_bias_pct", "Rel Bias %", 90),
+        ("corr_factor", "Corr Factor", 90),
+        ("t_stat", "t", 80),
+        ("f_stat", "F", 80),
+        ("bias_status", "Bias", 110),
+        ("precision_status", "Precision", 120),
+        ("overall_status", "Overall", 150),
+    ]:
+        ftir_stats_tree.heading(col, text=txt)
+        ftir_stats_tree.column(col, width=width, stretch=(col in ("bias_status", "precision_status", "overall_status")))
+
+    ftir_windows_wrap = tk.Frame(report_builder_validation_wrap, bg=BG)
+    ftir_windows_wrap.pack(fill="both", expand=True)
+    tk.Label(ftir_windows_wrap, text="Aligned Comparison Windows / Exclusions", fg=FG, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w")
+    ftir_windows_body = tk.Frame(ftir_windows_wrap, bg=BG)
+    ftir_windows_body.pack(fill="both", expand=True)
+    ftir_windows_vscroll = tk.Scrollbar(ftir_windows_body, orient="vertical")
+    ftir_windows_vscroll.pack(side="right", fill="y")
+    ftir_windows_hscroll = tk.Scrollbar(ftir_windows_body, orient="horizontal")
+    ftir_windows_hscroll.pack(side="bottom", fill="x")
+    ftir_windows_cols = ("run_no", "label", "analyte", "status", "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference")
+    ftir_windows_tree = ttk.Treeview(ftir_windows_body, columns=ftir_windows_cols, show="headings", height=8)
+    ftir_windows_tree.pack(side="left", fill="both", expand=True)
+    ftir_windows_tree.configure(yscrollcommand=ftir_windows_vscroll.set, xscrollcommand=ftir_windows_hscroll.set)
+    ftir_windows_vscroll.configure(command=ftir_windows_tree.yview)
+    ftir_windows_hscroll.configure(command=ftir_windows_tree.xview)
+    for col, txt, width in [
+        ("run_no", "Run", 60),
+        ("label", "Label", 160),
+        ("analyte", "Analyte", 80),
+        ("status", "Status", 120),
+        ("mole_count", "MOLE N", 70),
+        ("ftir_count", "FTIR N", 70),
+        ("mole_avg", "MOLE Avg", 100),
+        ("ftir_avg", "FTIR Avg", 100),
+        ("difference", "Diff", 100),
+    ]:
+        ftir_windows_tree.heading(col, text=txt)
+        ftir_windows_tree.column(col, width=width, stretch=(col in ("label", "status")))
 
     report_builder_text_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_text_wrap.pack(fill="both", expand=True)
@@ -14583,6 +14660,119 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         parts = re.split(r"[;\n]+", txt)
         return [str(item).strip() for item in parts if str(item or "").strip()]
 
+    def _report_builder_tree_clear(tree: Any) -> None:
+        try:
+            for iid in tree.get_children():
+                tree.delete(iid)
+        except Exception:
+            pass
+
+    def _report_builder_actual_runs(sess_local: Dict[str, Any]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        try:
+            blk = sess_local.get("daq_runner") or {}
+            runs = blk.get("runs") or []
+            for idx, run in enumerate(list(runs or []), start=1):
+                if not isinstance(run, dict):
+                    continue
+                start_iso = str(run.get("start_iso") or "").strip()
+                end_iso = str(run.get("end_iso") or "").strip()
+                if not start_iso or not end_iso:
+                    continue
+                out.append({
+                    "run_no": int(run.get("run_no") or idx),
+                    "start_ts_iso": start_iso,
+                    "end_ts_iso": end_iso,
+                    "label": f"Run {int(run.get('run_no') or idx)}",
+                })
+        except Exception:
+            return []
+        return out
+
+    def _refresh_ftir_validation_preview(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        _report_builder_tree_clear(ftir_stats_tree)
+        _report_builder_tree_clear(ftir_windows_tree)
+        try:
+            sess_use = dict(sess_local) if isinstance(sess_local, dict) else _report_builder_save_to_session(show_message=False)
+            _ensure_daq_schema(sess_use)
+            cfg = _ftir_validation_block(sess_use)
+            if not bool(cfg.get("enabled")):
+                var_ftir_validation_review_status.set("FTIR validation preview disabled for this session.")
+                return
+            if mole_ftir_validation is None:
+                var_ftir_validation_review_status.set("FTIR validation module is unavailable in this runtime.")
+                return
+            outputs = init_outputs(sess_use, cfg_path, None)
+            raw_samples_path = outputs.raw_dir / "raw_samples.jsonl"
+            actual_runs = _report_builder_actual_runs(sess_use)
+            preview = mole_ftir_validation.build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples_path,
+            )
+            ftir_src = preview.get("ftir_source") if isinstance(preview.get("ftir_source"), dict) else {}
+            mole_src = preview.get("mole_source") if isinstance(preview.get("mole_source"), dict) else {}
+            aligned_rows = list(preview.get("aligned_rows") or [])
+            paired_rows = [row for row in aligned_rows if bool(row.get("paired"))]
+            excluded_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
+            var_ftir_validation_review_status.set(
+                " | ".join([
+                    f"Status: {preview.get('status') or '(n/a)'}",
+                    f"Overall: {preview.get('overall_status') or '(n/a)'}",
+                    f"Mode: {cfg.get('validation_mode') or '(n/a)'}",
+                    f"Paired windows: {int(preview.get('paired_window_count') or 0)}",
+                    f"Aligned rows: {len(aligned_rows)}",
+                    f"Exclusions: {len(excluded_rows)}",
+                    f"FTIR records: {int((ftir_src.get('record_count') or 0) if isinstance(ftir_src, dict) else 0)}",
+                    f"MOLE rows: {int((mole_src.get('record_count') or 0) if isinstance(mole_src, dict) else 0)}",
+                    str(preview.get("coverage_note") or "").strip(),
+                ]).strip(" |")
+            )
+            for row in list(preview.get("method301") or []):
+                if not isinstance(row, dict):
+                    continue
+                ftir_stats_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        str(row.get("analyte") or ""),
+                        int(row.get("paired_window_count") or 0),
+                        _fmt_num(row.get("relative_bias_pct"), 3, ""),
+                        _fmt_num(row.get("correction_factor"), 4, ""),
+                        _fmt_num(row.get("t_statistic"), 3, ""),
+                        _fmt_num(row.get("f_statistic"), 3, ""),
+                        str(row.get("bias_status") or ""),
+                        str(row.get("precision_status") or ""),
+                        str(row.get("overall_status") or ""),
+                    ),
+                )
+            for row in aligned_rows:
+                if not isinstance(row, dict):
+                    continue
+                ftir_windows_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        str(row.get("run_no") or ""),
+                        str(row.get("label") or ""),
+                        str(row.get("analyte") or ""),
+                        str(row.get("status") or ""),
+                        int(row.get("mole_count") or 0),
+                        int(row.get("ftir_count") or 0),
+                        _fmt_num(row.get("mole_avg"), 4, ""),
+                        _fmt_num(row.get("ftir_avg"), 4, ""),
+                        _fmt_num(row.get("difference"), 4, ""),
+                    ),
+                )
+            if not aligned_rows:
+                ftir_windows_tree.insert("", "end", values=("", "", "", "NO ALIGNED WINDOWS", 0, 0, "", "", ""))
+            if not list(preview.get("method301") or []):
+                ftir_stats_tree.insert("", "end", values=("", 0, "", "", "", "", "", "", "NO STATS"))
+        except Exception as e:
+            var_ftir_validation_review_status.set(f"FTIR validation preview failed: {e}")
+            _report_builder_tree_clear(ftir_stats_tree)
+            _report_builder_tree_clear(ftir_windows_tree)
+
     def _report_builder_actor(sess_local: Dict[str, Any]) -> str:
         try:
             actor = str(((sess_local.get("project") or {}).get("operator")) or "").strip()
@@ -15118,6 +15308,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
         btn_report_builder_build.configure(command=build_formal_report_ui)
         btn_report_builder_refresh.configure(command=lambda: _refresh_report_builder_status(_load_session()))
+        btn_ftir_validation_preview.configure(command=lambda: _refresh_ftir_validation_preview(None))
         btn_report_builder_open_final.configure(command=_open_report_builder_final)
         btn_report_builder_open_final_dir.configure(command=_open_report_builder_final_dir)
         btn_report_builder_open_pack_dir.configure(command=_open_report_builder_pack_dir)
@@ -15125,6 +15316,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_tm_report_pack.configure(text="Build Report Disabled (Diagnostics)", state="disabled")
             btn_report_builder_save.configure(state="disabled")
             btn_report_builder_build.configure(state="disabled")
+            btn_ftir_validation_preview.configure(state="disabled")
             btn_report_builder_open_final.configure(state="disabled")
             btn_report_builder_open_final_dir.configure(state="disabled")
             btn_report_builder_open_pack_dir.configure(state="disabled")
