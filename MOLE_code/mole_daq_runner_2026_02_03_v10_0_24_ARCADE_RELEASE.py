@@ -10086,6 +10086,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
     btn_ftir_validation_browse = tk.Button(report_builder_ftir_btns, text="Browse FTIR File", bg=BTN_BG, fg=FG, relief="flat")
     btn_ftir_validation_browse.pack(side="left")
+    btn_ftir_validation_open_templates = tk.Button(report_builder_ftir_btns, text="Open Template Folder", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_open_templates.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_open_import_template = tk.Button(report_builder_ftir_btns, text="Open Import Template", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_open_import_template.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_open_alignment = tk.Button(report_builder_ftir_btns, text="Open Alignment Worksheet", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_open_alignment.pack(side="left", padx=(8, 0))
 
     txt_ftir_validation_column_map = _report_builder_labeled_text(
         report_builder_ftir_wrap,
@@ -14486,6 +14492,18 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "final_report_index": final_dir / "index.json",
         }
 
+    def _ftir_validation_template_paths() -> Dict[str, Path]:
+        root_dir = Path(__file__).resolve().parents[1]
+        template_dir = root_dir / "docs" / "protocols" / "ftir_validation_templates"
+        return {
+            "template_dir": template_dir,
+            "import_csv": template_dir / "FTIR_VALIDATION_IMPORT_TEMPLATE_2026_04_10_001.csv",
+            "manual_windows_csv": template_dir / "FTIR_VALIDATION_MANUAL_WINDOWS_TEMPLATE_2026_04_10_001.csv",
+            "column_map_csv": template_dir / "FTIR_VALIDATION_COLUMN_MAP_TEMPLATE_2026_04_10_001.csv",
+            "alignment_xlsx": template_dir / "FTIR_VALIDATION_ALIGNMENT_WORKSHEET_2026_04_10_001.xlsx",
+            "readme_md": template_dir / "README.md",
+        }
+
     def _open_fs_target(target: Any, title: str = "Open Failed") -> None:
         try:
             path = Path(str(target)).expanduser()
@@ -14956,6 +14974,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
                 lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
                 lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
+            tpl = _ftir_validation_template_paths()
+            lines.extend([
+                "",
+                "FTIR validation templates:",
+                f"- Template folder: {tpl['template_dir']}",
+                f"- Import template CSV: {tpl['import_csv']} [{'YES' if tpl['import_csv'].exists() else 'NO'}]",
+                f"- Manual windows CSV: {tpl['manual_windows_csv']} [{'YES' if tpl['manual_windows_csv'].exists() else 'NO'}]",
+                f"- Column map CSV: {tpl['column_map_csv']} [{'YES' if tpl['column_map_csv'].exists() else 'NO'}]",
+                f"- Alignment worksheet: {tpl['alignment_xlsx']} [{'YES' if tpl['alignment_xlsx'].exists() else 'NO'}]",
+            ])
 
             report_builder_text.configure(state="normal")
             report_builder_text.delete("1.0", "end")
@@ -14973,7 +15001,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _browse_ftir_validation_file() -> None:
         try:
-            initial_dir = str((cfg_path.parent if cfg_path else Path.cwd()).resolve())
+            current_path = Path(str(var_ftir_validation_file.get() or "")).expanduser()
+            if current_path.exists():
+                initial_dir = str(current_path.parent.resolve())
+            else:
+                initial_dir = str(_ftir_validation_template_paths()["template_dir"].resolve())
         except Exception:
             initial_dir = str(Path.cwd())
         chosen = filedialog.askopenfilename(
@@ -14989,6 +15021,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         )
         if chosen:
             var_ftir_validation_file.set(str(chosen))
+
+    def _open_ftir_validation_template_folder() -> None:
+        _open_fs_target(_ftir_validation_template_paths().get("template_dir"), title="Open FTIR Template Folder Failed")
+
+    def _open_ftir_validation_import_template() -> None:
+        _open_fs_target(_ftir_validation_template_paths().get("import_csv"), title="Open FTIR Import Template Failed")
+
+    def _open_ftir_validation_alignment() -> None:
+        _open_fs_target(_ftir_validation_template_paths().get("alignment_xlsx"), title="Open FTIR Alignment Worksheet Failed")
 
     def build_formal_report_ui() -> None:
         nonlocal sess
@@ -15070,6 +15111,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     try:
         btn_ftir_validation_browse.configure(command=_browse_ftir_validation_file)
+        btn_ftir_validation_open_templates.configure(command=_open_ftir_validation_template_folder)
+        btn_ftir_validation_open_import_template.configure(command=_open_ftir_validation_import_template)
+        btn_ftir_validation_open_alignment.configure(command=_open_ftir_validation_alignment)
         btn_report_builder_save.configure(command=lambda: _report_builder_save_to_session(show_message=True))
         btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
         btn_report_builder_build.configure(command=build_formal_report_ui)
