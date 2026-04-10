@@ -41,3 +41,9 @@ mole_das_data/training/db/*.sqlite-wal
 RELEASES/*.zip
 RELEASES/RELEASE_CERT_*.json
 RELEASES/RELEASE_CERT_*.txt
+
+# Local scratch / editor temp artifacts
+-HAL-9000.gitignore
+MOLE_code/*-HAL-9000.py
+figures/~$$*.vsdx
+~$*

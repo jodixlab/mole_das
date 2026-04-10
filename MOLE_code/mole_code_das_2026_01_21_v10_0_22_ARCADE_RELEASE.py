@@ -15063,6 +15063,10 @@ def _build_intake(self) -> None:
             except Exception as e:
                 raise RuntimeError(f"Non-JSON response from {url}: {e}")
 
+        def _federal_register_documents_url(params: Dict[str, Any]) -> str:
+            query = urllib.parse.urlencode(params, doseq=True)
+            return "https://www.federalregister.gov/api/v1/documents.json?" + query
+
         # Determine the previous sync date (YYYY-MM-DD) if available
         prev_sync = None
         try:
@@ -15111,8 +15115,7 @@ def _build_intake(self) -> None:
                 if prev_sync:
                     params["conditions[publication_date][gte]"] = prev_sync
 
-                q = urllib.parse.urlencode(params, doseq=True)
-                url = "https://www.federalregister.gov/api/v1/documents.jsonalpha" + q
+                url = _federal_register_documents_url(params)
                 d = _get_json(url, timeout_s=10.0)
                 results = (d or {}).get("results") or []
                 trimmed = []
@@ -15181,8 +15184,7 @@ def _build_intake(self) -> None:
                 if prev_sync:
                     params["conditions[publication_date][gte]"] = prev_sync
 
-                q = urllib.parse.urlencode(params, doseq=True)
-                url = "https://www.federalregister.gov/api/v1/documents.jsonalpha" + q
+                url = _federal_register_documents_url(params)
                 d = _get_json(url, timeout_s=10.0)
                 results = (d or {}).get("results") or []
                 trimmed = []
