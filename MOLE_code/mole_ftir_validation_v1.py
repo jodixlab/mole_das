@@ -190,6 +190,24 @@ def _normalize_review_snapshot(value: Any) -> Dict[str, Any]:
     }
 
 
+def _normalize_signoff(value: Any) -> Dict[str, Any]:
+    block = dict(value or {}) if isinstance(value, dict) else {}
+    decision = str(block.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+    if decision not in ("UNSIGNED", "ACCEPTED", "REJECTED"):
+        decision = "UNSIGNED"
+    basis = str(block.get("basis") or "").strip().upper()
+    if basis not in ("", "FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY", "REJECTED_NOT_ACCEPTED"):
+        basis = ""
+    return {
+        "decision": decision,
+        "basis": basis,
+        "by": str(block.get("by") or "").strip(),
+        "role": str(block.get("role") or "").strip(),
+        "iso": str(block.get("iso") or "").strip(),
+        "note": str(block.get("note") or "").strip(),
+    }
+
+
 def _row_key(run_no: Any, analyte: Any, start_iso: Any, end_iso: Any) -> str:
     return "|".join([
         str(run_no or "").strip(),
@@ -239,6 +257,7 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "review_unlock_by": str(block.get("review_unlock_by") or "").strip(),
         "review_unlock_iso": str(block.get("review_unlock_iso") or "").strip(),
         "review_snapshot": _normalize_review_snapshot(block.get("review_snapshot")),
+        "signoff": _normalize_signoff(block.get("signoff")),
         "exclusions": _normalize_exclusions(block.get("exclusions")),
     }
 
@@ -661,6 +680,7 @@ def build_validation_package(
         "review_unlock_by": str(normalized.get("review_unlock_by") or "").strip(),
         "review_unlock_iso": str(normalized.get("review_unlock_iso") or "").strip(),
         "review_snapshot": dict(normalized.get("review_snapshot") or {}) if isinstance(normalized.get("review_snapshot"), dict) else {},
+        "signoff": dict(normalized.get("signoff") or {}) if isinstance(normalized.get("signoff"), dict) else _normalize_signoff(None),
     }
 
 

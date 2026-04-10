@@ -10035,6 +10035,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_master_clock = tk.StringVar(value="SESSION_MASTER_CLOCK")
     var_ftir_validation_exclusion_reason = tk.StringVar(value="")
     var_ftir_validation_lock_status = tk.StringVar(value="FTIR validation review state: UNLOCKED")
+    var_ftir_validation_signoff_by = tk.StringVar(value="")
+    var_ftir_validation_signoff_role = tk.StringVar(value="")
+    var_ftir_validation_signoff_decision = tk.StringVar(value="UNSIGNED")
+    var_ftir_validation_signoff_basis = tk.StringVar(value="")
+    var_ftir_validation_signoff_status = tk.StringVar(value="FTIR validation signoff: UNSIGNED")
 
     chk_ftir_validation_enabled = tk.Checkbutton(
         report_builder_ftir_form,
@@ -10126,6 +10131,46 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         height=3,
         note="Session-level reviewer annotation carried into the FTIR validation summary and final report.",
     )
+    report_builder_ftir_signoff_form = tk.Frame(report_builder_ftir_wrap, bg=BG)
+    report_builder_ftir_signoff_form.pack(fill="x", pady=(0, 6))
+    _configure_runner_form_grid(report_builder_ftir_signoff_form, minspec="runner_two_pair")
+    tk.Label(report_builder_ftir_signoff_form, text="Approver name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_signoff_by = tk.Entry(report_builder_ftir_signoff_form, textvariable=var_ftir_validation_signoff_by, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_signoff_by.grid(row=0, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_signoff_form, text="Approver role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_signoff_role = tk.Entry(report_builder_ftir_signoff_form, textvariable=var_ftir_validation_signoff_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_signoff_role.grid(row=0, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_signoff_form, text="Decision:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    cbo_ftir_validation_signoff_decision = ttk.Combobox(
+        report_builder_ftir_signoff_form,
+        textvariable=var_ftir_validation_signoff_decision,
+        values=("UNSIGNED", "ACCEPTED", "REJECTED"),
+        state="readonly",
+        font=("Consolas", 9),
+    )
+    cbo_ftir_validation_signoff_decision.grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_signoff_form, text="Acceptance basis:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    cbo_ftir_validation_signoff_basis = ttk.Combobox(
+        report_builder_ftir_signoff_form,
+        textvariable=var_ftir_validation_signoff_basis,
+        values=("FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY", "REJECTED_NOT_ACCEPTED"),
+        state="readonly",
+        font=("Consolas", 9),
+    )
+    cbo_ftir_validation_signoff_basis.grid(row=1, column=3, sticky="ew", pady=(0, 6))
+    txt_ftir_validation_signoff_note = _report_builder_labeled_text(
+        report_builder_ftir_wrap,
+        "FTIR Validation Signoff Note",
+        height=3,
+        note="Optional approval note describing the acceptance basis or any limiting conditions on use.",
+    )
+    tk.Label(
+        report_builder_ftir_wrap,
+        textvariable=var_ftir_validation_signoff_status,
+        fg=ACC,
+        bg=BG,
+        font=("Consolas", 9, "bold"),
+    ).pack(anchor="w", pady=(0, 4))
     tk.Label(
         report_builder_ftir_wrap,
         textvariable=var_ftir_validation_lock_status,
@@ -10242,6 +10287,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_ftir_validation_lock.pack(side="left", padx=(16, 0))
     btn_ftir_validation_unlock = tk.Button(ftir_review_ctrls, text="Unlock Review", bg=BTN_BG, fg=FG, relief="flat")
     btn_ftir_validation_unlock.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_sign = tk.Button(ftir_review_ctrls, text="Sign Off", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_sign.pack(side="left", padx=(16, 0))
+    btn_ftir_validation_clear_signoff = tk.Button(ftir_review_ctrls, text="Clear Signoff", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_clear_signoff.pack(side="left", padx=(8, 0))
 
     report_builder_text_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_text_wrap.pack(fill="both", expand=True)
@@ -14734,6 +14783,20 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             return {}
 
+    def _ftir_validation_signoff_block(blk_local: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            sign = blk_local.get("signoff") if isinstance(blk_local.get("signoff"), dict) else {}
+            return dict(sign or {})
+        except Exception:
+            return {}
+
+    def _ftir_validation_is_signed(blk_local: Dict[str, Any]) -> bool:
+        try:
+            sign = _ftir_validation_signoff_block(blk_local)
+            return str(sign.get("decision") or "UNSIGNED").strip().upper() != "UNSIGNED"
+        except Exception:
+            return False
+
     def _load_ftir_validation_locked_snapshot(blk_local: Dict[str, Any]) -> Dict[str, Any]:
         snap = _ftir_validation_snapshot_block(blk_local)
         obj = _load_json_file(snap.get("json_path"))
@@ -14798,6 +14861,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             sess_use = dict(sess_local) if isinstance(sess_local, dict) else _load_session()
             blk_local = _ftir_validation_block(sess_use)
             locked = _ftir_validation_is_locked(blk_local)
+            signed = _ftir_validation_is_signed(blk_local)
+            sign = _ftir_validation_signoff_block(blk_local)
             lock_by = str(blk_local.get("review_lock_by") or "").strip()
             lock_iso = str(blk_local.get("review_lock_iso") or "").strip()
             unlock_by = str(blk_local.get("review_unlock_by") or "").strip()
@@ -14811,6 +14876,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if unlock_by or unlock_iso:
                     msg += f" | last unlock by {unlock_by or '(unknown)'} @ {unlock_iso or '(unknown)'}"
             var_ftir_validation_lock_status.set(msg)
+            if signed:
+                sign_msg = f"FTIR validation signoff: {str(sign.get('decision') or '').strip().upper() or 'SIGNED'}"
+                if str(sign.get("basis") or "").strip():
+                    sign_msg += f" | basis {sign.get('basis')}"
+                if str(sign.get("by") or "").strip() or str(sign.get("iso") or "").strip():
+                    sign_msg += f" | by {sign.get('by') or '(unknown)'} @ {sign.get('iso') or '(unknown)'}"
+            else:
+                sign_msg = "FTIR validation signoff: UNSIGNED"
+            var_ftir_validation_signoff_status.set(sign_msg)
 
             for widget in [
                 chk_ftir_validation_enabled,
@@ -14844,6 +14918,22 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 _set_widget_state(txt, "disabled" if locked else "normal")
             _set_widget_state(btn_ftir_validation_lock, "disabled" if locked else "normal")
             _set_widget_state(btn_ftir_validation_unlock, "normal" if locked else "disabled")
+            for widget in [
+                ent_ftir_validation_signoff_by,
+                ent_ftir_validation_signoff_role,
+            ]:
+                if signed:
+                    _set_widget_state(widget, "disabled")
+                else:
+                    _set_widget_state(widget, "normal")
+            for widget in [cbo_ftir_validation_signoff_decision, cbo_ftir_validation_signoff_basis]:
+                if signed:
+                    _set_widget_state(widget, "disabled")
+                else:
+                    _set_widget_state(widget, "readonly")
+            _set_widget_state(txt_ftir_validation_signoff_note, "disabled" if signed else "normal")
+            _set_widget_state(btn_ftir_validation_sign, "normal" if locked and not signed else "disabled")
+            _set_widget_state(btn_ftir_validation_clear_signoff, "normal" if signed else "disabled")
         except Exception:
             pass
 
@@ -14982,6 +15072,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             paired_rows = [row for row in aligned_rows if bool(row.get("paired"))]
             excluded_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
             snap = preview.get("review_snapshot") if isinstance(preview.get("review_snapshot"), dict) else {}
+            sign = preview.get("signoff") if isinstance(preview.get("signoff"), dict) else {}
             var_ftir_validation_review_status.set(
                 " | ".join([
                     f"Source: {source_label}",
@@ -14991,6 +15082,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     f"Paired windows: {int(preview.get('paired_window_count') or 0)}",
                     f"Aligned rows: {len(aligned_rows)}",
                     f"Excluded rows: {int(preview.get('excluded_count') or 0)}",
+                    f"Signoff: {str(sign.get('decision') or 'UNSIGNED').strip().upper() or 'UNSIGNED'}",
                     f"Unpaired/excluded candidates: {len(excluded_rows)}",
                     f"FTIR records: {int((ftir_src.get('record_count') or 0) if isinstance(ftir_src, dict) else 0)}",
                     f"MOLE rows: {int((mole_src.get('record_count') or 0) if isinstance(mole_src, dict) else 0)}",
@@ -15136,6 +15228,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             )
             _report_builder_text_set(txt_ftir_validation_notes, ftir_validation.get("notes"))
             _report_builder_text_set(txt_ftir_validation_review_notes, ftir_validation.get("review_notes"))
+            signoff = ftir_validation.get("signoff") if isinstance(ftir_validation.get("signoff"), dict) else {}
+            var_ftir_validation_signoff_by.set(str(signoff.get("by") or ""))
+            var_ftir_validation_signoff_role.set(str(signoff.get("role") or ""))
+            var_ftir_validation_signoff_decision.set(str(signoff.get("decision") or "UNSIGNED"))
+            var_ftir_validation_signoff_basis.set(str(signoff.get("basis") or ""))
+            _report_builder_text_set(txt_ftir_validation_signoff_note, signoff.get("note"))
             var_ftir_validation_exclusion_reason.set("")
             _apply_ftir_validation_lock_state(sess_use)
         except Exception:
@@ -15277,6 +15375,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         meta = blk.get("meta") if isinstance(blk.get("meta"), dict) else {}
         ftir_validation = _ftir_validation_block(sess)
         ftir_locked = _ftir_validation_is_locked(ftir_validation)
+        ftir_signed = _ftir_validation_is_signed(ftir_validation)
 
         parties.update({
             "client_name": str(var_report_client_name.get() or "").strip(),
@@ -15329,6 +15428,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "review_notes": _report_builder_text_get(txt_ftir_validation_review_notes),
                 "reviewer": _report_builder_actor(sess),
             })
+        if not ftir_signed:
+            ftir_validation["signoff"] = {
+                "decision": str(var_ftir_validation_signoff_decision.get() or "UNSIGNED").strip().upper() or "UNSIGNED",
+                "basis": str(var_ftir_validation_signoff_basis.get() or "").strip().upper(),
+                "by": str(var_ftir_validation_signoff_by.get() or "").strip(),
+                "role": str(var_ftir_validation_signoff_role.get() or "").strip(),
+                "iso": "",
+                "note": _report_builder_text_get(txt_ftir_validation_signoff_note),
+            }
         meta.update({
             "updated_by": _report_builder_actor(sess),
             "updated_iso": now_iso(),
@@ -15444,6 +15552,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if isinstance(pdf_row, dict) and str(pdf_row.get("reason") or "").strip():
                     lines.append(f"  reason: {pdf_row.get('reason')}")
             if isinstance(ftir_blk, dict) and ftir_blk:
+                sign = ftir_blk.get("signoff") if isinstance(ftir_blk.get("signoff"), dict) else {}
                 lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
                 lines.append(f"- FTIR validation source: {ftir_blk.get('source') or '(n/a)'}")
@@ -15461,6 +15570,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     lines.append(f"- FTIR locked snapshot: {snap_json_txt or '(n/a)'} [{'YES' if snap_exists else 'NO'}]")
                     if str(snap.get("snapshot_iso") or "").strip() or str(snap.get("snapshot_by") or "").strip():
                         lines.append(f"  snapshot by: {snap.get('snapshot_by') or '(n/a)'} @ {snap.get('snapshot_iso') or '(n/a)'}")
+                lines.append(f"- FTIR validation signoff: {str(sign.get('decision') or 'UNSIGNED').strip().upper() or 'UNSIGNED'}")
+                if str(sign.get("basis") or "").strip():
+                    lines.append(f"  basis: {sign.get('basis')}")
+                if str(sign.get("by") or "").strip() or str(sign.get("iso") or "").strip():
+                    lines.append(f"  by: {sign.get('by') or '(n/a)'} | role: {sign.get('role') or '(n/a)'} | at: {sign.get('iso') or '(n/a)'}")
                 lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
             tpl = _ftir_validation_template_paths()
             lines.extend([
@@ -15512,6 +15626,77 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception as e:
             messagebox.showerror("FTIR Validation Review", str(e))
 
+    def _signoff_ftir_validation_review() -> None:
+        nonlocal sess
+        try:
+            sess = _load_session()
+            _ensure_daq_schema(sess)
+            blk = _ftir_validation_block(sess)
+            if not _ftir_validation_is_locked(blk):
+                raise ValueError("Lock FTIR validation review before signing off.")
+            decision = str(var_ftir_validation_signoff_decision.get() or "UNSIGNED").strip().upper() or "UNSIGNED"
+            basis = str(var_ftir_validation_signoff_basis.get() or "").strip().upper()
+            approver = str(var_ftir_validation_signoff_by.get() or "").strip()
+            role = str(var_ftir_validation_signoff_role.get() or "").strip()
+            note = _report_builder_text_get(txt_ftir_validation_signoff_note)
+            if decision == "UNSIGNED":
+                raise ValueError("Select a signoff decision before signing off.")
+            if not approver:
+                raise ValueError("Approver name is required.")
+            if decision == "ACCEPTED" and basis not in ("FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY"):
+                raise ValueError("Accepted FTIR validation signoff requires a formal or informed-comparison basis.")
+            if decision == "REJECTED" and basis != "REJECTED_NOT_ACCEPTED":
+                raise ValueError("Rejected FTIR validation signoff requires basis REJECTED_NOT_ACCEPTED.")
+            signoff = {
+                "decision": decision,
+                "basis": basis,
+                "by": approver,
+                "role": role,
+                "iso": now_iso(),
+                "note": note,
+            }
+            blk["signoff"] = signoff
+            snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
+            snap_payload["signoff"] = dict(signoff)
+            blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, snap_payload)
+            sess["ftir_validation"] = blk
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _refresh_ftir_validation_preview(sess)
+            _apply_ftir_validation_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Signoff", str(e))
+
+    def _clear_ftir_validation_signoff() -> None:
+        nonlocal sess
+        if not messagebox.askyesno("FTIR Validation Signoff", "Clear FTIR validation signoff for this locked review?"):
+            return
+        try:
+            sess = _load_session()
+            _ensure_daq_schema(sess)
+            blk = _ftir_validation_block(sess)
+            blk["signoff"] = {
+                "decision": "UNSIGNED",
+                "basis": "",
+                "by": "",
+                "role": "",
+                "iso": "",
+                "note": "",
+            }
+            if _ftir_validation_is_locked(blk):
+                snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
+                snap_payload["signoff"] = dict(blk["signoff"])
+                blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, snap_payload)
+            sess["ftir_validation"] = blk
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _refresh_ftir_validation_preview(sess)
+            _apply_ftir_validation_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Signoff", str(e))
+
     def _unlock_ftir_validation_review() -> None:
         nonlocal sess
         if not messagebox.askyesno("FTIR Validation Review", "Unlock FTIR validation review and allow edits?"):
@@ -15523,6 +15708,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             blk["review_locked"] = False
             blk["review_unlock_by"] = _report_builder_actor(sess)
             blk["review_unlock_iso"] = now_iso()
+            blk["review_snapshot"] = {}
+            blk["signoff"] = {
+                "decision": "UNSIGNED",
+                "basis": "",
+                "by": "",
+                "role": "",
+                "iso": "",
+                "note": "",
+            }
             sess["ftir_validation"] = blk
             _save_session(sess)
             _report_builder_load_form(sess)
@@ -15618,6 +15812,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     ):
                         _refresh_report_builder_status(sess)
                         return
+                sign = _ftir_validation_signoff_block(ftir_blk)
+                if str(sign.get("decision") or "UNSIGNED").strip().upper() == "UNSIGNED":
+                    if not messagebox.askyesno(
+                        "Report Builder",
+                        "FTIR validation review is locked, but no signoff has been recorded.\n\n"
+                        "Build anyway without an FTIR validation approval decision?",
+                    ):
+                        _refresh_report_builder_status(sess)
+                        return
             outputs = init_outputs(sess, cfg_path, None)
             try:
                 from mole_report_pack_v1 import generate_report_pack_v1
@@ -15674,6 +15877,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         btn_ftir_validation_clear_exclusions.configure(command=_clear_all_ftir_validation_exclusions)
         btn_ftir_validation_lock.configure(command=_lock_ftir_validation_review)
         btn_ftir_validation_unlock.configure(command=_unlock_ftir_validation_review)
+        btn_ftir_validation_sign.configure(command=_signoff_ftir_validation_review)
+        btn_ftir_validation_clear_signoff.configure(command=_clear_ftir_validation_signoff)
         btn_report_builder_save.configure(command=lambda: _report_builder_save_to_session(show_message=True))
         btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
         btn_report_builder_build.configure(command=build_formal_report_ui)
@@ -15692,6 +15897,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_ftir_validation_clear_exclusions.configure(state="disabled")
             btn_ftir_validation_lock.configure(state="disabled")
             btn_ftir_validation_unlock.configure(state="disabled")
+            btn_ftir_validation_sign.configure(state="disabled")
+            btn_ftir_validation_clear_signoff.configure(state="disabled")
             btn_report_builder_open_final.configure(state="disabled")
             btn_report_builder_open_final_dir.configure(state="disabled")
             btn_report_builder_open_pack_dir.configure(state="disabled")

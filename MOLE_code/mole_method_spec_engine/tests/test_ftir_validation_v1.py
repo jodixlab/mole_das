@@ -182,6 +182,14 @@ class FtirValidationTests(unittest.TestCase):
                     "snapshot_by": "peer_scientist",
                     "source": "LOCK_REVIEW",
                 },
+                "signoff": {
+                    "decision": "ACCEPTED",
+                    "basis": "FORMAL_METHOD_301_PASS",
+                    "by": "peer_scientist",
+                    "role": "Peer Scientist",
+                    "iso": "2026-04-10T18:15:00Z",
+                    "note": "Accepted for formal Method 301 reporting.",
+                },
                 "aligned_rows": [
                     {
                         "run_no": 1,
@@ -243,6 +251,8 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(snapshot.get("source"), "LOCKED_REVIEW_SNAPSHOT")
             self.assertTrue(snapshot.get("review_locked"))
             self.assertEqual((snapshot.get("review_snapshot") or {}).get("snapshot_by"), "peer_scientist")
+            self.assertEqual((snapshot.get("signoff") or {}).get("decision"), "ACCEPTED")
+            self.assertEqual((snapshot.get("signoff") or {}).get("basis"), "FORMAL_METHOD_301_PASS")
             windows_csv = (root / "locked_windows.csv").read_text(encoding="utf-8")
             self.assertIn("startup stabilization", windows_csv)
             method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
