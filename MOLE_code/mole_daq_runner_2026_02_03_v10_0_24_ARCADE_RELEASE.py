@@ -458,6 +458,17 @@ def _fmt_num(value: Any, decimals: int = 3, fallback: str = "(n/a)") -> str:
 def _fmt_num_g(value: Any, sig: int = 6, fallback: str = "(n/a)") -> str:
     return _fmt_display_num(value, DISPLAY_DECIMALS, fallback)
 
+def _fmt_minutes_m(value: Any, fallback: str = "(n/a)") -> str:
+    try:
+        minutes = float(value)
+        if math.isnan(minutes) or math.isinf(minutes):
+            return fallback
+        if abs(minutes - round(minutes)) < 1e-9:
+            return f"{int(round(minutes))} min"
+        return f"{minutes:,.1f} min"
+    except Exception:
+        return fallback
+
 @dataclass
 class ExecStep:
     step_id: str
