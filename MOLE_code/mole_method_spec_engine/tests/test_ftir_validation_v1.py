@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from mole_ftir_validation_v1 import build_validation_package, normalize_config
+from mole_ftir_validation_v1 import build_validation_package, normalize_config, write_validation_exports
 
 
 class FtirValidationTests(unittest.TestCase):
@@ -163,6 +163,90 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(row.get("paired_window_count"), 5)
             self.assertEqual(row.get("excluded_window_count"), 1)
             self.assertEqual(row.get("overall_status"), "INSUFFICIENT_FORMAL_WINDOWS")
+
+    def test_write_validation_exports_preserves_snapshot_and_exclusion_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            payload = {
+                "status": "Available",
+                "overall_status": "PASS",
+                "source": "LOCKED_REVIEW_SNAPSHOT",
+                "review_locked": True,
+                "review_lock_by": "peer_scientist",
+                "review_lock_iso": "2026-04-10T18:05:00Z",
+                "review_snapshot": {
+                    "json_path": str(root / "locked.json"),
+                    "windows_csv_path": str(root / "locked_windows.csv"),
+                    "method301_csv_path": str(root / "locked_method301.csv"),
+                    "snapshot_iso": "2026-04-10T18:05:00Z",
+                    "snapshot_by": "peer_scientist",
+                    "source": "LOCK_REVIEW",
+                },
+                "aligned_rows": [
+                    {
+                        "run_no": 1,
+                        "label": "Run 1",
+                        "window_start_iso": "2026-04-10T12:00:00Z",
+                        "window_end_iso": "2026-04-10T12:20:00Z",
+                        "analyte": "NO",
+                        "row_key": "1|NO|2026-04-10T12:00:00Z|2026-04-10T12:20:00Z",
+                        "mole_count": 4,
+                        "ftir_count": 4,
+                        "mole_avg": 10.0,
+                        "ftir_avg": 9.5,
+                        "difference": 0.5,
+                        "paired": True,
+                        "status": "PAIRED",
+                        "excluded": True,
+                        "exclusion_reason": "startup stabilization",
+                        "reviewer": "peer_scientist",
+                        "updated_iso": "2026-04-10T18:00:00Z",
+                    }
+                ],
+                "method301": [
+                    {
+                        "analyte": "NO",
+                        "mode": "METHOD_301_FORMAL",
+                        "paired_window_count": 5,
+                        "excluded_window_count": 1,
+                        "mole_mean": 10.0,
+                        "ftir_mean": 9.5,
+                        "mean_difference": 0.5,
+                        "relative_bias_pct": 5.263157,
+                        "correction_factor": 0.95,
+                        "difference_sd": 0.1,
+                        "t_statistic": 1.0,
+                        "t_critical_95_two_sided": 2.571,
+                        "candidate_variance": 0.01,
+                        "validated_variance": 0.02,
+                        "f_statistic": 2.0,
+                        "f_critical_95": 4.28,
+                        "bias_status": "PASS",
+                        "precision_status": "PASS",
+                        "overall_status": "PASS",
+                        "note": "frozen",
+                    }
+                ],
+            }
+
+            out = write_validation_exports(
+                payload,
+                json_path=root / "locked.json",
+                windows_csv_path=root / "locked_windows.csv",
+                method301_csv_path=root / "locked_method301.csv",
+            )
+
+            self.assertTrue(Path(out["json_path"]).exists())
+            self.assertTrue(Path(out["windows_csv_path"]).exists())
+            self.assertTrue(Path(out["method301_csv_path"]).exists())
+            snapshot = json.loads((root / "locked.json").read_text(encoding="utf-8"))
+            self.assertEqual(snapshot.get("source"), "LOCKED_REVIEW_SNAPSHOT")
+            self.assertTrue(snapshot.get("review_locked"))
+            self.assertEqual((snapshot.get("review_snapshot") or {}).get("snapshot_by"), "peer_scientist")
+            windows_csv = (root / "locked_windows.csv").read_text(encoding="utf-8")
+            self.assertIn("startup stabilization", windows_csv)
+            method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
+            self.assertIn("excluded_window_count", method_csv)
 
 
 if __name__ == "__main__":

@@ -14602,6 +14602,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "final_report_dir": final_dir,
             "summary_json": pack_dir / "summary.json",
             "report_context_json": pack_dir / "report_context.json",
+            "ftir_validation_locked_json": pack_dir / "ftir_validation_locked_snapshot.json",
+            "ftir_validation_locked_windows_csv": pack_dir / "ftir_validation_locked_window_alignment.csv",
+            "ftir_validation_locked_method301_csv": pack_dir / "ftir_validation_locked_method301.csv",
             "final_report_md": final_dir / "final_test_report_v1.md",
             "final_report_docx": final_dir / "final_test_report_v1.docx",
             "final_report_pdf": final_dir / "final_test_report_v1.pdf",
@@ -14708,11 +14711,81 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     ftir_validation_preview_rows: Dict[str, Dict[str, Any]] = {}
 
+    def _load_json_file(path: Any) -> Dict[str, Any]:
+        try:
+            p = Path(str(path)).expanduser()
+            if not p.exists():
+                return {}
+            obj = json.loads(p.read_text(encoding="utf-8-sig"))
+            return obj if isinstance(obj, dict) else {}
+        except Exception:
+            return {}
+
     def _ftir_validation_is_locked(blk_local: Dict[str, Any]) -> bool:
         try:
             return bool((blk_local or {}).get("review_locked"))
         except Exception:
             return False
+
+    def _ftir_validation_snapshot_block(blk_local: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            snap = blk_local.get("review_snapshot") if isinstance(blk_local.get("review_snapshot"), dict) else {}
+            return dict(snap or {})
+        except Exception:
+            return {}
+
+    def _load_ftir_validation_locked_snapshot(blk_local: Dict[str, Any]) -> Dict[str, Any]:
+        snap = _ftir_validation_snapshot_block(blk_local)
+        obj = _load_json_file(snap.get("json_path"))
+        return obj if isinstance(obj, dict) else {}
+
+    def _build_ftir_validation_preview_payload(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        cfg = _ftir_validation_block(sess_local)
+        if not bool(cfg.get("enabled")):
+            return {
+                "status": "DISABLED",
+                "overall_status": "DISABLED",
+                "coverage_note": "FTIR validation not enabled for this session.",
+                "aligned_rows": [],
+                "method301": [],
+                "excluded_rows": [],
+                "paired_window_count": 0,
+                "excluded_count": 0,
+            }
+        if mole_ftir_validation is None:
+            raise RuntimeError("FTIR validation module is unavailable in this runtime.")
+        outputs = init_outputs(sess_local, cfg_path, None)
+        raw_samples_path = outputs.raw_dir / "raw_samples.jsonl"
+        actual_runs = _report_builder_actual_runs(sess_local)
+        return mole_ftir_validation.build_validation_package(
+            cfg,
+            run_aggregation={"actual_runs": actual_runs},
+            raw_samples_path=raw_samples_path,
+        )
+
+    def _write_ftir_validation_locked_snapshot(sess_local: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+        if mole_ftir_validation is None:
+            raise RuntimeError("FTIR validation module is unavailable in this runtime.")
+        pths = _report_builder_paths(sess_local)
+        snap_by = _report_builder_actor(sess_local)
+        snap_iso = now_iso()
+        payload_out = dict(payload or {})
+        payload_out["source"] = "LOCKED_REVIEW_SNAPSHOT"
+        payload_out["review_snapshot"] = {
+            "json_path": str(pths["ftir_validation_locked_json"]),
+            "windows_csv_path": str(pths["ftir_validation_locked_windows_csv"]),
+            "method301_csv_path": str(pths["ftir_validation_locked_method301_csv"]),
+            "snapshot_iso": snap_iso,
+            "snapshot_by": snap_by,
+            "source": "LOCK_REVIEW",
+        }
+        mole_ftir_validation.write_validation_exports(
+            payload_out,
+            json_path=pths["ftir_validation_locked_json"],
+            windows_csv_path=pths["ftir_validation_locked_windows_csv"],
+            method301_csv_path=pths["ftir_validation_locked_method301_csv"],
+        )
+        return dict(payload_out.get("review_snapshot") or {})
 
     def _set_widget_state(widget: Any, state: str) -> None:
         try:
@@ -14893,24 +14966,25 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if not bool(cfg.get("enabled")):
                 var_ftir_validation_review_status.set("FTIR validation preview disabled for this session.")
                 return
-            if mole_ftir_validation is None:
-                var_ftir_validation_review_status.set("FTIR validation module is unavailable in this runtime.")
-                return
-            outputs = init_outputs(sess_use, cfg_path, None)
-            raw_samples_path = outputs.raw_dir / "raw_samples.jsonl"
-            actual_runs = _report_builder_actual_runs(sess_use)
-            preview = mole_ftir_validation.build_validation_package(
-                cfg,
-                run_aggregation={"actual_runs": actual_runs},
-                raw_samples_path=raw_samples_path,
-            )
+            preview = {}
+            source_label = "LIVE_COMPUTE"
+            if _ftir_validation_is_locked(cfg):
+                preview = _load_ftir_validation_locked_snapshot(cfg)
+                if preview:
+                    source_label = "LOCKED_REVIEW_SNAPSHOT"
+            if not isinstance(preview, dict) or not preview:
+                preview = _build_ftir_validation_preview_payload(sess_use)
+            if not isinstance(preview, dict):
+                preview = {}
             ftir_src = preview.get("ftir_source") if isinstance(preview.get("ftir_source"), dict) else {}
             mole_src = preview.get("mole_source") if isinstance(preview.get("mole_source"), dict) else {}
             aligned_rows = list(preview.get("aligned_rows") or [])
             paired_rows = [row for row in aligned_rows if bool(row.get("paired"))]
             excluded_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
+            snap = preview.get("review_snapshot") if isinstance(preview.get("review_snapshot"), dict) else {}
             var_ftir_validation_review_status.set(
                 " | ".join([
+                    f"Source: {source_label}",
                     f"Status: {preview.get('status') or '(n/a)'}",
                     f"Overall: {preview.get('overall_status') or '(n/a)'}",
                     f"Mode: {cfg.get('validation_mode') or '(n/a)'}",
@@ -14920,6 +14994,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     f"Unpaired/excluded candidates: {len(excluded_rows)}",
                     f"FTIR records: {int((ftir_src.get('record_count') or 0) if isinstance(ftir_src, dict) else 0)}",
                     f"MOLE rows: {int((mole_src.get('record_count') or 0) if isinstance(mole_src, dict) else 0)}",
+                    (f"Snapshot: {str(snap.get('snapshot_iso') or '').strip()}" if str(snap.get("snapshot_iso") or "").strip() else ""),
                     str(preview.get("coverage_note") or "").strip(),
                 ]).strip(" |")
             )
@@ -15281,6 +15356,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             summary = _read_json(pths["summary_json"]) if pths["summary_json"].exists() else {}
             final_blk: Dict[str, Any] = {}
             ftir_blk: Dict[str, Any] = {}
+            ftir_cfg = _ftir_validation_block(sess_use)
             if isinstance(summary, dict):
                 final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
                 ftir_blk = summary.get("ftir_validation") if isinstance(summary.get("ftir_validation"), dict) else {}
@@ -15295,6 +15371,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     pths["final_report_index"] = Path(str(final_blk.get("index_path")))
                 if str(rc_blk.get("json_path") or "").strip():
                     pths["report_context_json"] = Path(str(rc_blk.get("json_path")))
+            if not isinstance(ftir_blk, dict) or not ftir_blk:
+                ftir_blk = dict(ftir_cfg)
 
             report_context = _read_json(pths["report_context_json"]) if pths["report_context_json"].exists() else {}
             coverage = report_context.get("coverage") if isinstance(report_context, dict) else {}
@@ -15368,6 +15446,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if isinstance(ftir_blk, dict) and ftir_blk:
                 lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
+                lines.append(f"- FTIR validation source: {ftir_blk.get('source') or '(n/a)'}")
                 lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
                 lines.append(f"- FTIR validation excluded rows: {ftir_blk.get('excluded_count') or 0}")
                 lines.append(f"- FTIR validation review locked: {'YES' if bool(ftir_blk.get('review_locked')) else 'NO'}")
@@ -15375,6 +15454,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     lines.append(f"  locked by: {ftir_blk.get('review_lock_by') or '(n/a)'} @ {ftir_blk.get('review_lock_iso') or '(n/a)'}")
                 elif str(ftir_blk.get('review_unlock_by') or '').strip() or str(ftir_blk.get('review_unlock_iso') or '').strip():
                     lines.append(f"  last unlock: {ftir_blk.get('review_unlock_by') or '(n/a)'} @ {ftir_blk.get('review_unlock_iso') or '(n/a)'}")
+                snap = ftir_blk.get("review_snapshot") if isinstance(ftir_blk.get("review_snapshot"), dict) else {}
+                if isinstance(snap, dict) and snap:
+                    snap_json_txt = str(snap.get("json_path") or "").strip()
+                    snap_exists = Path(snap_json_txt).exists() if snap_json_txt else False
+                    lines.append(f"- FTIR locked snapshot: {snap_json_txt or '(n/a)'} [{'YES' if snap_exists else 'NO'}]")
+                    if str(snap.get("snapshot_iso") or "").strip() or str(snap.get("snapshot_by") or "").strip():
+                        lines.append(f"  snapshot by: {snap.get('snapshot_by') or '(n/a)'} @ {snap.get('snapshot_iso') or '(n/a)'}")
                 lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
             tpl = _ftir_validation_template_paths()
             lines.extend([
@@ -15410,9 +15496,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if _ftir_validation_is_locked(blk):
                 _apply_ftir_validation_lock_state(sess)
                 return
+            if not bool(blk.get("enabled")):
+                raise ValueError("Enable FTIR validation before locking the review.")
             blk["review_locked"] = True
             blk["review_lock_by"] = _report_builder_actor(sess)
             blk["review_lock_iso"] = now_iso()
+            sess["ftir_validation"] = blk
+            preview = _build_ftir_validation_preview_payload(sess)
+            blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, preview)
             sess["ftir_validation"] = blk
             _save_session(sess)
             _refresh_report_builder_status(sess)
@@ -15515,6 +15606,18 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ):
                     _refresh_report_builder_status(sess)
                     return
+            snap = _ftir_validation_snapshot_block(ftir_blk)
+            if bool(ftir_blk.get("enabled")) and _ftir_validation_is_locked(ftir_blk):
+                snap_json_txt = str((snap.get("json_path") if isinstance(snap, dict) else "") or "").strip()
+                snap_exists = Path(snap_json_txt).expanduser().exists() if snap_json_txt else False
+                if not snap_exists:
+                    if not messagebox.askyesno(
+                        "Report Builder",
+                        "FTIR validation review is locked, but the frozen snapshot artifact is missing.\n\n"
+                        "Build anyway using a live recompute?",
+                    ):
+                        _refresh_report_builder_status(sess)
+                        return
             outputs = init_outputs(sess, cfg_path, None)
             try:
                 from mole_report_pack_v1 import generate_report_pack_v1

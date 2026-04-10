@@ -150,6 +150,23 @@ def _ftir_validation_cfg_from_session(session: Dict[str, Any]) -> Dict[str, Any]
     return mole_ftir_validation.normalize_config(block, analytes_default=analytes_default)
 
 
+def _locked_ftir_validation_snapshot(cfg: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        if not bool(cfg.get("review_locked")):
+            return None
+        snapshot = cfg.get("review_snapshot") if isinstance(cfg.get("review_snapshot"), dict) else {}
+        json_txt = str(snapshot.get("json_path") or "").strip()
+        if not json_txt:
+            return None
+        json_path = Path(json_txt).expanduser()
+        if not json_path.exists():
+            return None
+        obj = _read_json(json_path)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
 def _ctx_field(
     value: Any = None,
     source: str = "",
@@ -3380,6 +3397,7 @@ def _build_report_context(
                 {
                     "status": ftir_validation.get("status"),
                     "overall_status": ftir_validation.get("overall_status"),
+                    "source": ftir_validation.get("source"),
                     "validation_mode": ((ftir_validation.get("config") or {}).get("validation_mode") if isinstance(ftir_validation.get("config"), dict) else None),
                     "comparator_method": ((ftir_validation.get("config") or {}).get("comparator_method") if isinstance(ftir_validation.get("config"), dict) else None),
                     "paired_window_count": ftir_validation.get("paired_window_count"),
@@ -3392,6 +3410,7 @@ def _build_report_context(
                     "review_lock_iso": ftir_validation.get("review_lock_iso"),
                     "review_unlock_by": ftir_validation.get("review_unlock_by"),
                     "review_unlock_iso": ftir_validation.get("review_unlock_iso"),
+                    "review_snapshot": ftir_validation.get("review_snapshot"),
                     "excluded_rows": ftir_validation.get("excluded_rows"),
                     "method301": ftir_validation.get("method301"),
                 } if ftir_validation else None,
@@ -3853,6 +3872,7 @@ def _write_final_report_markdown(
     lines.append("")
     lines.append(f"- Validation status: {_md_scalar((ftir_validation_summary.get('status') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Overall status: {_md_scalar((ftir_validation_summary.get('overall_status') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Validation source: {_md_scalar((ftir_validation_summary.get('source') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Validation mode: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('validation_mode')))}")
     lines.append(f"- Comparator method: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('comparator_method')))}")
     lines.append(f"- Paired window count: {_md_scalar((ftir_validation_summary.get('paired_window_count') if isinstance(ftir_validation_summary, dict) else None))}")
@@ -3863,6 +3883,7 @@ def _write_final_report_markdown(
     lines.append(f"- Review locked: {_md_scalar((ftir_validation_summary.get('review_locked') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Lock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_lock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_lock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
     lines.append(f"- Last unlock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_unlock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_unlock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
+    lines.append(f"- Locked snapshot: {_md_scalar((ftir_validation_summary.get('review_snapshot') if isinstance(ftir_validation_summary, dict) else None))}")
     method301_rows = []
     for row in list((ftir_validation_summary.get("method301") if isinstance(ftir_validation_summary, dict) else []) or []):
         if not isinstance(row, dict):
@@ -4508,13 +4529,15 @@ def generate_report_pack_v1(
     side_by_side_summary = _side_by_side_snapshot(session)
     run_aggregation_preview = _report_run_aggregation(session, evidence_bundle, cfg_path=cfg_path, session_dir=session_dir)
     ftir_validation_cfg = _ftir_validation_cfg_from_session(session)
-    if mole_ftir_validation is not None:
+    ftir_validation_summary = _locked_ftir_validation_snapshot(ftir_validation_cfg)
+    ftir_validation_source = "LOCKED_REVIEW_SNAPSHOT" if isinstance(ftir_validation_summary, dict) else "LIVE_COMPUTE"
+    if not isinstance(ftir_validation_summary, dict) and mole_ftir_validation is not None:
         ftir_validation_summary = mole_ftir_validation.build_validation_package(
             ftir_validation_cfg,
             run_aggregation=run_aggregation_preview,
             raw_samples_path=raw_samples_path,
         )
-    else:
+    elif not isinstance(ftir_validation_summary, dict):
         ftir_validation_summary = {
             "status": "Gap",
             "config": ftir_validation_cfg,
@@ -4527,6 +4550,15 @@ def generate_report_pack_v1(
             "overall_status": "Gap",
             "paired_window_count": 0,
         }
+        ftir_validation_source = "MODULE_UNAVAILABLE"
+    if isinstance(ftir_validation_summary, dict):
+        ftir_validation_summary["source"] = ftir_validation_source
+        if not isinstance(ftir_validation_summary.get("review_snapshot"), dict):
+            ftir_validation_summary["review_snapshot"] = (
+                dict(ftir_validation_cfg.get("review_snapshot") or {})
+                if isinstance(ftir_validation_cfg.get("review_snapshot"), dict)
+                else {}
+            )
 
     offset_policy = {}
     offset_store_summary = {}
@@ -4678,6 +4710,7 @@ def generate_report_pack_v1(
         "ftir_validation": {
             "status": ftir_validation_summary.get("status"),
             "overall_status": ftir_validation_summary.get("overall_status"),
+            "source": ftir_validation_source,
             "coverage_note": ftir_validation_summary.get("coverage_note"),
             "paired_window_count": ftir_validation_summary.get("paired_window_count"),
             "excluded_count": ftir_validation_summary.get("excluded_count"),
@@ -4688,6 +4721,7 @@ def generate_report_pack_v1(
             "review_lock_iso": ftir_validation_summary.get("review_lock_iso"),
             "review_unlock_by": ftir_validation_summary.get("review_unlock_by"),
             "review_unlock_iso": ftir_validation_summary.get("review_unlock_iso"),
+            "review_snapshot": ftir_validation_summary.get("review_snapshot"),
             "config": ftir_validation_summary.get("config"),
             "ftir_source": ftir_validation_summary.get("ftir_source"),
             "mole_source": ftir_validation_summary.get("mole_source"),
@@ -5204,89 +5238,15 @@ def generate_report_pack_v1(
                 row.get("method_standard"),
             ])
 
-    paths.ftir_validation_json.write_text(json.dumps(ftir_validation_summary, indent=2), encoding="utf-8")
-
-    with open(paths.ftir_validation_windows_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow([
-            "run_no",
-            "label",
-            "window_start_iso",
-            "window_end_iso",
-            "analyte",
-            "mole_count",
-            "ftir_count",
-            "mole_avg",
-            "ftir_avg",
-            "difference",
-            "paired",
-            "status",
-        ])
-        for row in list(ftir_validation_summary.get("aligned_rows") or []):
-            if not isinstance(row, dict):
-                continue
-            w.writerow([
-                row.get("run_no"),
-                row.get("label"),
-                row.get("window_start_iso"),
-                row.get("window_end_iso"),
-                row.get("analyte"),
-                row.get("mole_count"),
-                row.get("ftir_count"),
-                _fmt_num(row.get("mole_avg"), 6, ""),
-                _fmt_num(row.get("ftir_avg"), 6, ""),
-                _fmt_num(row.get("difference"), 6, ""),
-                row.get("paired"),
-                row.get("status"),
-            ])
-
-    with open(paths.ftir_validation_method301_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow([
-            "analyte",
-            "mode",
-            "paired_window_count",
-            "mole_mean",
-            "ftir_mean",
-            "mean_difference",
-            "relative_bias_pct",
-            "correction_factor",
-            "difference_sd",
-            "t_statistic",
-            "t_critical_95_two_sided",
-            "candidate_variance",
-            "validated_variance",
-            "f_statistic",
-            "f_critical_95",
-            "bias_status",
-            "precision_status",
-            "overall_status",
-            "note",
-        ])
-        for row in list(ftir_validation_summary.get("method301") or []):
-            if not isinstance(row, dict):
-                continue
-            w.writerow([
-                row.get("analyte"),
-                row.get("mode"),
-                row.get("paired_window_count"),
-                _fmt_num(row.get("mole_mean"), 6, ""),
-                _fmt_num(row.get("ftir_mean"), 6, ""),
-                _fmt_num(row.get("mean_difference"), 6, ""),
-                _fmt_num(row.get("relative_bias_pct"), 6, ""),
-                _fmt_num(row.get("correction_factor"), 6, ""),
-                _fmt_num(row.get("difference_sd"), 6, ""),
-                _fmt_num(row.get("t_statistic"), 6, ""),
-                _fmt_num(row.get("t_critical_95_two_sided"), 6, ""),
-                _fmt_num(row.get("candidate_variance"), 6, ""),
-                _fmt_num(row.get("validated_variance"), 6, ""),
-                _fmt_num(row.get("f_statistic"), 6, ""),
-                _fmt_num(row.get("f_critical_95"), 6, ""),
-                row.get("bias_status"),
-                row.get("precision_status"),
-                row.get("overall_status"),
-                row.get("note"),
-            ])
+    if mole_ftir_validation is not None:
+        mole_ftir_validation.write_validation_exports(
+            ftir_validation_summary,
+            json_path=paths.ftir_validation_json,
+            windows_csv_path=paths.ftir_validation_windows_csv,
+            method301_csv_path=paths.ftir_validation_method301_csv,
+        )
+    else:
+        paths.ftir_validation_json.write_text(json.dumps(ftir_validation_summary, indent=2), encoding="utf-8")
 
     # Test matrix CSV
     with open(paths.test_matrix_csv, "w", newline="", encoding="utf-8") as f:

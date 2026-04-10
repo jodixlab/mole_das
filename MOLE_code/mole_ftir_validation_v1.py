@@ -29,6 +29,15 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
+def _fmt_num(value: Any, precision: int = 6) -> str:
+    try:
+        if value in (None, ""):
+            return ""
+        return f"{float(value):.{precision}f}"
+    except Exception:
+        return ""
+
+
 def _parse_iso_dt(text: Any) -> Optional[datetime]:
     try:
         s = str(text or "").strip()
@@ -169,6 +178,18 @@ def _normalize_exclusions(value: Any) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def _normalize_review_snapshot(value: Any) -> Dict[str, Any]:
+    block = dict(value or {}) if isinstance(value, dict) else {}
+    return {
+        "json_path": str(block.get("json_path") or "").strip(),
+        "windows_csv_path": str(block.get("windows_csv_path") or "").strip(),
+        "method301_csv_path": str(block.get("method301_csv_path") or "").strip(),
+        "snapshot_iso": str(block.get("snapshot_iso") or "").strip(),
+        "snapshot_by": str(block.get("snapshot_by") or "").strip(),
+        "source": str(block.get("source") or "").strip(),
+    }
+
+
 def _row_key(run_no: Any, analyte: Any, start_iso: Any, end_iso: Any) -> str:
     return "|".join([
         str(run_no or "").strip(),
@@ -217,6 +238,7 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "review_lock_iso": str(block.get("review_lock_iso") or "").strip(),
         "review_unlock_by": str(block.get("review_unlock_by") or "").strip(),
         "review_unlock_iso": str(block.get("review_unlock_iso") or "").strip(),
+        "review_snapshot": _normalize_review_snapshot(block.get("review_snapshot")),
         "exclusions": _normalize_exclusions(block.get("exclusions")),
     }
 
@@ -638,4 +660,121 @@ def build_validation_package(
         "review_lock_iso": str(normalized.get("review_lock_iso") or "").strip(),
         "review_unlock_by": str(normalized.get("review_unlock_by") or "").strip(),
         "review_unlock_iso": str(normalized.get("review_unlock_iso") or "").strip(),
+        "review_snapshot": dict(normalized.get("review_snapshot") or {}) if isinstance(normalized.get("review_snapshot"), dict) else {},
+    }
+
+
+def write_validation_exports(
+    payload: Dict[str, Any],
+    *,
+    json_path: Any,
+    windows_csv_path: Any,
+    method301_csv_path: Any,
+) -> Dict[str, str]:
+    json_p = Path(str(json_path)).expanduser()
+    windows_p = Path(str(windows_csv_path)).expanduser()
+    method_p = Path(str(method301_csv_path)).expanduser()
+    for path in (json_p, windows_p, method_p):
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    json_p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    with open(windows_p, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "run_no",
+            "label",
+            "window_start_iso",
+            "window_end_iso",
+            "analyte",
+            "row_key",
+            "mole_count",
+            "ftir_count",
+            "mole_avg",
+            "ftir_avg",
+            "difference",
+            "paired",
+            "status",
+            "excluded",
+            "exclusion_reason",
+            "reviewer",
+            "updated_iso",
+        ])
+        for row in list(payload.get("aligned_rows") or []):
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                row.get("run_no"),
+                row.get("label"),
+                row.get("window_start_iso"),
+                row.get("window_end_iso"),
+                row.get("analyte"),
+                row.get("row_key"),
+                row.get("mole_count"),
+                row.get("ftir_count"),
+                _fmt_num(row.get("mole_avg"), 6),
+                _fmt_num(row.get("ftir_avg"), 6),
+                _fmt_num(row.get("difference"), 6),
+                row.get("paired"),
+                row.get("status"),
+                row.get("excluded"),
+                row.get("exclusion_reason"),
+                row.get("reviewer"),
+                row.get("updated_iso"),
+            ])
+
+    with open(method_p, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "analyte",
+            "mode",
+            "paired_window_count",
+            "excluded_window_count",
+            "mole_mean",
+            "ftir_mean",
+            "mean_difference",
+            "relative_bias_pct",
+            "correction_factor",
+            "difference_sd",
+            "t_statistic",
+            "t_critical_95_two_sided",
+            "candidate_variance",
+            "validated_variance",
+            "f_statistic",
+            "f_critical_95",
+            "bias_status",
+            "precision_status",
+            "overall_status",
+            "note",
+        ])
+        for row in list(payload.get("method301") or []):
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                row.get("analyte"),
+                row.get("mode"),
+                row.get("paired_window_count"),
+                row.get("excluded_window_count"),
+                _fmt_num(row.get("mole_mean"), 6),
+                _fmt_num(row.get("ftir_mean"), 6),
+                _fmt_num(row.get("mean_difference"), 6),
+                _fmt_num(row.get("relative_bias_pct"), 6),
+                _fmt_num(row.get("correction_factor"), 6),
+                _fmt_num(row.get("difference_sd"), 6),
+                _fmt_num(row.get("t_statistic"), 6),
+                _fmt_num(row.get("t_critical_95_two_sided"), 6),
+                _fmt_num(row.get("candidate_variance"), 6),
+                _fmt_num(row.get("validated_variance"), 6),
+                _fmt_num(row.get("f_statistic"), 6),
+                _fmt_num(row.get("f_critical_95"), 6),
+                row.get("bias_status"),
+                row.get("precision_status"),
+                row.get("overall_status"),
+                row.get("note"),
+            ])
+
+    return {
+        "json_path": str(json_p),
+        "windows_csv_path": str(windows_p),
+        "method301_csv_path": str(method_p),
     }
