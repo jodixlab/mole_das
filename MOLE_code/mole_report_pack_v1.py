@@ -3142,6 +3142,11 @@ def _report_appendix_manifest(
         ("F", "FTIR validation summary", "json", paths.ftir_validation_json, "ftir_validation_v1", "Session-scoped FTIR side-by-side validation summary"),
         ("F", "FTIR validation window alignment", "csv", paths.ftir_validation_windows_csv, "ftir_validation_v1", "Aligned MOLE / FTIR comparison windows"),
         ("F", "FTIR validation Method 301 stats", "csv", paths.ftir_validation_method301_csv, "ftir_validation_v1", "Method 301 bias / precision comparison statistics"),
+        ("F", "FTIR validation signoff cover", "md", paths.ftir_validation_appendix_cover_md, "ftir_validation_appendix_v1", "Reviewer-facing FTIR validation signoff cover sheet."),
+        ("F", "FTIR validation signed comparison ledger", "csv", paths.ftir_validation_appendix_ledger_csv, "ftir_validation_appendix_v1", "Signed aligned-window ledger bound to the frozen FTIR validation snapshot."),
+        ("F", "FTIR validation signed Method 301 stats", "csv", paths.ftir_validation_appendix_method301_csv, "ftir_validation_appendix_v1", "Signed Method 301 bias / precision statistics bound to the frozen FTIR validation snapshot."),
+        ("F", "FTIR validation signed exclusion register", "csv", paths.ftir_validation_appendix_exclusions_csv, "ftir_validation_appendix_v1", "Signed exclusion register for FTIR validation windows."),
+        ("F", "FTIR validation appendix index", "json", paths.ftir_validation_appendix_index_json, "ftir_validation_appendix_v1", "Index of reviewer-facing FTIR validation appendix artifacts."),
         ("E", "Workstep log", "jsonl", ((sources.get("worksteps") or {}).get("path") if isinstance(sources.get("worksteps"), dict) else ""), "evidence_bundle.sources.worksteps", "Field and activity log"),
         ("E", "Raw samples", "jsonl", ((sources.get("raw_samples") or {}).get("path") if isinstance(sources.get("raw_samples"), dict) else ""), "evidence_bundle.sources.raw_samples", "Raw sample evidence"),
         ("E", "Raw events", "jsonl", ((sources.get("raw_events") or {}).get("path") if isinstance(sources.get("raw_events"), dict) else ""), "evidence_bundle.sources.raw_events", "Runner event evidence"),
@@ -3890,6 +3895,7 @@ def _write_final_report_markdown(
     lines.append(f"- Signoff basis: {_md_scalar((signoff.get('basis') if isinstance(signoff, dict) else None))}")
     lines.append(f"- Signoff by / role / at: {_md_scalar({'by': (signoff.get('by') if isinstance(signoff, dict) else None), 'role': (signoff.get('role') if isinstance(signoff, dict) else None), 'at': (signoff.get('iso') if isinstance(signoff, dict) else None)})}")
     lines.append(f"- Signoff note: {_md_scalar((signoff.get('note') if isinstance(signoff, dict) else None))}")
+    lines.append(f"- FTIR appendix package: {_md_scalar((((summary.get('ftir_validation') or {}).get('appendix')) if isinstance(summary.get('ftir_validation'), dict) else None))}")
     method301_rows = []
     for row in list((ftir_validation_summary.get("method301") if isinstance(ftir_validation_summary, dict) else []) or []):
         if not isinstance(row, dict):
@@ -4275,9 +4281,136 @@ def _write_final_report_index(
         "coverage": report_context.get("coverage"),
         "template_contract": report_context.get("template_contract"),
         "render_status": render_status or {},
+        "ftir_validation_appendix": ((summary.get("ftir_validation") or {}).get("appendix") if isinstance(summary.get("ftir_validation"), dict) else None),
         "files": files,
     }
     paths.final_report_index_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_summary: Dict[str, Any]) -> Dict[str, Any]:
+    _ensure_dir(paths.ftir_validation_appendix_dir)
+    ftir = dict(ftir_validation_summary or {}) if isinstance(ftir_validation_summary, dict) else {}
+    signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
+    snap = ftir.get("review_snapshot") if isinstance(ftir.get("review_snapshot"), dict) else {}
+    config = ftir.get("config") if isinstance(ftir.get("config"), dict) else {}
+    aligned_rows = list(ftir.get("aligned_rows") or [])
+    method301_rows = list(ftir.get("method301") or [])
+    excluded_rows = list(ftir.get("excluded_rows") or [])
+
+    cover_lines = [
+        "# FTIR Validation Appendix Package",
+        "",
+        "## Signoff Summary",
+        "",
+        f"- Validation status: {ftir.get('status') or '(n/a)'}",
+        f"- Overall status: {ftir.get('overall_status') or '(n/a)'}",
+        f"- Source: {ftir.get('source') or '(n/a)'}",
+        f"- Validation mode: {config.get('validation_mode') or '(n/a)'}",
+        f"- Comparator method: {config.get('comparator_method') or '(n/a)'}",
+        f"- Paired window count: {ftir.get('paired_window_count') or 0}",
+        f"- Excluded row count: {ftir.get('excluded_count') or 0}",
+        f"- Review locked: {ftir.get('review_locked')}",
+        f"- Review lock by / at: {ftir.get('review_lock_by') or '(n/a)'} / {ftir.get('review_lock_iso') or '(n/a)'}",
+        f"- Signoff decision: {signoff.get('decision') or 'UNSIGNED'}",
+        f"- Signoff basis: {signoff.get('basis') or '(n/a)'}",
+        f"- Signoff by / role / at: {signoff.get('by') or '(n/a)'} / {signoff.get('role') or '(n/a)'} / {signoff.get('iso') or '(n/a)'}",
+        f"- Signoff note: {signoff.get('note') or '(n/a)'}",
+        f"- Frozen snapshot JSON: {snap.get('json_path') or '(n/a)'}",
+        f"- Frozen snapshot created by / at: {snap.get('snapshot_by') or '(n/a)'} / {snap.get('snapshot_iso') or '(n/a)'}",
+        f"- Coverage note: {ftir.get('coverage_note') or '(n/a)'}",
+        "",
+        "## Appendix Artifacts",
+        "",
+        f"- Comparison ledger CSV: {paths.ftir_validation_appendix_ledger_csv}",
+        f"- Method 301 stats CSV: {paths.ftir_validation_appendix_method301_csv}",
+        f"- Exclusion register CSV: {paths.ftir_validation_appendix_exclusions_csv}",
+    ]
+    paths.ftir_validation_appendix_cover_md.write_text("\n".join(cover_lines).strip() + "\n", encoding="utf-8")
+
+    with open(paths.ftir_validation_appendix_ledger_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "run_no", "label", "window_start_iso", "window_end_iso", "analyte", "row_key",
+            "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference",
+            "paired", "status", "excluded", "exclusion_reason", "reviewer", "updated_iso",
+        ])
+        for row in aligned_rows:
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                row.get("run_no"), row.get("label"), row.get("window_start_iso"), row.get("window_end_iso"),
+                row.get("analyte"), row.get("row_key"), row.get("mole_count"), row.get("ftir_count"),
+                _fmt_num(row.get("mole_avg"), 6, ""), _fmt_num(row.get("ftir_avg"), 6, ""),
+                _fmt_num(row.get("difference"), 6, ""), row.get("paired"), row.get("status"),
+                row.get("excluded"), row.get("exclusion_reason"), row.get("reviewer"), row.get("updated_iso"),
+            ])
+
+    with open(paths.ftir_validation_appendix_method301_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "analyte", "mode", "paired_window_count", "excluded_window_count", "mole_mean", "ftir_mean",
+            "mean_difference", "relative_bias_pct", "correction_factor", "difference_sd",
+            "t_statistic", "t_critical_95_two_sided", "candidate_variance", "validated_variance",
+            "f_statistic", "f_critical_95", "bias_status", "precision_status", "overall_status", "note",
+        ])
+        for row in method301_rows:
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                row.get("analyte"), row.get("mode"), row.get("paired_window_count"), row.get("excluded_window_count"),
+                _fmt_num(row.get("mole_mean"), 6, ""), _fmt_num(row.get("ftir_mean"), 6, ""),
+                _fmt_num(row.get("mean_difference"), 6, ""), _fmt_num(row.get("relative_bias_pct"), 6, ""),
+                _fmt_num(row.get("correction_factor"), 6, ""), _fmt_num(row.get("difference_sd"), 6, ""),
+                _fmt_num(row.get("t_statistic"), 6, ""), _fmt_num(row.get("t_critical_95_two_sided"), 6, ""),
+                _fmt_num(row.get("candidate_variance"), 6, ""), _fmt_num(row.get("validated_variance"), 6, ""),
+                _fmt_num(row.get("f_statistic"), 6, ""), _fmt_num(row.get("f_critical_95"), 6, ""),
+                row.get("bias_status"), row.get("precision_status"), row.get("overall_status"), row.get("note"),
+            ])
+
+    with open(paths.ftir_validation_appendix_exclusions_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["row_key", "run_no", "label", "analyte", "reason", "reviewer", "updated_iso"])
+        for row in excluded_rows:
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                row.get("row_key"), row.get("run_no"), row.get("label"), row.get("analyte"),
+                row.get("reason"), row.get("reviewer"), row.get("updated_iso"),
+            ])
+
+    appendix_files: List[Dict[str, Any]] = []
+    for p in [
+        paths.ftir_validation_appendix_cover_md,
+        paths.ftir_validation_appendix_ledger_csv,
+        paths.ftir_validation_appendix_method301_csv,
+        paths.ftir_validation_appendix_exclusions_csv,
+    ]:
+        try:
+            appendix_files.append({
+                "name": p.name,
+                "path": str(p),
+                "sha256": _sha256_file(p),
+                "bytes": p.stat().st_size,
+            })
+        except Exception:
+            continue
+    appendix_index = {
+        "contract_version": "ftir_validation_appendix_v1",
+        "export_dir": str(paths.ftir_validation_appendix_dir),
+        "source": str(ftir.get("source") or ""),
+        "review_locked": bool(ftir.get("review_locked")),
+        "signoff": signoff,
+        "files": appendix_files,
+    }
+    paths.ftir_validation_appendix_index_json.write_text(json.dumps(appendix_index, indent=2), encoding="utf-8")
+    return {
+        "dir": str(paths.ftir_validation_appendix_dir),
+        "cover_md": str(paths.ftir_validation_appendix_cover_md),
+        "ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
+        "method301_csv": str(paths.ftir_validation_appendix_method301_csv),
+        "exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+        "index_json": str(paths.ftir_validation_appendix_index_json),
+    }
 
 
 # -----------------------------
@@ -4289,11 +4422,17 @@ def _write_final_report_index(
 class ReportPackPaths:
     out_dir: Path
     final_report_dir: Path
+    ftir_validation_appendix_dir: Path
     summary_json: Path
     report_context_json: Path
     ftir_validation_json: Path
     ftir_validation_windows_csv: Path
     ftir_validation_method301_csv: Path
+    ftir_validation_appendix_cover_md: Path
+    ftir_validation_appendix_ledger_csv: Path
+    ftir_validation_appendix_method301_csv: Path
+    ftir_validation_appendix_exclusions_csv: Path
+    ftir_validation_appendix_index_json: Path
     final_report_md: Path
     final_report_docx: Path
     final_report_pdf: Path
@@ -4356,6 +4495,7 @@ def generate_report_pack_v1(
     # Output folder
     out_dir = _ensure_dir(session_dir / "exports" / "report_pack_v1")
     final_report_dir = _ensure_dir(session_dir / "exports" / "final_report_v1")
+    ftir_validation_appendix_dir = _ensure_dir(final_report_dir / "ftir_validation_appendix_v1")
     legacy_final_report_md = out_dir / "final_test_report_v1.md"
     try:
         if legacy_final_report_md.exists():
@@ -4366,11 +4506,17 @@ def generate_report_pack_v1(
     paths = ReportPackPaths(
         out_dir=out_dir,
         final_report_dir=final_report_dir,
+        ftir_validation_appendix_dir=ftir_validation_appendix_dir,
         summary_json=out_dir / "summary.json",
         report_context_json=out_dir / "report_context.json",
         ftir_validation_json=out_dir / "ftir_validation_summary.json",
         ftir_validation_windows_csv=out_dir / "ftir_validation_window_alignment.csv",
         ftir_validation_method301_csv=out_dir / "ftir_validation_method301.csv",
+        ftir_validation_appendix_cover_md=ftir_validation_appendix_dir / "ftir_validation_signoff_cover_v1.md",
+        ftir_validation_appendix_ledger_csv=ftir_validation_appendix_dir / "ftir_validation_signed_comparison_ledger.csv",
+        ftir_validation_appendix_method301_csv=ftir_validation_appendix_dir / "ftir_validation_signed_method301_stats.csv",
+        ftir_validation_appendix_exclusions_csv=ftir_validation_appendix_dir / "ftir_validation_signed_exclusion_register.csv",
+        ftir_validation_appendix_index_json=ftir_validation_appendix_dir / "index.json",
         final_report_md=final_report_dir / "final_test_report_v1.md",
         final_report_docx=final_report_dir / "final_test_report_v1.docx",
         final_report_pdf=final_report_dir / "final_test_report_v1.pdf",
@@ -4661,6 +4807,8 @@ def generate_report_pack_v1(
     if validity_blocked > 0:
         overall_pass = False
 
+    ftir_validation_appendix = _write_ftir_validation_appendix(paths, ftir_validation_summary)
+
     # Summary JSON
     summary = {
         "generated_iso": _now_iso(),
@@ -4742,6 +4890,7 @@ def generate_report_pack_v1(
             "summary_json": str(paths.ftir_validation_json),
             "window_alignment_csv": str(paths.ftir_validation_windows_csv),
             "method301_csv": str(paths.ftir_validation_method301_csv),
+            "appendix": ftir_validation_appendix,
         },
         "analyzer_validity": analyzer_validity_summary,
         "fuel_analysis": fuel_analysis_summary,
@@ -4759,6 +4908,11 @@ def generate_report_pack_v1(
             "ftir_validation_json": str(paths.ftir_validation_json),
             "ftir_validation_windows_csv": str(paths.ftir_validation_windows_csv),
             "ftir_validation_method301_csv": str(paths.ftir_validation_method301_csv),
+            "ftir_validation_appendix_cover_md": str(paths.ftir_validation_appendix_cover_md),
+            "ftir_validation_appendix_ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
+            "ftir_validation_appendix_method301_csv": str(paths.ftir_validation_appendix_method301_csv),
+            "ftir_validation_appendix_exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+            "ftir_validation_appendix_index_json": str(paths.ftir_validation_appendix_index_json),
             "spec_engine_shadow": evidence_bundle.get("spec_engine_shadow"),
             "static_artifacts": {
                 "active_count": ((evidence_bundle.get("static_artifacts") or {}).get("active_count")),
@@ -5616,6 +5770,7 @@ def generate_report_pack_v1(
         "docx_path": str(paths.final_report_docx),
         "pdf_path": str(paths.final_report_pdf),
         "index_path": str(paths.final_report_index_json),
+        "ftir_validation_appendix_dir": str(paths.ftir_validation_appendix_dir),
         "source_report_context_json": str(paths.report_context_json),
         "source_report_pack_dir": str(paths.out_dir),
         "render_status": {
@@ -5646,6 +5801,11 @@ def generate_report_pack_v1(
         paths.final_report_docx,
         paths.final_report_pdf,
         paths.final_report_index_json,
+        paths.ftir_validation_appendix_cover_md,
+        paths.ftir_validation_appendix_ledger_csv,
+        paths.ftir_validation_appendix_method301_csv,
+        paths.ftir_validation_appendix_exclusions_csv,
+        paths.ftir_validation_appendix_index_json,
         paths.evidence_bundle_json,
         paths.evidence_step_eval_csv,
         paths.analyzer_validity_csv,

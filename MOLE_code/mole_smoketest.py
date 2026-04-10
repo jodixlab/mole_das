@@ -58,6 +58,11 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         "summary_path": "",
         "final_report_path": "",
         "final_report_index_path": "",
+        "ftir_appendix_cover_path": "",
+        "ftir_appendix_ledger_path": "",
+        "ftir_appendix_method301_path": "",
+        "ftir_appendix_exclusions_path": "",
+        "ftir_appendix_index_path": "",
         "bootstrap_stdout": "",
         "bootstrap_stderr": "",
         "report_stdout": "",
@@ -146,6 +151,56 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         out["error"] = "final report index does not include final_test_report_v1.md"
         return out
 
+    ftir_validation = summary.get("ftir_validation") if isinstance(summary, dict) else {}
+    if not isinstance(ftir_validation, dict):
+        out["error"] = "summary.json missing ftir_validation block"
+        return out
+    appendix = ftir_validation.get("appendix")
+    if not isinstance(appendix, dict):
+        out["error"] = "summary.json ftir_validation block missing appendix"
+        return out
+
+    appendix_keys = {
+        "cover_md": "ftir_appendix_cover_path",
+        "ledger_csv": "ftir_appendix_ledger_path",
+        "method301_csv": "ftir_appendix_method301_path",
+        "exclusions_csv": "ftir_appendix_exclusions_path",
+        "index_json": "ftir_appendix_index_path",
+    }
+    appendix_paths: Dict[str, Path] = {}
+    for src_key, out_key in appendix_keys.items():
+        raw = appendix.get(src_key)
+        if not raw:
+            out["error"] = f"summary.json ftir_validation appendix missing {src_key}"
+            return out
+        path = Path(str(raw))
+        appendix_paths[src_key] = path
+        out[out_key] = str(path)
+        if not path.exists():
+            out["error"] = f"expected FTIR appendix artifact not found: {path}"
+            return out
+
+    try:
+        appendix_index = json.loads(appendix_paths["index_json"].read_text(encoding="utf-8"))
+    except Exception as e:
+        out["error"] = f"failed to load FTIR appendix index: {type(e).__name__}: {e}"
+        return out
+
+    appendix_file_names = {
+        str(item.get("name") or "")
+        for item in (appendix_index.get("files") or [])
+        if isinstance(item, dict)
+    }
+    for expected_name in {
+        "ftir_validation_signoff_cover_v1.md",
+        "ftir_validation_signed_comparison_ledger.csv",
+        "ftir_validation_signed_method301_stats.csv",
+        "ftir_validation_signed_exclusion_register.csv",
+    }:
+        if expected_name not in appendix_file_names:
+            out["error"] = f"FTIR appendix index does not include {expected_name}"
+            return out
+
     out["ok"] = True
     return out
 
@@ -161,6 +216,16 @@ def _format_integration_report(result: Dict[str, Any]) -> str:
         lines.append(f"  final_report: {result.get('final_report_path')}")
     if result.get("final_report_index_path"):
         lines.append(f"  final_report_index: {result.get('final_report_index_path')}")
+    if result.get("ftir_appendix_cover_path"):
+        lines.append(f"  ftir_appendix_cover: {result.get('ftir_appendix_cover_path')}")
+    if result.get("ftir_appendix_ledger_path"):
+        lines.append(f"  ftir_appendix_ledger: {result.get('ftir_appendix_ledger_path')}")
+    if result.get("ftir_appendix_method301_path"):
+        lines.append(f"  ftir_appendix_method301: {result.get('ftir_appendix_method301_path')}")
+    if result.get("ftir_appendix_exclusions_path"):
+        lines.append(f"  ftir_appendix_exclusions: {result.get('ftir_appendix_exclusions_path')}")
+    if result.get("ftir_appendix_index_path"):
+        lines.append(f"  ftir_appendix_index: {result.get('ftir_appendix_index_path')}")
     if result.get("error"):
         lines.append(f"  error: {result.get('error')}")
     return "\n".join(lines)
