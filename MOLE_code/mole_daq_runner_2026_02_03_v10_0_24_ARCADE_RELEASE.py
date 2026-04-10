@@ -106,11 +106,6 @@ try:
 except Exception:
     mole_spec_engine = None
 
-try:
-    import mole_postcal_policy as mole_postcal_policy
-except Exception:
-    mole_postcal_policy = None
-
 
 
 
@@ -462,18 +457,6 @@ def _fmt_num(value: Any, decimals: int = 3, fallback: str = "(n/a)") -> str:
 
 def _fmt_num_g(value: Any, sig: int = 6, fallback: str = "(n/a)") -> str:
     return _fmt_display_num(value, DISPLAY_DECIMALS, fallback)
-
-def _fmt_minutes_m(value: Any, fallback: str = "(n/a)") -> str:
-    try:
-        minutes = float(value)
-        if not math.isfinite(minutes):
-            return fallback
-        rounded = round(minutes, 1)
-        if abs(rounded - round(rounded)) < 0.05:
-            return f"{int(round(rounded))} min"
-        return f"{rounded:g} min"
-    except Exception:
-        return fallback
 
 @dataclass
 class ExecStep:
@@ -2956,441 +2939,6 @@ def _pollutant_adjustment_elapsed_hours(sess: Dict[str, Any], frame_ts_iso: Opti
         return 0.0
 
 
-def _pollutant_adjustment_active_run_no(sess: Dict[str, Any]) -> Optional[int]:
-    """Return the current active run number, even if that run has already ended."""
-    try:
-        blk = (sess.get("daq_runner") or {}) if isinstance(sess, dict) else {}
-        runs = blk.get("runs") if isinstance(blk.get("runs"), list) else []
-        if not runs:
-            return None
-        idx = int(blk.get("active_run_index") or 0)
-        idx = max(0, min(idx, len(runs) - 1))
-        run = runs[idx] if 0 <= idx < len(runs) else {}
-        if not isinstance(run, dict):
-            return None
-        run_no = run.get("run_no")
-        return int(run_no) if run_no not in (None, "") else None
-    except Exception:
-        return None
-
-
-def _pollutant_adjustment_effective_after_run_no(spec: Any) -> Optional[int]:
-    try:
-        if not isinstance(spec, dict):
-            return None
-        value = spec.get("effective_after_run_no")
-        return int(value) if value not in (None, "") else None
-    except Exception:
-        return None
-
-
-def _pollutant_adjustment_expires_after_run_no(spec: Any) -> Optional[int]:
-    try:
-        if not isinstance(spec, dict):
-            return None
-        value = spec.get("expires_after_run_no")
-        return int(value) if value not in (None, "") else None
-    except Exception:
-        return None
-
-
-def _pollutant_adjustment_expires_after_postcal_run_no(spec: Any) -> Optional[int]:
-    try:
-        if not isinstance(spec, dict):
-            return None
-        value = spec.get("expires_after_postcal_run_no")
-        return int(value) if value not in (None, "") else None
-    except Exception:
-        return None
-
-
-def _normalize_pollutant_adjustment_scope(value: Any, source: Any = "") -> str:
-    scope = _policy_token(value)
-    if scope in ("NEXT_RUN_ONLY", "UNTIL_NEXT_POSTCAL", "PERSISTENT"):
-        return scope
-    src = _policy_token(source)
-    if src == "POSTCAL_AUTO":
-        return "UNTIL_NEXT_POSTCAL"
-    return "PERSISTENT"
-
-
-def _pollutant_adjustment_scope(spec: Any) -> str:
-    try:
-        if not isinstance(spec, dict):
-            return "PERSISTENT"
-        return _normalize_pollutant_adjustment_scope(spec.get("scope"), spec.get("source"))
-    except Exception:
-        return "PERSISTENT"
-
-
-def _pollutant_adjustment_scope_label(scope: Any) -> str:
-    scope_u = _normalize_pollutant_adjustment_scope(scope)
-    if scope_u == "NEXT_RUN_ONLY":
-        return "next run only"
-    if scope_u == "UNTIL_NEXT_POSTCAL":
-        return "until next post-cal"
-    return "persistent"
-
-
-def _pollutant_adjustment_completed_postcal_runs(sess: Dict[str, Any]) -> set[int]:
-    completed: set[int] = set()
-    try:
-        blk = (sess.get("daq_runner") or {}) if isinstance(sess, dict) else {}
-        ws = blk.get("worksteps") if isinstance(blk.get("worksteps"), dict) else {}
-        postcal = ws.get("postcal") if isinstance(ws.get("postcal"), dict) else {}
-        comp = postcal.get("completed_runs") if isinstance(postcal.get("completed_runs"), dict) else {}
-        for key, value in comp.items():
-            try:
-                run_no = int(str(key))
-            except Exception:
-                continue
-            if isinstance(value, dict):
-                if bool(str(value.get("completed_iso") or "").strip()) or ("overall_pass" in value):
-                    completed.add(run_no)
-            else:
-                completed.add(run_no)
-    except Exception:
-        return set()
-    return completed
-
-
-def _pollutant_adjustment_is_expired(sess: Dict[str, Any], spec: Any) -> bool:
-    try:
-        if not isinstance(spec, dict):
-            return False
-        cur_run_no = _pollutant_adjustment_active_run_no(sess)
-        exp_run_no = _pollutant_adjustment_expires_after_run_no(spec)
-        if exp_run_no is not None and cur_run_no is not None and cur_run_no > exp_run_no:
-            return True
-        exp_postcal_run_no = _pollutant_adjustment_expires_after_postcal_run_no(spec)
-        if exp_postcal_run_no is not None and exp_postcal_run_no in _pollutant_adjustment_completed_postcal_runs(sess):
-            return True
-        return False
-    except Exception:
-        return False
-
-
-def _pollutant_adjustment_scope_windows(
-    scope: Any,
-    *,
-    effective_after_run_no: Optional[int] = None,
-) -> Dict[str, Optional[int]]:
-    scope_u = _normalize_pollutant_adjustment_scope(scope)
-    eff_run_no = (int(effective_after_run_no) if effective_after_run_no not in (None, "") else None)
-    exp_run_no: Optional[int] = None
-    exp_postcal_run_no: Optional[int] = None
-    if scope_u == "NEXT_RUN_ONLY" and eff_run_no is not None:
-        exp_run_no = int(eff_run_no) + 1
-    elif scope_u == "UNTIL_NEXT_POSTCAL" and eff_run_no is not None:
-        exp_postcal_run_no = int(eff_run_no) + 1
-    return {
-        "scope": scope_u,
-        "expires_after_run_no": exp_run_no,
-        "expires_after_postcal_run_no": exp_postcal_run_no,
-    }
-
-
-def _pollutant_adjustment_apply_scope_to_spec(
-    spec: Dict[str, Any],
-    *,
-    scope: Any,
-    effective_after_run_no: Optional[int] = None,
-) -> None:
-    wins = _pollutant_adjustment_scope_windows(scope, effective_after_run_no=effective_after_run_no)
-    spec["scope"] = wins.get("scope")
-    spec["expires_after_run_no"] = wins.get("expires_after_run_no")
-    spec["expires_after_postcal_run_no"] = wins.get("expires_after_postcal_run_no")
-
-
-def _pollutant_adjustment_attach_policy_metadata(spec: Dict[str, Any], policy: Dict[str, Any]) -> None:
-    spec["policy_method_effective"] = str(policy.get("method_effective") or "")
-    spec["policy_profile_id"] = str(policy.get("profile_id") or "")
-    spec["policy_track"] = str(policy.get("track") or "")
-    spec["policy_mode"] = str(policy.get("policy_mode") or "")
-    spec["policy_rule_id"] = str(policy.get("policy_rule_id") or "")
-    spec["policy_matrix_version"] = str(policy.get("policy_matrix_version") or "")
-
-
-def _pollutant_adjustment_scope_summary(spec: Any) -> str:
-    scope_label = _pollutant_adjustment_scope_label(spec)
-    exp_run_no = _pollutant_adjustment_expires_after_run_no(spec)
-    exp_postcal_run_no = _pollutant_adjustment_expires_after_postcal_run_no(spec)
-    if exp_run_no is not None:
-        return f"{scope_label} (expires after Run {exp_run_no})"
-    if exp_postcal_run_no is not None:
-        return f"{scope_label} (expires after Post-Cal Run {exp_postcal_run_no})"
-    return scope_label
-
-
-def _pollutant_adjustment_state_snapshot(
-    sess: Dict[str, Any],
-    spec: Any,
-    *,
-    global_enabled: bool = True,
-) -> Dict[str, Any]:
-    spec_dict = spec if isinstance(spec, dict) else {}
-    spec_enabled = bool(spec_dict.get("enabled", True))
-    lifecycle_status = str(spec_dict.get("lifecycle_status") or "").strip().upper()
-    status_reason = str(spec_dict.get("status_reason") or "").strip()
-    source_txt = str(spec_dict.get("source") or "MANUAL").strip().upper() or "MANUAL"
-    source_run_no = spec_dict.get("source_run_no")
-    eff_run_no = _pollutant_adjustment_effective_after_run_no(spec_dict)
-    scope_txt = _pollutant_adjustment_scope(spec_dict)
-    scope_label = _pollutant_adjustment_scope_label(scope_txt)
-    scope_summary = _pollutant_adjustment_scope_summary(spec_dict)
-    expired = _pollutant_adjustment_is_expired(sess, spec_dict)
-    active_now = bool(global_enabled and spec_enabled and (not expired) and _pollutant_adjustment_spec_is_active(sess, spec_dict))
-    if not global_enabled:
-        state_label = "GLOBAL OFF"
-        effective_label = "global adjustments disabled"
-    elif lifecycle_status in ("POLICY_SUSPENDED", "DISABLED_BY_POLICY", "DISABLED_AFTER_FAIL"):
-        state_label = "SUSPENDED"
-        effective_label = "disabled"
-    elif expired:
-        state_label = "EXPIRED"
-        effective_label = "scope completed"
-    elif not spec_enabled:
-        state_label = "DISABLED"
-        effective_label = "disabled"
-    elif active_now:
-        state_label = "ACTIVE"
-        effective_label = "active now"
-    elif eff_run_no is not None:
-        state_label = "PENDING"
-        effective_label = ("at next run start" if int(eff_run_no) <= 0 else f"after Run {eff_run_no}")
-    else:
-        state_label = "READY"
-        effective_label = "manual / immediate"
-    source_label = source_txt if source_run_no in (None, "") else f"{source_txt} (Run {source_run_no})"
-    return {
-        "state_label": state_label,
-        "effective_label": effective_label,
-        "active_now": bool(active_now),
-        "source": source_txt,
-        "source_label": source_label,
-        "source_run_no": source_run_no,
-        "effective_after_run_no": eff_run_no,
-        "scope": scope_txt,
-        "scope_label": scope_label,
-        "scope_summary": scope_summary,
-        "expires_after_run_no": _pollutant_adjustment_expires_after_run_no(spec_dict),
-        "expires_after_postcal_run_no": _pollutant_adjustment_expires_after_postcal_run_no(spec_dict),
-        "lifecycle_status": lifecycle_status,
-        "status_reason": status_reason,
-        "enabled": bool(spec_enabled),
-        "expired": bool(expired),
-    }
-
-
-def _pollutant_adjustment_spec_is_inherited(spec: Any) -> bool:
-    try:
-        return _policy_token((spec or {}).get("source")) == "POSTCAL_AUTO"
-    except Exception:
-        return False
-
-
-def _policy_token(value: Any) -> str:
-    if mole_postcal_policy is not None:
-        try:
-            return str(mole_postcal_policy.policy_token(value))
-        except Exception:
-            pass
-    return str(value or "").strip().upper().replace("-", "_").replace(" ", "_")
-
-
-def _pollutant_method_policy_context(sess: Dict[str, Any], code: Any) -> Dict[str, Any]:
-    if mole_postcal_policy is not None:
-        try:
-            return dict(mole_postcal_policy.policy_context_from_session(sess, code))
-        except Exception:
-            pass
-    code_u = _policy_token(code)
-    qa = (sess.get("qa_qc") or {}) if isinstance(sess, dict) else {}
-    sm = (sess.get("session_mode") or {}) if isinstance(sess, dict) else {}
-    poll = (sess.get("pollutants") or {}) if isinstance(sess.get("pollutants"), dict) else {}
-    resolved = poll.get("resolved") if isinstance(poll.get("resolved"), dict) else {}
-    resolved_by = resolved.get("resolved_by_analyte") if isinstance(resolved.get("resolved_by_analyte"), dict) else {}
-    method_map = resolved.get("method_map") if isinstance(resolved.get("method_map"), dict) else (qa.get("method_map") if isinstance(qa.get("method_map"), dict) else {})
-    profile_map = resolved.get("profile_map") if isinstance(resolved.get("profile_map"), dict) else (qa.get("profile_map") if isinstance(qa.get("profile_map"), dict) else {})
-    row = resolved_by.get(code_u) if isinstance(resolved_by.get(code_u), dict) else {}
-    return {
-        "code": code_u,
-        "track": _policy_token(resolved.get("track") or qa.get("track")),
-        "session_mode_name": _policy_token((sm.get("mode") or "")),
-        "diagnostic_only": bool(sm.get("diagnostic_only")),
-        "may_support_compliance": bool(sm.get("may_support_compliance")),
-        "method_effective": _policy_token(row.get("method_effective") or ((method_map or {}).get(code_u) if isinstance(method_map, dict) else "")),
-        "method_selected": _policy_token(row.get("method_selected")),
-        "method_recommended": _policy_token(row.get("method_recommended")),
-        "profile_id": _policy_token(row.get("profile_id") or ((profile_map or {}).get(code_u) if isinstance(profile_map, dict) else "")),
-    }
-
-
-def _postcal_carry_forward_policy(sess: Dict[str, Any], code: Any) -> Dict[str, Any]:
-    ctx = _pollutant_method_policy_context(sess, code)
-    if mole_postcal_policy is not None:
-        try:
-            return dict(mole_postcal_policy.evaluate_postcal_carry_forward_policy(ctx))
-        except Exception:
-            pass
-    method_effective = str(ctx.get("method_effective") or "")
-    profile_id = str(ctx.get("profile_id") or "")
-    track = str(ctx.get("track") or "")
-    session_mode_name = str(ctx.get("session_mode_name") or "")
-    diagnostic_only = bool(ctx.get("diagnostic_only"))
-    may_support_compliance = bool(ctx.get("may_support_compliance"))
-    display_method = method_effective or profile_id or "UNSPECIFIED_METHOD"
-    if method_effective.startswith("EPA_"):
-        reason = f"{display_method} keeps post-run bias/drift in validation/manual-adjustment mode."
-        return dict(ctx, policy_mode="MANUAL_ONLY", allow_auto_promote=False, reason=reason, policy_rule_id="epa_method_manual_only")
-    if method_effective == "ASTM_D6522" or (not method_effective and profile_id == "PROFILE:DEFAULT"):
-        if diagnostic_only or track in ("DIAG", "PROJECT") or session_mode_name == "DIAGNOSTICS_SESSION":
-            reason = f"{display_method} allows zero-based additive carry-forward after completed post-cal."
-            return dict(ctx, policy_mode="AUTO_ZERO_ONLY", allow_auto_promote=True, reason=reason, policy_rule_id="astm_d6522_or_default_auto_zero")
-        reason = f"{display_method} is active outside diagnostic/project workflow; keep carry-forward manual."
-        return dict(ctx, policy_mode="MANUAL_ONLY", allow_auto_promote=False, reason=reason, policy_rule_id="astm_d6522_or_default_manual_elsewhere")
-    if diagnostic_only and not may_support_compliance and not method_effective:
-        reason = "Diagnostic-only session without an explicit EPA method may carry forward zero-based additive drift."
-        return dict(ctx, policy_mode="AUTO_ZERO_ONLY", allow_auto_promote=True, reason=reason, policy_rule_id="diagnostic_only_without_explicit_method_auto_zero")
-    reason = f"No auto carry-forward rule is defined for {display_method}; keep carry-forward manual."
-    return dict(ctx, policy_mode="MANUAL_ONLY", allow_auto_promote=False, reason=reason, policy_rule_id="fallback_manual_only")
-
-
-def _pollutant_adjustment_spec_is_active(sess: Dict[str, Any], spec: Any) -> bool:
-    """True when a stored adjustment is eligible to affect the current active run."""
-    if _pollutant_adjustment_is_expired(sess, spec):
-        return False
-    eff_run_no = _pollutant_adjustment_effective_after_run_no(spec)
-    if eff_run_no is None:
-        return True
-    cur_run_no = _pollutant_adjustment_active_run_no(sess)
-    if cur_run_no is None:
-        return False
-    return bool(cur_run_no > eff_run_no)
-
-
-def _pollutant_adjustment_reconcile_lifecycle(sess: Dict[str, Any], *, actor: str = "AUTO_POLICY_GUARD") -> Dict[str, List[str]]:
-    summary: Dict[str, List[str]] = {"expired": [], "policy_suspended": []}
-    try:
-        pa = _pa_block(sess)
-        ch_map = pa.get("channels") if isinstance(pa.get("channels"), dict) else {}
-        if not isinstance(ch_map, dict):
-            return summary
-        stamp_iso = _iso_now()
-        changed = False
-        for code, spec in list(ch_map.items()):
-            if not isinstance(spec, dict):
-                continue
-            code_u = str(code or "").strip().upper()
-            if not code_u:
-                continue
-            if bool(spec.get("enabled", True)) and _pollutant_adjustment_is_expired(sess, spec):
-                spec["enabled"] = False
-                spec["lifecycle_status"] = "EXPIRED"
-                spec["status_reason"] = (
-                    f"Adjustment scope {_pollutant_adjustment_scope_label(spec.get('scope'))} completed; "
-                    f"disabled automatically before acquisition."
-                )
-                spec["updated_by"] = actor
-                spec["updated_iso"] = stamp_iso
-                changed = True
-                summary["expired"].append(code_u)
-                continue
-            if (not bool(spec.get("enabled", True))) or (not _pollutant_adjustment_spec_is_inherited(spec)):
-                continue
-            stored_method = _policy_token(spec.get("policy_method_effective"))
-            stored_profile = _policy_token(spec.get("policy_profile_id"))
-            stored_track = _policy_token(spec.get("policy_track"))
-            if not any((stored_method, stored_profile, stored_track)):
-                continue
-            policy = _postcal_carry_forward_policy(sess, code_u)
-            current_method = _policy_token(policy.get("method_effective"))
-            current_profile = _policy_token(policy.get("profile_id"))
-            current_track = _policy_token(policy.get("track"))
-            if stored_method == current_method and stored_profile == current_profile and stored_track == current_track:
-                continue
-            spec["enabled"] = False
-            spec["effective_after_run_no"] = None
-            spec["expires_after_run_no"] = None
-            spec["expires_after_postcal_run_no"] = None
-            spec["lifecycle_status"] = "POLICY_SUSPENDED"
-            spec["status_reason"] = (
-                f"Inherited adjustment suspended because method/profile changed "
-                f"from {stored_method or stored_profile or '(unknown)'} to {current_method or current_profile or '(unknown)'}."
-            )
-            spec["updated_by"] = actor
-            spec["updated_iso"] = stamp_iso
-            _pollutant_adjustment_attach_policy_metadata(spec, policy)
-            changed = True
-            summary["policy_suspended"].append(code_u)
-        if changed:
-            summary["changed"] = ["YES"]
-    except Exception:
-        return summary
-    return summary
-
-
-def _pollutant_adjustment_pre_run_review_message(sess: Dict[str, Any], lifecycle_summary: Optional[Dict[str, List[str]]] = None) -> str:
-    try:
-        pa = _pa_block(sess)
-        if not bool(pa.get("enabled")):
-            return ""
-        ch_map = pa.get("channels") if isinstance(pa.get("channels"), dict) else {}
-        if not isinstance(ch_map, dict):
-            return ""
-        active_lines: List[str] = []
-        pending_lines: List[str] = []
-        for code, spec in sorted(ch_map.items()):
-            if not isinstance(spec, dict):
-                continue
-            if not bool(spec.get("enabled", True)):
-                continue
-            bias = _parse_float(spec.get("bias"), 0.0) or 0.0
-            drift_hr = _parse_float(spec.get("drift_per_hr"), 0.0) or 0.0
-            if abs(float(bias)) < 1e-12 and abs(float(drift_hr)) < 1e-12:
-                continue
-            source_txt = str(spec.get("source") or "MANUAL").strip().upper() or "MANUAL"
-            scope_label = _pollutant_adjustment_scope_label(spec.get("scope"))
-            eff_label = "active now" if _pollutant_adjustment_spec_is_active(sess, spec) else (
-                ("at next run start" if int(_pollutant_adjustment_effective_after_run_no(spec) or 0) <= 0 else f"after Run {_pollutant_adjustment_effective_after_run_no(spec)}")
-                if _pollutant_adjustment_effective_after_run_no(spec) is not None
-                else "pending"
-            )
-            line = (
-                f"{str(code or '').strip().upper()}: {source_txt} | {scope_label} | "
-                f"bias={_fmt_num(bias, 3, '0.0')} | drift/hr={_fmt_num(drift_hr, 3, '0.0')} | {eff_label}"
-            )
-            if _pollutant_adjustment_spec_is_active(sess, spec):
-                active_lines.append(line)
-            else:
-                pending_lines.append(line)
-        if not active_lines and not pending_lines and not (lifecycle_summary or {}).get("expired") and not (lifecycle_summary or {}).get("policy_suspended"):
-            return ""
-        lines = ["Pollutant bias / drift review before acquisition:"]
-        if active_lines:
-            lines.append("")
-            lines.append("Active adjustments")
-            lines.extend([f"- {item}" for item in active_lines])
-        if pending_lines:
-            lines.append("")
-            lines.append("Pending adjustments")
-            lines.extend([f"- {item}" for item in pending_lines])
-        if lifecycle_summary:
-            expired = [str(code).strip().upper() for code in list(lifecycle_summary.get("expired") or []) if str(code).strip()]
-            suspended = [str(code).strip().upper() for code in list(lifecycle_summary.get("policy_suspended") or []) if str(code).strip()]
-            if expired:
-                lines.append("")
-                lines.append(f"Expired and disabled automatically: {', '.join(expired)}")
-            if suspended:
-                lines.append("")
-                lines.append(f"Suspended due to method/profile change: {', '.join(suspended)}")
-        lines.append("")
-        lines.append("Proceed with acquisition?")
-        return "\n".join(lines)
-    except Exception:
-        return ""
-
-
 def apply_pollutant_bias_drift(frame: Dict[str, Any], sess: Dict[str, Any]) -> Dict[str, Any]:
     """Apply per-pollutant additive bias and elapsed drift before derived calculations.
 
@@ -3423,8 +2971,6 @@ def apply_pollutant_bias_drift(frame: Dict[str, Any], sess: Dict[str, Any]) -> D
                     continue
                 if not bool(spec.get("enabled", True)):
                     continue
-                if not _pollutant_adjustment_spec_is_active(sess, spec):
-                    continue
                 v = out.get(code)
                 if v in (None, ""):
                     continue
@@ -3439,10 +2985,6 @@ def apply_pollutant_bias_drift(frame: Dict[str, Any], sess: Dict[str, Any]) -> D
                     "drift_per_hr": drift_per_hr,
                     "elapsed_hr": float(elapsed_hr),
                     "total_adjustment": total_adj,
-                    "scope": _pollutant_adjustment_scope(spec),
-                    "effective_after_run_no": _pollutant_adjustment_effective_after_run_no(spec),
-                    "expires_after_run_no": _pollutant_adjustment_expires_after_run_no(spec),
-                    "expires_after_postcal_run_no": _pollutant_adjustment_expires_after_postcal_run_no(spec),
                     "formula": "adjusted = raw + bias + (drift_per_hr * elapsed_run_hr)",
                 }
             except Exception:
@@ -3465,6 +3007,33 @@ def apply_pollutant_bias_drift(frame: Dict[str, Any], sess: Dict[str, Any]) -> D
         return out
     except Exception:
         return frame
+
+
+def _active_o2_pollutant_adjustment(sess: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        blk = (sess.get("daq_runner") or {}) if isinstance(sess, dict) else {}
+        adj_blk = blk.get("pollutant_adjustments") or {}
+        if (not isinstance(adj_blk, dict)) or (not bool(adj_blk.get("enabled"))):
+            return {"active": False, "bias": 0.0, "drift_per_hr": 0.0}
+        ch_map = adj_blk.get("channels") or {}
+        if not isinstance(ch_map, dict):
+            return {"active": False, "bias": 0.0, "drift_per_hr": 0.0}
+        spec = ch_map.get("O2")
+        if not isinstance(spec, dict):
+            return {"active": False, "bias": 0.0, "drift_per_hr": 0.0}
+        enabled = bool(spec.get("enabled", True))
+        bias = _parse_float(spec.get("bias"), 0.0) or 0.0
+        drift_per_hr = _parse_float(spec.get("drift_per_hr"), 0.0) or 0.0
+        active = bool(enabled and (abs(float(bias)) > 1e-12 or abs(float(drift_per_hr)) > 1e-12))
+        return {"active": active, "bias": float(bias), "drift_per_hr": float(drift_per_hr)}
+    except Exception:
+        return {"active": False, "bias": 0.0, "drift_per_hr": 0.0}
+
+
+def _o2_correction_denominator_note(sess: Dict[str, Any]) -> str:
+    if bool(_active_o2_pollutant_adjustment(sess).get("active")):
+        return "Adjusted O2 is used as the EPA 3A / 7E corrected-concentration denominator when O2 bias / drift is active."
+    return "O2 correction denominator uses the live O2 channel."
 
 
 def apply_ftir_offset_recommendations(frame: Dict[str, Any], sess: Dict[str, Any]) -> Dict[str, Any]:
@@ -5627,28 +5196,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             pol_adj["channels"] = pol_adj_map
         for _code, _spec in list(pol_adj_map.items()):
             if not isinstance(_spec, dict):
-                pol_adj_map[_code] = {
-                    "enabled": True,
-                    "bias": 0.0,
-                    "drift_per_hr": 0.0,
-                    "note": "",
-                    "updated_by": "",
-                    "updated_iso": "",
-                    "source": "",
-                    "scope": "PERSISTENT",
-                    "lifecycle_status": "",
-                    "status_reason": "",
-                    "source_run_no": None,
-                    "effective_after_run_no": None,
-                    "expires_after_run_no": None,
-                    "expires_after_postcal_run_no": None,
-                    "policy_method_effective": "",
-                    "policy_profile_id": "",
-                    "policy_track": "",
-                    "policy_mode": "",
-                    "policy_rule_id": "",
-                    "policy_matrix_version": "",
-                }
+                pol_adj_map[_code] = {"enabled": True, "bias": 0.0, "drift_per_hr": 0.0, "note": "", "updated_by": "", "updated_iso": ""}
                 continue
             _spec.setdefault("enabled", True)
             _spec.setdefault("bias", 0.0)
@@ -5656,20 +5204,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _spec.setdefault("note", "")
             _spec.setdefault("updated_by", "")
             _spec.setdefault("updated_iso", "")
-            _spec.setdefault("source", "")
-            _spec["scope"] = _normalize_pollutant_adjustment_scope(_spec.get("scope"), _spec.get("source"))
-            _spec.setdefault("lifecycle_status", "")
-            _spec.setdefault("status_reason", "")
-            _spec.setdefault("source_run_no", None)
-            _spec.setdefault("effective_after_run_no", None)
-            _spec.setdefault("expires_after_run_no", None)
-            _spec.setdefault("expires_after_postcal_run_no", None)
-            _spec.setdefault("policy_method_effective", "")
-            _spec.setdefault("policy_profile_id", "")
-            _spec.setdefault("policy_track", "")
-            _spec.setdefault("policy_mode", "")
-            _spec.setdefault("policy_rule_id", "")
-            _spec.setdefault("policy_matrix_version", "")
 
         static_art = blk.get("static_artifacts")
         if not isinstance(static_art, dict):
@@ -9243,10 +8777,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     ws_stable_var = tk.StringVar(value="Stability: (n/a)")
     ws_parity_var = tk.StringVar(value="Spec parity: no captured checks yet")
     ws_phase_var = tk.StringVar(value="Phase: IDLE")
-    ws_capture_gate_var = tk.StringVar(value="Capture gate: initiate a gas step")
 
     tk.Label(ws_actions, textvariable=ws_phase_var, fg=ACC2, bg=BG, font=("Consolas", 9, "bold")).pack(side="right", padx=(0, 0))
-    tk.Label(ws_actions, textvariable=ws_capture_gate_var, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(side="right", padx=(0, 14))
     tk.Label(ws_actions, textvariable=ws_purge_timer_var, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(side="right", padx=(0, 14))
     tk.Label(ws_actions, textvariable=ws_test_timer_var, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(side="right", padx=(0, 14))
     tk.Label(ws_actions, textvariable=ws_purge_reco_var, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(side="right", padx=(0, 14))
@@ -10316,6 +9848,182 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     calc_audit_scroll.configure(command=calc_audit_text.yview)
     calc_audit_text.configure(state="disabled")
 
+    # Formal report builder
+    sec_report_builder = _section(scroll, "Report Builder (Formal Deliverables)")
+    report_builder_wrap = tk.Frame(sec_report_builder, bg=BG)
+    report_builder_wrap.pack(fill="both", expand=True)
+
+    var_report_builder_status = tk.StringVar(value="No formal report build recorded for this session.")
+    var_report_builder_target = tk.StringVar(value="Targets: report_pack_v1 + final_report_v1 (md/docx/pdf)")
+    var_report_builder_completeness = tk.StringVar(value="Report metadata completeness: (not evaluated)")
+    tk.Label(
+        report_builder_wrap,
+        text="Build the formal project deliverables from the active session package and report protocol.",
+        fg=FG_DIM,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w")
+    tk.Label(
+        report_builder_wrap,
+        textvariable=var_report_builder_target,
+        fg=FG_DIM,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(2, 0))
+    tk.Label(
+        report_builder_wrap,
+        textvariable=var_report_builder_status,
+        fg=ACC2,
+        bg=BG,
+        font=("Consolas", 9, "bold"),
+    ).pack(anchor="w", pady=(4, 6))
+    tk.Label(
+        report_builder_wrap,
+        textvariable=var_report_builder_completeness,
+        fg=FG,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(0, 6))
+
+    report_builder_form = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_form.pack(fill="x", pady=(0, 8))
+    _configure_runner_form_grid(report_builder_form, minspec="runner_two_pair")
+
+    var_report_client_name = tk.StringVar(value="")
+    var_report_facility_owner = tk.StringVar(value="")
+    var_report_test_company = tk.StringVar(value="")
+    var_report_laboratory = tk.StringVar(value="")
+    var_report_session_operator = tk.StringVar(value="")
+    var_report_responsible_official = tk.StringVar(value="")
+    var_report_responsible_title = tk.StringVar(value="")
+    var_report_agency_contact = tk.StringVar(value="")
+    var_report_notice_of_intent = tk.StringVar(value="")
+    var_report_submission_status = tk.StringVar(value="")
+    var_report_observer_contacts = tk.StringVar(value="")
+    var_report_approval_dates = tk.StringVar(value="")
+
+    tk.Label(report_builder_form, text="Client name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_client_name, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Facility owner / operator:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_facility_owner, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_form, text="Test company:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_test_company, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Laboratory:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_laboratory, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=1, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_form, text="Session operator:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_session_operator, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=2, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Responsible official:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_responsible_official, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=2, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_form, text="Responsible title:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_responsible_title, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Agency contact:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_agency_contact, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_form, text="Notice of intent date:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_notice_of_intent, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=4, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Submission status:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_submission_status, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=4, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_form, text="Observer contacts:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_observer_contacts, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_form, text="Approval dates:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    tk.Entry(report_builder_form, textvariable=var_report_approval_dates, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=3, sticky="ew", pady=(0, 6))
+
+    report_builder_longform = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_longform.pack(fill="x", pady=(0, 8))
+
+    def _report_builder_labeled_text(parent: Any, title: str, *, height: int = 3, note: str = "") -> tk.Text:
+        box = tk.Frame(parent, bg=BG)
+        box.pack(fill="x", pady=(0, 8))
+        tk.Label(box, text=title, fg=ACC, bg=BG, font=("Consolas", 10, "bold")).pack(anchor="w")
+        if note:
+            tk.Label(box, text=note, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(anchor="w", pady=(2, 4))
+        txt = tk.Text(box, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", height=height, font=("Consolas", 9), wrap="word")
+        txt.pack(fill="x")
+        return txt
+
+    txt_report_process_narrative = _report_builder_labeled_text(
+        report_builder_longform,
+        "Process Narrative",
+        height=4,
+        note="Describe the source, process duty, and operating context in report-ready language.",
+    )
+    txt_report_control_equipment = _report_builder_labeled_text(
+        report_builder_longform,
+        "Control Equipment Description",
+        height=3,
+        note="Describe control devices and any relevant operating parameters.",
+    )
+    txt_report_planned_deviations = _report_builder_labeled_text(
+        report_builder_longform,
+        "Planned Deviations",
+        height=3,
+        note="One item per line. Include approved alternatives or preplanned departures from standard procedure.",
+    )
+    txt_report_field_deviations = _report_builder_labeled_text(
+        report_builder_longform,
+        "Field Deviations",
+        height=3,
+        note="One item per line. Record observed field deviations during testing.",
+    )
+    txt_report_alt_approvals = _report_builder_labeled_text(
+        report_builder_longform,
+        "Alternative Method / Approval References",
+        height=3,
+        note="One item per line. Include permit, email, or agency approval identifiers.",
+    )
+    txt_report_impact_statement = _report_builder_labeled_text(
+        report_builder_longform,
+        "Impact Statement",
+        height=3,
+        note="State whether deviations or approvals affected validity, comparability, or report interpretation.",
+    )
+    txt_report_correspondence_notes = _report_builder_labeled_text(
+        report_builder_longform,
+        "Regulatory / Correspondence Notes",
+        height=3,
+        note="Summarize NOI, agency coordination, ERT/CEDRI status, and related correspondence context.",
+    )
+
+    report_builder_btns = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_btns.pack(fill="x", pady=(0, 8))
+    btn_report_builder_save = tk.Button(report_builder_btns, text="Save Report Metadata", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_save.pack(side="left")
+    btn_report_builder_build = tk.Button(report_builder_btns, text="Build Final Report", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_build.pack(side="left", padx=(8, 0))
+    btn_report_builder_refresh = tk.Button(report_builder_btns, text="Refresh Status", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_refresh.pack(side="left", padx=(8, 0))
+    btn_report_builder_open_final = tk.Button(report_builder_btns, text="Open Final Report", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_open_final.pack(side="left", padx=(8, 0))
+    btn_report_builder_open_final_dir = tk.Button(report_builder_btns, text="Open Final Report Folder", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_open_final_dir.pack(side="left", padx=(8, 0))
+    btn_report_builder_open_pack_dir = tk.Button(report_builder_btns, text="Open Report Pack Folder", bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_open_pack_dir.pack(side="left", padx=(8, 0))
+
+    report_builder_text_wrap = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_text_wrap.pack(fill="both", expand=True)
+    report_builder_scroll = tk.Scrollbar(report_builder_text_wrap)
+    report_builder_scroll.pack(side="right", fill="y")
+    report_builder_text = tk.Text(
+        report_builder_text_wrap,
+        bg=PANEL_BG,
+        fg=FG,
+        insertbackground=FG,
+        relief="flat",
+        height=14,
+        font=("Consolas", 9),
+        wrap="word",
+        padx=10,
+        pady=10,
+        yscrollcommand=report_builder_scroll.set,
+    )
+    report_builder_text.pack(side="left", fill="both", expand=True)
+    report_builder_scroll.configure(command=report_builder_text.yview)
+    report_builder_text.configure(state="disabled")
+
     # Log
     sec_log = _section(scroll, "Runner Log")
     log_text = tk.Text(sec_log, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", height=8, font=("Consolas", 9))
@@ -10346,6 +10054,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         "runs": sec_runs,
         "diag_verify": sec_diag_verify,
         "audit": sec_calc_audit,
+        "report_builder": sec_report_builder,
         "log": sec_log,
     }
 
@@ -10367,6 +10076,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     host.pack(fill="x", padx=12, pady=(10, 0))
             else:
                 host.pack_forget()
+        except Exception:
+            pass
+
+    def _scroll_to_runner_section(section_inner: Any) -> None:
+        try:
+            host = getattr(section_inner, "master", None)
+            if host is None:
+                return
+            root.update_idletasks()
+            bbox = canvas.bbox("all")
+            if not bbox:
+                return
+            top_y = int(host.winfo_y() or 0)
+            total_h = max(1, int(bbox[3] - bbox[1]))
+            view_h = max(1, int(canvas.winfo_height() or 1))
+            denom = max(1, total_h - view_h)
+            frac = max(0.0, min(1.0, float(top_y) / float(denom)))
+            canvas.yview_moveto(frac)
         except Exception:
             pass
 
@@ -12919,7 +12646,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "t90": tk.StringVar(value=fmt_target(t90)),
                 "valid": tk.StringVar(value=valid_state),
                 "valid_fg": valid_fg,
-                "units": tk.StringVar(value=str(units or "")),
             }
             if show_mid:
                 ws_vars.update({
@@ -12960,7 +12686,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             b0 = tk.Button(ws_frame, text="Capture", command=lambda c=code: ws_capture_zero(c), bg=BTN_BG, fg=FG, relief="flat")
             b0.grid(row=row, column=col, sticky="w", padx=4); col += 1
-            ws_vars["zero_btn"] = b0
 
             tk.Label(ws_frame, textvariable=ws_vars["zero_avg"], bg=PANEL_BG, fg=ws_vars["zero_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
             tk.Label(ws_frame, textvariable=ws_vars["zero_ok"], bg=PANEL_BG, fg=ws_vars["zero_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
@@ -12973,7 +12698,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
                 bm = tk.Button(ws_frame, text="Capture", command=lambda c=code: ws_capture_mid(c), bg=BTN_BG, fg=FG, relief="flat")
                 bm.grid(row=row, column=col, sticky="w", padx=4); col += 1
-                ws_vars["mid_btn"] = bm
 
                 tk.Label(ws_frame, textvariable=ws_vars["mid_avg"], bg=PANEL_BG, fg=ws_vars["mid_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
                 tk.Label(ws_frame, textvariable=ws_vars["mid_recov"], bg=PANEL_BG, fg=ws_vars["mid_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
@@ -12984,7 +12708,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             bs = tk.Button(ws_frame, text="Capture", command=lambda c=code: ws_capture_span(c), bg=BTN_BG, fg=FG, relief="flat")
             bs.grid(row=row, column=col, sticky="w", padx=4); col += 1
-            ws_vars["span_btn"] = bs
 
             tk.Label(ws_frame, textvariable=ws_vars["span_avg"], bg=PANEL_BG, fg=ws_vars["span_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
             tk.Label(ws_frame, textvariable=ws_vars["span_recov"], bg=PANEL_BG, fg=ws_vars["span_ok_fg"], font=FONT).grid(row=row, column=col, sticky="w", padx=4); col += 1
@@ -13190,7 +12913,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ent_zero_tgt = tk.Entry(ws_post_rows_container, textvariable=v_zero_tgt, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", width=8, font=("Consolas", 9))
             ent_zero_tgt.grid(row=r, column=2, sticky="w", padx=(0, 10))
 
-            btn_post_zero = tk.Button(
+            tk.Button(
                 ws_post_rows_container,
                 text="Post ZERO",
                 bg=BTN_BG,
@@ -13198,8 +12921,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 relief="flat",
                 font=("Consolas", 8),
                 command=lambda c=code: ws_capture_post_zero(c),
-            )
-            btn_post_zero.grid(row=r, column=3, sticky="w", padx=(0, 10))
+            ).grid(row=r, column=3, sticky="w", padx=(0, 10))
 
             tk.Label(ws_post_rows_container, textvariable=v_post_zero, fg=(FG_OK if zero_ok_pass is True else (BAD if zero_ok_pass is False else VAL_FG)), bg=BG, font=("Consolas", 9)).grid(row=r, column=4, sticky="w", padx=(0, 10))
             tk.Label(ws_post_rows_container, textvariable=v_dz, fg=(FG_OK if zero_ok_pass is True else (BAD if zero_ok_pass is False else VAL_FG)), bg=BG, font=("Consolas", 9)).grid(row=r, column=5, sticky="w", padx=(0, 10))
@@ -13214,7 +12936,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ent_span_tgt = tk.Entry(ws_post_rows_container, textvariable=v_span_tgt, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", width=8, font=("Consolas", 9))
             ent_span_tgt.grid(row=r, column=7, sticky="w", padx=(0, 10))
 
-            btn_post_span = tk.Button(
+            tk.Button(
                 ws_post_rows_container,
                 text="Post SPAN",
                 bg=BTN_BG,
@@ -13222,8 +12944,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 relief="flat",
                 font=("Consolas", 8),
                 command=lambda c=code: ws_capture_post_span(c),
-            )
-            btn_post_span.grid(row=r, column=8, sticky="w", padx=(0, 10))
+            ).grid(row=r, column=8, sticky="w", padx=(0, 10))
 
             tk.Label(ws_post_rows_container, textvariable=v_post_span, fg=(FG_OK if span_ok_pass is True else (BAD if span_ok_pass is False else VAL_FG)), bg=BG, font=("Consolas", 9)).grid(row=r, column=9, sticky="w", padx=(0, 10))
             tk.Label(ws_post_rows_container, textvariable=v_post_recov, fg=(FG_OK if span_ok_pass is True else (BAD if span_ok_pass is False else VAL_FG)), bg=BG, font=("Consolas", 9)).grid(row=r, column=10, sticky="w", padx=(0, 10))
@@ -13244,13 +12965,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 font=("Consolas", 9, "bold"),
             ).grid(row=r, column=13, sticky="w", padx=(0, 10))
 
-            ws_post_row_vars[code] = {
-                "zero_tgt": v_zero_tgt,
-                "span_tgt": v_span_tgt,
-                "units": tk.StringVar(value=str(units or "")),
-                "zero_btn": btn_post_zero,
-                "span_btn": btn_post_span,
-            }
+            ws_post_row_vars[code] = {"zero_tgt": v_zero_tgt, "span_tgt": v_span_tgt}
             r += 1
 
 
@@ -14326,6 +14041,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         _populate_test_matrix(sess)
         _refresh_runs_ui(sess)
         _diag_verification_refresh_ui(sess)
+        _report_builder_load_form(sess)
+        _refresh_report_builder_status(sess)
 
         # Site: prefer session.site_conditions.active if present
         try:
@@ -14631,44 +14348,506 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         pass
 
     # -------------------------------
-    # Report Pack v1 (QA/QC scorecard + evidence bundle)
+    # Formal report builder
     # -------------------------------
 
-    def generate_report_pack_ui() -> None:
-        """Generate a lightweight report pack into exports/report_pack_v1."""
+    def _report_builder_paths(sess_local: Dict[str, Any]) -> Dict[str, Path]:
+        outputs = init_outputs(sess_local, cfg_path, None)
+        session_dir = outputs.out_dir
+        pack_dir = session_dir / "exports" / "report_pack_v1"
+        final_dir = session_dir / "exports" / "final_report_v1"
+        return {
+            "session_dir": session_dir,
+            "report_pack_dir": pack_dir,
+            "final_report_dir": final_dir,
+            "summary_json": pack_dir / "summary.json",
+            "report_context_json": pack_dir / "report_context.json",
+            "final_report_md": final_dir / "final_test_report_v1.md",
+            "final_report_docx": final_dir / "final_test_report_v1.docx",
+            "final_report_pdf": final_dir / "final_test_report_v1.pdf",
+            "final_report_index": final_dir / "index.json",
+        }
+
+    def _open_fs_target(target: Any, title: str = "Open Failed") -> None:
+        try:
+            path = Path(str(target)).expanduser()
+            if not path.exists():
+                raise FileNotFoundError(path)
+            if os.name == "nt":
+                os.startfile(str(path))  # type: ignore
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(path)])
+            else:
+                subprocess.Popen(["xdg-open", str(path)])
+        except Exception as e:
+            messagebox.showerror(title, str(e))
+
+    def _report_builder_o2_note(sess_local: Dict[str, Any]) -> str:
+        try:
+            return _o2_correction_denominator_note(sess_local)
+        except Exception:
+            return "O2 correction denominator uses the live O2 channel."
+
+    def _report_builder_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        blk = sess_local.get("report_builder")
+        if not isinstance(blk, dict):
+            blk = {}
+            sess_local["report_builder"] = blk
+        for key in ("parties", "process_control", "deviations_approvals", "correspondence", "meta"):
+            if not isinstance(blk.get(key), dict):
+                blk[key] = {}
+        return blk
+
+    def _report_builder_text_get(widget: Any) -> str:
+        try:
+            return str(widget.get("1.0", "end-1c") or "").strip()
+        except Exception:
+            return ""
+
+    def _report_builder_text_set(widget: Any, value: Any) -> None:
+        try:
+            widget.delete("1.0", "end")
+            txt = str(value or "").strip()
+            if txt:
+                widget.insert("1.0", txt)
+        except Exception:
+            pass
+
+    def _report_builder_split_list(value: Any) -> List[str]:
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item or "").strip()]
+        txt = str(value or "").replace("\r", "\n").strip()
+        if not txt:
+            return []
+        parts = re.split(r"[;\n]+", txt)
+        return [str(item).strip() for item in parts if str(item or "").strip()]
+
+    def _report_builder_actor(sess_local: Dict[str, Any]) -> str:
+        try:
+            actor = str(((sess_local.get("project") or {}).get("operator")) or "").strip()
+            if actor:
+                return actor
+        except Exception:
+            pass
+        for env_key in ("USERNAME", "USER"):
+            try:
+                actor = str(os.environ.get(env_key) or "").strip()
+                if actor:
+                    return actor
+            except Exception:
+                pass
+        return "operator"
+
+    def _report_builder_load_form(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        try:
+            sess_use = dict(sess_local) if isinstance(sess_local, dict) else _load_session()
+            blk = _report_builder_block(sess_use)
+            parties = blk.get("parties") if isinstance(blk.get("parties"), dict) else {}
+            process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
+            deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
+            correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+            project = sess_use.get("project") if isinstance(sess_use.get("project"), dict) else {}
+            source = sess_use.get("source") if isinstance(sess_use.get("source"), dict) else {}
+
+            var_report_client_name.set(str(parties.get("client_name") or ""))
+            var_report_facility_owner.set(str(parties.get("facility_owner_operator_name") or project.get("site_facility") or ""))
+            var_report_test_company.set(str(parties.get("test_company_name") or project.get("operator") or ""))
+            var_report_laboratory.set(str(parties.get("laboratory_name") or ""))
+            var_report_session_operator.set(str(parties.get("session_operator_name") or project.get("operator") or ""))
+            var_report_responsible_official.set(str(parties.get("responsible_official_name") or ""))
+            var_report_responsible_title.set(str(parties.get("responsible_official_title") or ""))
+            var_report_agency_contact.set(str(correspondence.get("agency_contact") or ""))
+            var_report_notice_of_intent.set(str(correspondence.get("notice_of_intent_date") or ""))
+            var_report_submission_status.set(str(correspondence.get("submission_status") or ""))
+            var_report_observer_contacts.set("; ".join([str(item) for item in _report_builder_split_list(parties.get("observer_contacts"))]))
+            var_report_approval_dates.set("; ".join([str(item) for item in _report_builder_split_list(correspondence.get("approval_dates"))]))
+
+            _report_builder_text_set(
+                txt_report_process_narrative,
+                process_control.get("process_narrative")
+                or process_control.get("process_narrative_seed")
+                or " ".join(
+                    [
+                        part
+                        for part in [
+                            str(source.get("service_class") or "").strip(),
+                            str(source.get("source_category") or "").strip(),
+                            str(source.get("application") or source.get("source_application") or "").strip(),
+                        ]
+                        if part
+                    ]
+                ).strip(),
+            )
+            _report_builder_text_set(txt_report_control_equipment, process_control.get("control_equipment_description"))
+            _report_builder_text_set(txt_report_planned_deviations, "\n".join(_report_builder_split_list(deviations.get("planned_deviations"))))
+            _report_builder_text_set(txt_report_field_deviations, "\n".join(_report_builder_split_list(deviations.get("field_deviations"))))
+            _report_builder_text_set(txt_report_alt_approvals, "\n".join(_report_builder_split_list(deviations.get("alternative_method_approvals"))))
+            _report_builder_text_set(txt_report_impact_statement, deviations.get("impact_statement"))
+            _report_builder_text_set(txt_report_correspondence_notes, correspondence.get("notes"))
+        except Exception:
+            pass
+
+    def _report_builder_completeness(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        blk = _report_builder_block(sess_local)
+        parties = blk.get("parties") if isinstance(blk.get("parties"), dict) else {}
+        process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
+        deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
+        correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+
+        sections: List[Dict[str, Any]] = []
+
+        def _status(required: List[Tuple[str, Any]], optional: Optional[List[Tuple[str, Any]]] = None) -> Dict[str, Any]:
+            optional = optional or []
+            missing = [label for label, value in required if not (bool(value) if isinstance(value, list) else str(value or "").strip())]
+            have_optional = any((bool(value) if isinstance(value, list) else str(value or "").strip()) for _, value in optional)
+            if not missing and required:
+                state = "Available"
+            elif len(missing) < len(required) or have_optional:
+                state = "Partial"
+            else:
+                state = "Gap"
+            return {"status": state, "missing": missing}
+
+        party_eval = _status(
+            [
+                ("Client name", parties.get("client_name")),
+                ("Facility owner / operator", parties.get("facility_owner_operator_name")),
+                ("Test company", parties.get("test_company_name")),
+                ("Responsible official", parties.get("responsible_official_name")),
+            ],
+            [
+                ("Laboratory", parties.get("laboratory_name")),
+                ("Observer contacts", parties.get("observer_contacts")),
+                ("Responsible title", parties.get("responsible_official_title")),
+            ],
+        )
+        sections.append({"label": "Parties / certification", **party_eval})
+
+        process_eval = _status(
+            [
+                ("Process narrative", process_control.get("process_narrative")),
+                ("Control equipment description", process_control.get("control_equipment_description")),
+            ],
+        )
+        sections.append({"label": "Process / control", **process_eval})
+
+        dev_eval = _status(
+            [],
+            [
+                ("Planned deviations", deviations.get("planned_deviations")),
+                ("Field deviations", deviations.get("field_deviations")),
+                ("Alternative approvals", deviations.get("alternative_method_approvals")),
+                ("Impact statement", deviations.get("impact_statement")),
+            ],
+        )
+        if not any(str(item.get("label") or "").strip() == "Deviations / approvals" for item in sections):
+            dev_eval["status"] = "Available" if any(
+                bool(val) if isinstance(val, list) else str(val or "").strip()
+                for val in [
+                    deviations.get("planned_deviations"),
+                    deviations.get("field_deviations"),
+                    deviations.get("alternative_method_approvals"),
+                    deviations.get("impact_statement"),
+                ]
+            ) else "Gap"
+            dev_eval["missing"] = [] if dev_eval["status"] == "Available" else [
+                "Planned deviations or field deviations or approval references"
+            ]
+        sections.append({"label": "Deviations / approvals", **dev_eval})
+
+        corr_eval = _status(
+            [],
+            [
+                ("Notice of intent date", correspondence.get("notice_of_intent_date")),
+                ("Agency contact", correspondence.get("agency_contact")),
+                ("Approval dates", correspondence.get("approval_dates")),
+                ("Submission status", correspondence.get("submission_status")),
+                ("Correspondence notes", correspondence.get("notes")),
+            ],
+        )
+        corr_eval["status"] = "Available" if any(
+            bool(val) if isinstance(val, list) else str(val or "").strip()
+            for val in [
+                correspondence.get("notice_of_intent_date"),
+                correspondence.get("agency_contact"),
+                correspondence.get("approval_dates"),
+                correspondence.get("submission_status"),
+                correspondence.get("notes"),
+            ]
+        ) else "Gap"
+        corr_eval["missing"] = [] if corr_eval["status"] == "Available" else [
+            "Agency / correspondence tracking metadata"
+        ]
+        sections.append({"label": "Regulatory correspondence", **corr_eval})
+
+        counts = {"Available": 0, "Partial": 0, "Gap": 0}
+        for item in sections:
+            status = str(item.get("status") or "")
+            if status in counts:
+                counts[status] += 1
+        summary = f"Report metadata completeness A/P/G = {counts['Available']}/{counts['Partial']}/{counts['Gap']}"
+        warn_sections = [item for item in sections if str(item.get("status") or "") != "Available"]
+        return {
+            "sections": sections,
+            "counts": counts,
+            "summary": summary,
+            "warn": bool(warn_sections),
+            "warn_sections": warn_sections,
+        }
+
+    def _report_builder_save_to_session(*, show_message: bool = False) -> Dict[str, Any]:
+        nonlocal sess
+        sess = _load_session()
+        _ensure_daq_schema(sess)
+        blk = _report_builder_block(sess)
+        parties = blk.get("parties") if isinstance(blk.get("parties"), dict) else {}
+        process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
+        deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
+        correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+        meta = blk.get("meta") if isinstance(blk.get("meta"), dict) else {}
+
+        parties.update({
+            "client_name": str(var_report_client_name.get() or "").strip(),
+            "facility_owner_operator_name": str(var_report_facility_owner.get() or "").strip(),
+            "test_company_name": str(var_report_test_company.get() or "").strip(),
+            "laboratory_name": str(var_report_laboratory.get() or "").strip(),
+            "session_operator_name": str(var_report_session_operator.get() or "").strip(),
+            "responsible_official_name": str(var_report_responsible_official.get() or "").strip(),
+            "responsible_official_title": str(var_report_responsible_title.get() or "").strip(),
+            "observer_contacts": _report_builder_split_list(var_report_observer_contacts.get()),
+        })
+        process_control.update({
+            "process_narrative": _report_builder_text_get(txt_report_process_narrative),
+            "control_equipment_description": _report_builder_text_get(txt_report_control_equipment),
+        })
+        deviations.update({
+            "planned_deviations": _report_builder_split_list(_report_builder_text_get(txt_report_planned_deviations)),
+            "field_deviations": _report_builder_split_list(_report_builder_text_get(txt_report_field_deviations)),
+            "alternative_method_approvals": _report_builder_split_list(_report_builder_text_get(txt_report_alt_approvals)),
+            "impact_statement": _report_builder_text_get(txt_report_impact_statement),
+        })
+        correspondence.update({
+            "notice_of_intent_date": str(var_report_notice_of_intent.get() or "").strip(),
+            "agency_contact": str(var_report_agency_contact.get() or "").strip(),
+            "approval_dates": _report_builder_split_list(var_report_approval_dates.get()),
+            "submission_status": str(var_report_submission_status.get() or "").strip(),
+            "notes": _report_builder_text_get(txt_report_correspondence_notes),
+        })
+        meta.update({
+            "updated_by": _report_builder_actor(sess),
+            "updated_iso": now_iso(),
+        })
+        blk["parties"] = parties
+        blk["process_control"] = process_control
+        blk["deviations_approvals"] = deviations
+        blk["correspondence"] = correspondence
+        blk["meta"] = meta
+        sess["report_builder"] = blk
+        _save_session(sess)
+        _refresh_report_builder_status(sess)
+        if show_message:
+            messagebox.showinfo("Report Builder", "Report metadata saved.")
+        return sess
+
+    def _refresh_report_builder_status(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        try:
+            sess_use = dict(sess_local) if isinstance(sess_local, dict) else _load_session()
+            _ensure_daq_schema(sess_use)
+            completeness = _report_builder_completeness(sess_use)
+            pths = _report_builder_paths(sess_use)
+            summary = _read_json(pths["summary_json"]) if pths["summary_json"].exists() else {}
+            final_blk: Dict[str, Any] = {}
+            if isinstance(summary, dict):
+                final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
+                rc_blk = summary.get("report_context") if isinstance(summary.get("report_context"), dict) else {}
+                if str(final_blk.get("markdown_path") or "").strip():
+                    pths["final_report_md"] = Path(str(final_blk.get("markdown_path")))
+                if str(final_blk.get("docx_path") or "").strip():
+                    pths["final_report_docx"] = Path(str(final_blk.get("docx_path")))
+                if str(final_blk.get("pdf_path") or "").strip():
+                    pths["final_report_pdf"] = Path(str(final_blk.get("pdf_path")))
+                if str(final_blk.get("index_path") or "").strip():
+                    pths["final_report_index"] = Path(str(final_blk.get("index_path")))
+                if str(rc_blk.get("json_path") or "").strip():
+                    pths["report_context_json"] = Path(str(rc_blk.get("json_path")))
+
+            report_context = _read_json(pths["report_context_json"]) if pths["report_context_json"].exists() else {}
+            coverage = report_context.get("coverage") if isinstance(report_context, dict) else {}
+            available_ct = int((coverage or {}).get("Available") or 0) if isinstance(coverage, dict) else 0
+            partial_ct = int((coverage or {}).get("Partial") or 0) if isinstance(coverage, dict) else 0
+            gap_ct = int((coverage or {}).get("Gap") or 0) if isinstance(coverage, dict) else 0
+            final_md_exists = bool(pths["final_report_md"].exists())
+            final_docx_exists = bool(pths["final_report_docx"].exists())
+            final_pdf_exists = bool(pths["final_report_pdf"].exists())
+            final_exists = bool(final_md_exists or final_docx_exists or final_pdf_exists)
+            pack_exists = bool(pths["summary_json"].exists())
+
+            if final_exists:
+                var_report_builder_status.set("Formal report artifacts are available for this session.")
+            elif pack_exists:
+                var_report_builder_status.set("Report pack exists. Final report artifact is missing or stale.")
+            else:
+                var_report_builder_status.set("No formal report artifacts generated for this session.")
+
+            var_report_builder_target.set(
+                "Targets: report_pack_v1 + final_report_v1 (md/docx/pdf)"
+                + (f" | coverage A/P/G = {available_ct}/{partial_ct}/{gap_ct}" if (available_ct or partial_ct or gap_ct) else "")
+            )
+            var_report_builder_completeness.set(str(completeness.get("summary") or "Report metadata completeness: (n/a)"))
+
+            render_status = final_blk.get("render_status") if isinstance(final_blk.get("render_status"), dict) else {}
+            lines = [
+                f"Session dir: {pths['session_dir']}",
+                f"Report pack dir: {pths['report_pack_dir']}",
+                f"Final report dir: {pths['final_report_dir']}",
+                f"Summary JSON: {pths['summary_json']} [{'YES' if pths['summary_json'].exists() else 'NO'}]",
+                f"Report context: {pths['report_context_json']} [{'YES' if pths['report_context_json'].exists() else 'NO'}]",
+                f"Final report (Markdown): {pths['final_report_md']} [{'YES' if final_md_exists else 'NO'}]",
+                f"Final report (DOCX): {pths['final_report_docx']} [{'YES' if final_docx_exists else 'NO'}]",
+                f"Final report (PDF): {pths['final_report_pdf']} [{'YES' if final_pdf_exists else 'NO'}]",
+                f"Final report index: {pths['final_report_index']} [{'YES' if pths['final_report_index'].exists() else 'NO'}]",
+                "",
+                "Protocol notes:",
+                "- Formal deliverables are built from the active session package, evidence bundle, report context, and final report contract.",
+                f"- {_report_builder_o2_note(sess_use)}",
+                f"- {completeness.get('summary') or 'Report metadata completeness: (n/a)'}",
+            ]
+            section_rows = list(completeness.get("sections") or [])
+            if section_rows:
+                lines.append("- Report metadata sections:")
+                for item in section_rows:
+                    if not isinstance(item, dict):
+                        continue
+                    missing = ", ".join([str(v) for v in list(item.get("missing") or []) if str(v or "").strip()])
+                    row = f"  * {item.get('label') or 'Section'}: {item.get('status') or '(n/a)'}"
+                    if missing:
+                        row += f" | missing: {missing}"
+                    lines.append(row)
+            if isinstance(report_context, dict):
+                run_block = ((report_context.get("normalized_blocks") or {}).get("run_aggregation") if isinstance(report_context.get("normalized_blocks"), dict) else {}) or {}
+                if isinstance(run_block, dict):
+                    lines.append(f"- Run aggregation status: {run_block.get('status') or '(n/a)'}")
+                    lines.append(f"- Run coverage note: {run_block.get('coverage_note') or '(n/a)'}")
+                template_contract = report_context.get("template_contract") if isinstance(report_context.get("template_contract"), dict) else {}
+                if isinstance(template_contract, dict):
+                    lines.append(f"- Report contract: {template_contract.get('contract_version') or report_context.get('contract_version') or '(n/a)'}")
+            if isinstance(render_status, dict):
+                docx_row = render_status.get("docx") if isinstance(render_status.get("docx"), dict) else {}
+                pdf_row = render_status.get("pdf") if isinstance(render_status.get("pdf"), dict) else {}
+                lines.append(f"- DOCX render status: {(docx_row.get('status') if isinstance(docx_row, dict) else None) or '(n/a)'}")
+                if isinstance(docx_row, dict) and str(docx_row.get("reason") or "").strip():
+                    lines.append(f"  reason: {docx_row.get('reason')}")
+                lines.append(f"- PDF render status: {(pdf_row.get('status') if isinstance(pdf_row, dict) else None) or '(n/a)'}")
+                if isinstance(pdf_row, dict) and str(pdf_row.get("reason") or "").strip():
+                    lines.append(f"  reason: {pdf_row.get('reason')}")
+
+            report_builder_text.configure(state="normal")
+            report_builder_text.delete("1.0", "end")
+            report_builder_text.insert("1.0", "\n".join(lines).strip() + "\n")
+            report_builder_text.configure(state="disabled")
+        except Exception as e:
+            try:
+                var_report_builder_status.set("Report builder status refresh failed.")
+                report_builder_text.configure(state="normal")
+                report_builder_text.delete("1.0", "end")
+                report_builder_text.insert("1.0", f"Report builder refresh failed:\n{e}")
+                report_builder_text.configure(state="disabled")
+            except Exception:
+                pass
+
+    def build_formal_report_ui() -> None:
         nonlocal sess
         if diagnostics_ui:
             messagebox.showinfo(
-                "Report Pack",
-                "Report Pack is disabled in Diagnostics Runner.\n\n"
-                "Diagnostics sessions are excluded from compliance support and formal report-pack output.",
+                "Report Builder",
+                "Formal report generation is disabled in Diagnostics Runner.\n\n"
+                "Diagnostics sessions are excluded from compliance support and formal final-report output.",
             )
             return
         try:
-            sess = _load_session()
-            _ensure_daq_schema(sess)
-            # Ensure latest edits (test-matrix toggles, workstep captures, run notes) are on disk.
-            _save_session(sess)
-
-            # Reuse runner's output folder conventions (meta/raw/exports).
+            sess = _report_builder_save_to_session(show_message=False)
+            completeness = _report_builder_completeness(sess)
+            warn_rows = list(completeness.get("warn_sections") or [])
+            if warn_rows:
+                msg_lines = [
+                    "Formal report metadata is incomplete.",
+                    "",
+                    "The build can continue, but the final deliverable will still contain partial or gap sections.",
+                    "",
+                ]
+                for item in warn_rows:
+                    if not isinstance(item, dict):
+                        continue
+                    row = f"- {item.get('label') or 'Section'}: {item.get('status') or '(n/a)'}"
+                    missing = ", ".join([str(v) for v in list(item.get("missing") or []) if str(v or "").strip()])
+                    if missing:
+                        row += f" | missing: {missing}"
+                    msg_lines.append(row)
+                msg_lines.append("")
+                msg_lines.append("Build anyway?")
+                if not messagebox.askyesno("Report Builder", "\n".join(msg_lines)):
+                    _refresh_report_builder_status(sess)
+                    return
             outputs = init_outputs(sess, cfg_path, None)
-
-            # Lazy import so reportlab stays optional.
             try:
                 from mole_report_pack_v1 import generate_report_pack_v1
             except Exception as e:
                 raise RuntimeError(f"mole_report_pack_v1.py not available: {e}")
-
             out_dir = generate_report_pack_v1(session=sess, cfg_path=cfg_path, session_dir=outputs.out_dir)
-            log(f"Report pack generated: {out_dir}")
-            messagebox.showinfo("Report Pack", f"Report pack generated\n{out_dir}")
+            _refresh_report_builder_status(sess)
+            pths = _report_builder_paths(sess)
+            final_docx = pths.get("final_report_docx")
+            final_pdf = pths.get("final_report_pdf")
+            final_md = pths.get("final_report_md")
+            log(f"Formal report deliverables generated: {out_dir}")
+            messagebox.showinfo(
+                "Report Builder",
+                "Formal report deliverables generated.\n\n"
+                f"Report pack: {out_dir}\n"
+                f"Final report (DOCX): {final_docx}\n"
+                f"Final report (PDF): {final_pdf}\n"
+                f"Final report (Markdown): {final_md}",
+            )
         except Exception as e:
-            messagebox.showerror("Report Pack", str(e))
+            messagebox.showerror("Report Builder", str(e))
+
+    def _open_report_builder_final() -> None:
+        sess_use = _load_session()
+        _ensure_daq_schema(sess_use)
+        _refresh_report_builder_status(sess_use)
+        pths = _report_builder_paths(sess_use)
+        target = pths.get("final_report_docx")
+        if not isinstance(target, Path) or not target.exists():
+            target = pths.get("final_report_pdf")
+        if not isinstance(target, Path) or not target.exists():
+            target = pths.get("final_report_md")
+        _open_fs_target(target, title="Open Final Report Failed")
+
+    def _open_report_builder_final_dir() -> None:
+        sess_use = _load_session()
+        _ensure_daq_schema(sess_use)
+        _open_fs_target(_report_builder_paths(sess_use).get("final_report_dir"), title="Open Final Report Folder Failed")
+
+    def _open_report_builder_pack_dir() -> None:
+        sess_use = _load_session()
+        _ensure_daq_schema(sess_use)
+        _open_fs_target(_report_builder_paths(sess_use).get("report_pack_dir"), title="Open Report Pack Folder Failed")
 
     try:
-        btn_tm_report_pack.configure(command=generate_report_pack_ui)
+        btn_report_builder_save.configure(command=lambda: _report_builder_save_to_session(show_message=True))
+        btn_tm_report_pack.configure(text="Build Report", command=build_formal_report_ui)
+        btn_report_builder_build.configure(command=build_formal_report_ui)
+        btn_report_builder_refresh.configure(command=lambda: _refresh_report_builder_status(_load_session()))
+        btn_report_builder_open_final.configure(command=_open_report_builder_final)
+        btn_report_builder_open_final_dir.configure(command=_open_report_builder_final_dir)
+        btn_report_builder_open_pack_dir.configure(command=_open_report_builder_pack_dir)
         if diagnostics_ui:
-            btn_tm_report_pack.configure(text="Report Pack Disabled (Diagnostics)", state="disabled")
+            btn_tm_report_pack.configure(text="Build Report Disabled (Diagnostics)", state="disabled")
+            btn_report_builder_save.configure(state="disabled")
+            btn_report_builder_build.configure(state="disabled")
+            btn_report_builder_open_final.configure(state="disabled")
+            btn_report_builder_open_final_dir.configure(state="disabled")
+            btn_report_builder_open_pack_dir.configure(state="disabled")
     except Exception:
         pass
 
@@ -15389,14 +15568,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             sess = _load_session()
             blk = _ensure_daq_schema(sess)
-            try:
-                lifecycle_summary = _pollutant_adjustment_reconcile_lifecycle(sess, actor="AUTO_POLICY_GUARD")
-            except Exception:
-                lifecycle_summary = {}
-            try:
-                _save_session(sess)
-            except Exception:
-                pass
             if diagnostics_ui:
                 gate = _diag_calibration_gate(sess)
                 if bool(gate.get("limits_present")) and (not bool(gate.get("pretest_verified"))):
@@ -15407,13 +15578,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         f"{TEXT_DIAG_VERIFICATION} panel before acquisition can start.",
                     )
                     return
-            try:
-                pre_run_msg = _pollutant_adjustment_pre_run_review_message(sess, lifecycle_summary if isinstance(lifecycle_summary, dict) else None)
-                if pre_run_msg:
-                    if not bool(messagebox.askokcancel("Pollutant Adjustments", pre_run_msg)):
-                        return
-            except Exception:
-                pass
             cfg = blk.get("acq") or {}
             sp = float(cfg.get("sample_period_s") or 1.0)
             sr = float(cfg.get("site_refresh_s") or 300.0)
@@ -15503,6 +15667,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             messagebox.showerror("Open Folder Failed", str(e))
 
     tk.Button(btns, text="Open Config Folder", command=open_config_folder, bg=BTN_BG, fg=FG, relief="flat").pack(fill="x", pady=(0, 6))
+    btn_report_builder_nav = tk.Button(btns, text="Report Builder", command=lambda: _scroll_to_runner_section(sec_report_builder), bg=BTN_BG, fg=FG, relief="flat")
+    btn_report_builder_nav.pack(fill="x", pady=(0, 6))
+    try:
+        if diagnostics_ui:
+            btn_report_builder_nav.configure(text="Report Builder Disabled", state="disabled")
+    except Exception:
+        pass
     tk.Button(btns, text="Run Layout Audit", command=open_runner_layout_audit, bg=BTN_BG, fg=FG, relief="flat").pack(fill="x", pady=(0, 6))
     tk.Button(btns, text="Run Text Audit", command=open_runner_text_audit, bg=BTN_BG, fg=FG, relief="flat").pack(fill="x", pady=(0, 6))
 
@@ -15512,7 +15683,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _co_block(s: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            blk = _ensure_daq_schema(s)
+            s = _ensure_daq_schema(s)
+            blk = s.get('daq_runner') or {}
             co = blk.get('channel_offsets')
             if not isinstance(co, dict):
                 co = {}
@@ -15526,7 +15698,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _pa_block(s: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            blk = _ensure_daq_schema(s)
+            s = _ensure_daq_schema(s)
+            blk = s.get("daq_runner") or {}
             pa = blk.get("pollutant_adjustments")
             if not isinstance(pa, dict):
                 pa = {}
@@ -15536,20 +15709,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             pa.setdefault("formula", "adjusted = raw + bias + (drift_per_hr * elapsed_run_hr)")
             if not isinstance(pa.get("channels"), dict):
                 pa["channels"] = {}
-            for code_name, spec in list((pa.get("channels") or {}).items()):
-                if not isinstance(spec, dict):
-                    continue
-                spec["scope"] = _normalize_pollutant_adjustment_scope(spec.get("scope"), spec.get("source"))
-                spec.setdefault("lifecycle_status", "")
-                spec.setdefault("status_reason", "")
-                spec.setdefault("expires_after_run_no", None)
-                spec.setdefault("expires_after_postcal_run_no", None)
-                spec.setdefault("policy_method_effective", "")
-                spec.setdefault("policy_profile_id", "")
-                spec.setdefault("policy_track", "")
-                spec.setdefault("policy_mode", "")
-                spec.setdefault("policy_rule_id", "")
-                spec.setdefault("policy_matrix_version", "")
             return pa
         except Exception:
             return {"enabled": False, "drift_basis": "ACTIVE_RUN_HR", "formula": "", "channels": {}}
@@ -15880,10 +16039,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 pa2 = _pa_block(sess)
                 pa2["enabled"] = bool(enabled_var.get())
                 _save_session(sess)
-                try:
-                    _refresh_pa_table()
-                except Exception:
-                    pass
             except Exception as e:
                 try:
                     messagebox.showerror("Save Failed", str(e))
@@ -15919,17 +16074,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         body = tk.Frame(w, bg=BG)
         body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
-        tree_wrap = tk.Frame(body, bg=BG)
-        tree_wrap.pack(fill="both", expand=True)
-
-        cols = ("pollutant", "units", "state", "source", "effective", "scope", "raw", "bias", "drift_hr", "elapsed_hr", "total_adj", "adjusted", "note")
-        tree = ttk.Treeview(tree_wrap, columns=cols, show="headings", height=11)
+        cols = ("pollutant", "units", "raw", "bias", "drift_hr", "elapsed_hr", "total_adj", "adjusted", "note")
+        tree = ttk.Treeview(body, columns=cols, show="headings", height=12)
         tree.heading("pollutant", text="Pollutant")
         tree.heading("units", text="Units")
-        tree.heading("state", text="State")
-        tree.heading("source", text="Source")
-        tree.heading("effective", text="Effective")
-        tree.heading("scope", text="Scope")
         tree.heading("raw", text="Raw")
         tree.heading("bias", text="Bias")
         tree.heading("drift_hr", text="Drift / hr")
@@ -15939,45 +16087,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         tree.heading("note", text="Operator note")
         tree.column("pollutant", width=120, anchor="w")
         tree.column("units", width=90, anchor="w")
-        tree.column("state", width=120, anchor="w")
-        tree.column("source", width=165, anchor="w")
-        tree.column("effective", width=110, anchor="w")
-        tree.column("scope", width=145, anchor="w")
         tree.column("raw", width=110, anchor="e")
         tree.column("bias", width=90, anchor="e")
         tree.column("drift_hr", width=95, anchor="e")
         tree.column("elapsed_hr", width=95, anchor="e")
         tree.column("total_adj", width=95, anchor="e")
         tree.column("adjusted", width=110, anchor="e")
-        tree.column("note", width=340, anchor="w")
-        y_scroll = ttk.Scrollbar(tree_wrap, orient="vertical", command=tree.yview)
-        x_scroll = ttk.Scrollbar(tree_wrap, orient="horizontal", command=tree.xview)
-        tree.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
-        tree.grid(row=0, column=0, sticky="nsew")
-        y_scroll.grid(row=0, column=1, sticky="ns")
-        x_scroll.grid(row=1, column=0, sticky="ew")
-        tree_wrap.columnconfigure(0, weight=1)
-        tree_wrap.rowconfigure(0, weight=1)
-
-        ledger = tk.Frame(body, bg=BG)
-        ledger.pack(fill="x", pady=(10, 0))
-        tk.Label(ledger, text="Adjustment Ledger", bg=BG, fg=ACC2, font=("Consolas", 9, "bold")).pack(anchor="w")
-        pa_ledger_status_var = tk.StringVar(value="Select a pollutant to review adjustment state and post-cal history.")
-        tk.Label(
-            ledger,
-            textvariable=pa_ledger_status_var,
-            bg=BG,
-            fg=FG_DIM,
-            font=("Consolas", 9),
-            wraplength=1180,
-            justify="left",
-        ).pack(anchor="w", pady=(4, 6))
-        pa_ledger_text = tk.Text(ledger, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", height=10, wrap="word", font=("Consolas", 9))
-        pa_ledger_text.pack(fill="x")
-        try:
-            pa_ledger_text.configure(state="disabled")
-        except Exception:
-            pass
+        tree.column("note", width=260, anchor="w")
+        tree.pack(fill="both", expand=True)
 
         edit = tk.Frame(body, bg=BG)
         edit.pack(fill="x", pady=(10, 0))
@@ -15986,9 +16103,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         var_pol = tk.StringVar(value="")
         var_bias = tk.StringVar(value="0.0")
         var_drift = tk.StringVar(value="0.0")
-        var_scope = tk.StringVar(value="PERSISTENT")
         var_note = tk.StringVar(value="")
-        pa_scope_values = ("PERSISTENT", "NEXT_RUN_ONLY", "UNTIL_NEXT_POSTCAL")
 
         def _pa_raw_value(code_name: str):
             try:
@@ -16001,149 +16116,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 return None
             return None
 
-        def _pa_spec_snapshot(code_name: str) -> Dict[str, Any]:
-            code_u = str(code_name or "").strip().upper()
-            pa3 = _pa_block(sess)
-            ch_map = (pa3.get("channels") or {}) if isinstance(pa3.get("channels"), dict) else {}
-            spec = ch_map.get(code_u) if isinstance(ch_map.get(code_u), dict) else None
-            global_enabled = bool(pa3.get("enabled"))
-            if not isinstance(spec, dict):
-                return {
-                    "code": code_u,
-                    "exists": False,
-                    "state_label": ("GLOBAL OFF" if not global_enabled else "NO SAVED SPEC"),
-                    "source_label": "(none)",
-                    "effective_label": ("global adjustments disabled" if not global_enabled else "n/a"),
-                    "scope": "",
-                    "scope_label": "(n/a)",
-                    "scope_summary": "(n/a)",
-                    "bias": 0.0,
-                    "drift_per_hr": 0.0,
-                    "note": "",
-                    "updated_by": "",
-                    "updated_iso": "",
-                    "active_now": False,
-                    "enabled": False,
-                    "effective_after_run_no": None,
-                    "expires_after_run_no": None,
-                    "expires_after_postcal_run_no": None,
-                    "source_run_no": None,
-                    "lifecycle_status": "",
-                    "status_reason": "",
-                }
-            state = _pollutant_adjustment_state_snapshot(sess, spec, global_enabled=global_enabled)
-            return {
-                "code": code_u,
-                "exists": True,
-                "state_label": str(state.get("state_label") or ""),
-                "source_label": str(state.get("source_label") or ""),
-                "effective_label": str(state.get("effective_label") or ""),
-                "scope": str(state.get("scope") or ""),
-                "scope_label": str(state.get("scope_label") or ""),
-                "scope_summary": str(state.get("scope_summary") or ""),
-                "bias": float(spec.get("bias") or 0.0),
-                "drift_per_hr": float(spec.get("drift_per_hr") or 0.0),
-                "note": str(spec.get("note") or "").strip(),
-                "updated_by": str(spec.get("updated_by") or "").strip(),
-                "updated_iso": str(spec.get("updated_iso") or "").strip(),
-                "active_now": bool(state.get("active_now")),
-                "enabled": bool(state.get("enabled")),
-                "effective_after_run_no": state.get("effective_after_run_no"),
-                "expires_after_run_no": state.get("expires_after_run_no"),
-                "expires_after_postcal_run_no": state.get("expires_after_postcal_run_no"),
-                "source_run_no": state.get("source_run_no"),
-                "lifecycle_status": str(state.get("lifecycle_status") or ""),
-                "status_reason": str(state.get("status_reason") or ""),
-            }
-
-        def _pa_history_rows(code_name: str) -> List[Dict[str, Any]]:
-            code_u = str(code_name or "").strip().upper()
-            return list(_pollutant_adjustment_postcal_history(sess, code_u))
-
-        def _set_pa_ledger_text(message: str) -> None:
-            try:
-                pa_ledger_text.configure(state="normal")
-                pa_ledger_text.delete("1.0", "end")
-                pa_ledger_text.insert("1.0", str(message or ""))
-                pa_ledger_text.configure(state="disabled")
-            except Exception:
-                pass
-
-        def _render_pa_ledger(code_name: str = "") -> None:
-            code_u = str(code_name or "").strip().upper()
-            if not code_u:
-                pa_ledger_status_var.set("Select a pollutant to review adjustment state and post-cal history.")
-                _set_pa_ledger_text("No pollutant selected.")
-                return
-
-            snap = _pa_spec_snapshot(code_u)
-            hist = _pa_history_rows(code_u)
-            pa_ledger_status_var.set(
-                f"{code_u}: {str(snap.get('state_label') or '(unknown)')} | "
-                f"{str(snap.get('source_label') or '(none)')} | "
-                f"{str(snap.get('effective_label') or '(n/a)')}"
-            )
-            lines = [
-                "Current adjustment spec",
-                f"State: {str(snap.get('state_label') or '(unknown)')}",
-                f"Source: {str(snap.get('source_label') or '(none)')}",
-                f"Effective: {str(snap.get('effective_label') or '(n/a)')}",
-                f"Scope: {str(snap.get('scope_summary') or '(n/a)')}",
-                f"Bias: {_fmt_num(snap.get('bias'), 6, '0.0')}",
-                f"Drift / hr: {_fmt_num(snap.get('drift_per_hr'), 6, '0.0')}",
-            ]
-            lifecycle_status = str(snap.get("lifecycle_status") or "").strip()
-            if lifecycle_status:
-                lines.append(f"Lifecycle: {lifecycle_status}")
-            status_reason = str(snap.get("status_reason") or "").strip()
-            if status_reason:
-                lines.append(f"Reason: {status_reason}")
-            if str(snap.get("updated_by") or "").strip() or str(snap.get("updated_iso") or "").strip():
-                lines.append(
-                    f"Updated: {str(snap.get('updated_by') or '(unknown)')} @ {str(snap.get('updated_iso') or '(n/a)')}"
-                )
-            note_txt = str(snap.get("note") or "").strip()
-            if note_txt:
-                lines.append(f"Note: {note_txt}")
-
-            lines.append("")
-            lines.append("Post-cal history")
-            if hist:
-                for row in hist:
-                    pass_txt = ""
-                    if row.get("pass") is True:
-                        pass_txt = " | PASS"
-                    elif row.get("pass") is False:
-                        pass_txt = " | FAIL"
-                    mode_txt = str(row.get("policy_mode") or "NO_POLICY").strip().upper() or "NO_POLICY"
-                    detail_txt = str(row.get("detail") or "").strip()
-                    lines.append(f"Run {row.get('run_no')}: {str(row.get('event') or '(event)')}{pass_txt} | {mode_txt}")
-                    if detail_txt:
-                        lines.append(f"Detail: {detail_txt}")
-                    method_txt = str(row.get("method_effective") or "").strip()
-                    if method_txt:
-                        lines.append(f"Method: {method_txt}")
-                    reason_txt = str(row.get("reason") or "").strip()
-                    if reason_txt:
-                        lines.append(f"Reason: {reason_txt}")
-                    lines.append("")
-            else:
-                lines.append("No recorded post-cal carry-forward events for this pollutant yet.")
-
-            _set_pa_ledger_text("\n".join(lines).strip())
-
         def _refresh_pa_table() -> None:
             try:
                 tree.delete(*tree.get_children())
             except Exception:
                 pass
-            selected_code = str(var_pol.get() or "").strip().upper()
             pa3 = _pa_block(sess)
             ch_map = (pa3.get("channels") or {}) if isinstance(pa3.get("channels"), dict) else {}
             elapsed_hr = _pollutant_adjustment_elapsed_hours(sess, str((last_frame or {}).get("ts_iso") or "").strip() or None)
             pres = _pollutant_prescriptions(sess)
-            iid_by_code: Dict[str, Any] = {}
-            first_code = ""
             for code_name in _pollutant_adjustment_catalog(sess):
                 rawv = _pa_raw_value(code_name)
                 try:
@@ -16157,7 +16138,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 updated_by = ""
                 updated_iso = ""
                 enabled = bool(pa3.get("enabled"))
-                active_now = enabled
                 try:
                     if isinstance(spec, dict):
                         bias = float(spec.get("bias") or 0.0)
@@ -16166,57 +16146,27 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         updated_by = str(spec.get("updated_by") or "").strip()
                         updated_iso = str(spec.get("updated_iso") or "").strip()
                         enabled = bool(spec.get("enabled", enabled))
-                        active_now = bool(enabled and _pollutant_adjustment_spec_is_active(sess, spec))
                 except Exception:
                     bias, drift_hr = 0.0, 0.0
-                    active_now = bool(enabled)
-                units = str(((pres.get(code_name) or {}).get("expected_units") or (pres.get(code_name) or {}).get("units") or "")).strip()
-                snap = _pa_spec_snapshot(code_name)
-                active_now = bool(snap.get("active_now"))
-                enabled = bool(snap.get("enabled"))
-                total_adj = (bias + (drift_hr * float(elapsed_hr))) if active_now else 0.0
+                total_adj = (bias + (drift_hr * float(elapsed_hr))) if enabled else 0.0
                 adj_val = (rawf + total_adj) if rawf is not None else None
-                display_note_parts: List[str] = []
-                if note_txt:
-                    display_note_parts.append(note_txt)
-                if str(snap.get("status_reason") or "").strip():
-                    display_note_parts.append(str(snap.get("status_reason") or "").strip())
-                display_note = " | ".join(display_note_parts)
-                iid = tree.insert(
+                units = str(((pres.get(code_name) or {}).get("expected_units") or (pres.get(code_name) or {}).get("units") or "")).strip()
+                tree.insert(
                     "",
                     "end",
                     values=(
                         code_name,
                         units,
-                        str(snap.get("state_label") or ""),
-                        str(snap.get("source_label") or ""),
-                        str(snap.get("effective_label") or ""),
-                        str(snap.get("scope_summary") or ""),
                         _fmt_num(rawf, 3, "(n/a)"),
                         _fmt_num(bias, 6, "0.0"),
                         _fmt_num(drift_hr, 6, "0.0"),
                         _fmt_num(elapsed_hr, 4, "0.0"),
                         _fmt_num(total_adj, 6, "0.0"),
                         _fmt_num(adj_val, 3, "(n/a)"),
-                        display_note + (f" [{updated_by} @ {updated_iso}]" if updated_by or updated_iso else ""),
+                        note_txt + (f" [{updated_by} @ {updated_iso}]" if updated_by or updated_iso else ""),
                     ),
-                    tags=(("sel" if active_now and (abs(total_adj) > 1e-12 or abs(bias) > 1e-12 or abs(drift_hr) > 1e-12) else "dim"),),
+                    tags=(("sel" if enabled and (abs(total_adj) > 1e-12 or abs(bias) > 1e-12 or abs(drift_hr) > 1e-12) else "dim"),),
                 )
-                iid_by_code[str(code_name or "").strip().upper()] = iid
-                if not first_code:
-                    first_code = str(code_name or "").strip().upper()
-            target_code = selected_code if selected_code in iid_by_code else first_code
-            if target_code and target_code in iid_by_code:
-                try:
-                    tree.selection_set(iid_by_code[target_code])
-                    tree.focus(iid_by_code[target_code])
-                    tree.see(iid_by_code[target_code])
-                except Exception:
-                    pass
-                var_pol.set(target_code)
-                _render_pa_ledger(target_code)
-            else:
-                _render_pa_ledger("")
 
         def _select_pa_row(_evt=None):
             try:
@@ -16232,14 +16182,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if isinstance(sp, dict):
                     var_bias.set(str(sp.get("bias") if sp.get("bias") is not None else "0.0"))
                     var_drift.set(str(sp.get("drift_per_hr") if sp.get("drift_per_hr") is not None else "0.0"))
-                    var_scope.set(_pollutant_adjustment_scope(sp))
                     var_note.set(str(sp.get("note") or "").strip())
                 else:
                     var_bias.set("0.0")
                     var_drift.set("0.0")
-                    var_scope.set("PERSISTENT")
                     var_note.set("")
-                _render_pa_ledger(code_name)
             except Exception:
                 pass
 
@@ -16257,15 +16204,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ent_drift = tk.Entry(edit, textvariable=var_drift, width=12, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 10, "bold"))
         ent_drift.grid(row=0, column=5, sticky="w", padx=(8, 10))
 
-        tk.Label(edit, text="Scope", bg=BG, fg=FG_DIM, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", pady=(10, 0))
-        cmb_scope = ttk.Combobox(edit, textvariable=var_scope, values=list(pa_scope_values), state="readonly", width=20)
-        cmb_scope.grid(row=1, column=1, sticky="w", padx=(8, 10), pady=(10, 0))
-
-        tk.Label(edit, text="Temporary scopes become active on the next run.", bg=BG, fg=FG_DIM, font=("Consolas", 9)).grid(row=1, column=2, columnspan=4, sticky="w", pady=(10, 0))
-
-        tk.Label(edit, text="Operator note", bg=BG, fg=FG_DIM, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", pady=(10, 0))
+        tk.Label(edit, text="Operator note", bg=BG, fg=FG_DIM, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ent_note = tk.Entry(edit, textvariable=var_note, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 10))
-        ent_note.grid(row=2, column=1, columnspan=5, sticky="we", padx=(8, 10), pady=(10, 0))
+        ent_note.grid(row=1, column=1, columnspan=5, sticky="we", padx=(8, 10), pady=(10, 0))
 
         def _save_pa_one() -> None:
             try:
@@ -16275,15 +16216,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 bias = float(var_bias.get() or 0.0)
                 drift_hr = float(var_drift.get() or 0.0)
                 note_txt = str(var_note.get() or "").strip()
-                if not note_txt:
-                    try:
-                        messagebox.showwarning("Operator Note Required", "Enter a short reason before saving a pollutant adjustment.")
-                    except Exception:
-                        pass
-                    return
-                scope_txt = _normalize_pollutant_adjustment_scope(var_scope.get(), "MANUAL")
-                current_run_no = _pollutant_adjustment_active_run_no(sess)
-                effective_after_run_no = (None if scope_txt == "PERSISTENT" else int(current_run_no or 0))
                 actor_txt = _pollutant_adjustment_actor(sess)
                 stamp_iso = now_iso()
                 pa4 = _pa_block(sess)
@@ -16291,28 +16223,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if not isinstance(cm, dict):
                     cm = {}
                     pa4["channels"] = cm
-                prev_spec = cm.get(code_name) if isinstance(cm.get(code_name), dict) else {}
-                next_spec = dict(prev_spec) if isinstance(prev_spec, dict) else {}
-                next_spec.update({
+                cm[code_name] = {
                     "enabled": True,
                     "bias": bias,
                     "drift_per_hr": drift_hr,
                     "note": note_txt,
                     "updated_by": actor_txt,
                     "updated_iso": stamp_iso,
-                    "source": "MANUAL",
-                    "source_run_no": (int(current_run_no) if current_run_no not in (None, "", 0) else None),
-                    "effective_after_run_no": effective_after_run_no,
-                    "lifecycle_status": "",
-                    "status_reason": "",
-                })
-                _pollutant_adjustment_apply_scope_to_spec(
-                    next_spec,
-                    scope=scope_txt,
-                    effective_after_run_no=effective_after_run_no,
-                )
-                _pollutant_adjustment_attach_policy_metadata(next_spec, _postcal_carry_forward_policy(sess, code_name))
-                cm[code_name] = next_spec
+                }
                 _save_session(sess)
                 _refresh_pa_table()
             except Exception as e:
@@ -16333,7 +16251,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 _save_session(sess)
                 var_bias.set("0.0")
                 var_drift.set("0.0")
-                var_scope.set("PERSISTENT")
                 var_note.set("")
                 _refresh_pa_table()
             except Exception as e:
@@ -16348,7 +16265,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ent_note.bind("<Return>", lambda _e: _save_pa_one())
 
         btn_row = tk.Frame(edit, bg=BG)
-        btn_row.grid(row=3, column=0, columnspan=6, sticky="we", pady=(10, 0))
+        btn_row.grid(row=2, column=0, columnspan=6, sticky="we", pady=(10, 0))
         tk.Button(btn_row, text="Save", command=_save_pa_one, bg=BTN_BG, fg=FG, relief="flat").pack(side="left", padx=(0, 8))
         tk.Button(btn_row, text="Clear", command=_clear_pa_one, bg=BTN_BG, fg=FG, relief="flat").pack(side="left", padx=(0, 8))
         tk.Button(btn_row, text="Refresh", command=_refresh_pa_table, bg=BTN_BG, fg=FG, relief="flat").pack(side="right")
@@ -18088,31 +18005,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "history_count": len(list(meta.get("schema_migrations") or [])),
         }
 
-    def _pollutant_adjustment_units(sess_local: Dict[str, Any], code_name: Any) -> str:
-        code_u = str(code_name or "").strip().upper()
-        pres = _pollutant_prescriptions(sess_local)
-        return str(((pres.get(code_u) or {}).get("expected_units") or (pres.get(code_u) or {}).get("units") or "")).strip()
-
-    def _pollutant_adjustment_postcal_reviews(sess_local: Dict[str, Any]) -> List[Dict[str, Any]]:
-        if mole_postcal_policy is not None:
-            try:
-                return list(mole_postcal_policy.collect_postcal_reviews(sess_local))
-            except Exception:
-                pass
-        return []
-
-    def _pollutant_adjustment_postcal_history(sess_local: Dict[str, Any], code_name: Any = "") -> List[Dict[str, Any]]:
-        if mole_postcal_policy is not None:
-            try:
-                return list(mole_postcal_policy.collect_postcal_history(
-                    sess_local,
-                    code_name=code_name,
-                    units_lookup=lambda session_obj, pollutant: _pollutant_adjustment_units(session_obj, pollutant),
-                ))
-            except Exception:
-                pass
-        return []
-
     def _calc_audit_pollutant_adjustment_snapshot(sess_local: Dict[str, Any]) -> Dict[str, Any]:
         pa = _pa_block(sess_local)
         ch_map = (pa.get("channels") or {}) if isinstance(pa.get("channels"), dict) else {}
@@ -18120,10 +18012,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             sess_local,
             str((last_frame or {}).get("ts_iso") or "").strip() or None,
         )
-        global_enabled = bool(pa.get("enabled"))
-        active_run_no = _pollutant_adjustment_active_run_no(sess_local)
-        history_rows = _pollutant_adjustment_postcal_history(sess_local)
-        review_rows = _pollutant_adjustment_postcal_reviews(sess_local)
+        pres = _pollutant_prescriptions(sess_local)
         raw_before = (last_frame or {}).get("_pollutant_adjustment_raw_channels") if isinstance((last_frame or {}).get("_pollutant_adjustment_raw_channels"), dict) else {}
         rows: List[Dict[str, str]] = []
         for code in _pollutant_adjustment_catalog(sess_local):
@@ -18132,45 +18021,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 continue
             bias = _parse_float(spec.get("bias"), 0.0) or 0.0
             drift_hr = _parse_float(spec.get("drift_per_hr"), 0.0) or 0.0
-            state = _pollutant_adjustment_state_snapshot(sess_local, spec, global_enabled=global_enabled)
-            enabled = bool(state.get("enabled"))
-            active_now = bool(state.get("active_now"))
-            eff_run_no = state.get("effective_after_run_no")
-            total_adj = (float(bias) + (float(drift_hr) * float(elapsed_hr))) if active_now else 0.0
+            enabled = bool(spec.get("enabled", True))
+            total_adj = (float(bias) + (float(drift_hr) * float(elapsed_hr))) if enabled else 0.0
             if (not enabled) and abs(float(bias)) < 1e-12 and abs(float(drift_hr)) < 1e-12:
                 continue
             raw_v = _parse_float((raw_before or {}).get(code), _parse_float((last_frame or {}).get(code)))
             adjusted_v = _parse_float((last_frame or {}).get(code))
-            units = _pollutant_adjustment_units(sess_local, code)
-            source_txt = str(state.get("source") or "MANUAL")
-            source_run_no = state.get("source_run_no")
-            state_txt = str(state.get("state_label") or "")
-            effective_label = str(state.get("effective_label") or "")
-            note_parts: List[str] = []
-            base_note = str(spec.get("note") or "").strip()
-            if base_note:
-                note_parts.append(base_note)
-            if str(state.get("status_reason") or "").strip():
-                note_parts.append(str(state.get("status_reason") or "").strip())
-            note_txt = " | ".join(note_parts)
+            units = str(((pres.get(code) or {}).get("expected_units") or (pres.get(code) or {}).get("units") or "")).strip()
             rows.append({
                 "pollutant": code,
-                "enabled": ("PENDING" if enabled and (not active_now) and eff_run_no is not None else ("YES" if enabled else "NO")),
-                "channel_enabled": bool(enabled),
-                "state": state_txt,
-                "active_now": bool(active_now),
-                "source": source_txt,
-                "source_label": str(state.get("source_label") or ""),
-                "source_run_no": source_run_no,
-                "effective_after_run_no": eff_run_no,
-                "effective_label": effective_label,
-                "scope": str(state.get("scope_summary") or ""),
-                "scope_label": str(state.get("scope_label") or ""),
-                "scope_code": str(state.get("scope") or ""),
-                "expires_after_run_no": state.get("expires_after_run_no"),
-                "expires_after_postcal_run_no": state.get("expires_after_postcal_run_no"),
-                "lifecycle_status": str(state.get("lifecycle_status") or ""),
-                "status_reason": str(state.get("status_reason") or ""),
+                "enabled": "YES" if enabled else "NO",
                 "units": units,
                 "bias": _fmt_num(bias, 6, "0.0"),
                 "drift_per_hr": _fmt_num(drift_hr, 6, "0.0"),
@@ -18178,22 +18038,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "total_adjustment": _fmt_num(total_adj, 6, "0.0"),
                 "raw_before": _fmt_num(raw_v, 6, "(n/a)"),
                 "adjusted": _fmt_num(adjusted_v, 6, "(n/a)"),
-                "note": note_txt,
+                "note": str(spec.get("note") or "").strip(),
                 "updated_by": str(spec.get("updated_by") or "").strip(),
                 "updated_iso": str(spec.get("updated_iso") or "").strip(),
             })
         return {
-            "enabled": global_enabled,
+            "enabled": bool(pa.get("enabled")),
             "drift_basis": str(pa.get("drift_basis") or "ACTIVE_RUN_HR"),
             "formula": str(pa.get("formula") or "adjusted = raw + bias + (drift_per_hr * elapsed_run_hr)"),
             "elapsed_hr": _fmt_num(elapsed_hr, 4, "0.0"),
-            "active_run_no": active_run_no,
             "rows": rows,
-            "history_row_count": len(history_rows),
-            "history": history_rows,
-            "decision_review_count": len(review_rows),
-            "decision_reviews": review_rows,
-            "latest_review": (dict(review_rows[0]) if review_rows else {}),
         }
 
     def _calc_audit_build_snapshot(
@@ -18294,10 +18148,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         if liquid_hhv_share is not None:
             provenance_items.append(("DG liquid share (% HHV basis)", _fmt_num(liquid_hhv_share, 3, "(n/a)")))
         pollutant_adjustments = _calc_audit_pollutant_adjustment_snapshot(sess_use)
+        o2_adjustment = _active_o2_pollutant_adjustment(sess_use)
         if pollutant_adjustments.get("enabled"):
             provenance_items.append(("Pollutant bias / drift adjustments", "ENABLED"))
             provenance_items.append(("Adjustment drift basis", str(pollutant_adjustments.get("drift_basis") or "(n/a)")))
             provenance_items.append(("Adjustment formula", str(pollutant_adjustments.get("formula") or "(n/a)")))
+        provenance_items.append((
+            "O2 correction denominator",
+            "Adjusted O2 channel (post bias / drift)" if bool(o2_adjustment.get("active")) else "Live O2 channel",
+        ))
 
         crosswalk_notes = [
             str(part).strip()
@@ -18311,6 +18170,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         )
         if pollutant_adjustments.get("enabled") and list(pollutant_adjustments.get("rows") or []):
             assumptions.append("Per-pollutant bias / drift adjustments are active before dry, corrected, and Method 19 calculations.")
+        if bool(o2_adjustment.get("active")):
+            assumptions.append("Adjusted O2 is used as the EPA 3A / 7E corrected-concentration denominator when O2 bias / drift is active.")
 
         return {
             "generated": now_iso(),
@@ -18400,9 +18261,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         lines.append(f"  Drift basis: {padj.get('drift_basis') or '(n/a)'}")
         lines.append(f"  Formula: {padj.get('formula') or '(n/a)'}")
         lines.append(f"  Elapsed active-run hours: {padj.get('elapsed_hr') or '(n/a)'}")
-        lines.append(f"  Active run number: {padj.get('active_run_no') or '(n/a)'}")
-        lines.append(f"  Post-cal history rows: {padj.get('history_row_count') or 0}")
-        lines.append(f"  Decision reviews: {padj.get('decision_review_count') or 0}")
         if padj.get("rows"):
             for item in list(padj.get("rows") or []):
                 if not isinstance(item, dict):
@@ -18416,68 +18274,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     + (f" {item.get('units')}/hr" if str(item.get("units") or "").strip() else "")
                     + f" | total adj {item.get('total_adjustment') or '0.0'}"
                     + (f" {item.get('units')}" if str(item.get("units") or "").strip() else "")
-                    + f" | state {item.get('state') or '(n/a)'}"
-                    + f" | source {item.get('source_label') or item.get('source') or '(n/a)'}"
-                    + f" | effective {item.get('effective_label') or '(n/a)'}"
-                    + f" | scope {item.get('scope') or '(n/a)'}"
                     + f" | raw before {item.get('raw_before') or '(n/a)'}"
                     + f" | adjusted {item.get('adjusted') or '(n/a)'}"
                     + (f" | note {item.get('note')}" if str(item.get("note") or "").strip() else "")
-                    + (f" | lifecycle {item.get('lifecycle_status')}" if str(item.get("lifecycle_status") or "").strip() else "")
-                    + (f" | reason {item.get('status_reason')}" if str(item.get("status_reason") or "").strip() else "")
                     + (f" | by {item.get('updated_by')}" if str(item.get("updated_by") or "").strip() else "")
                     + (f" | at {item.get('updated_iso')}" if str(item.get("updated_iso") or "").strip() else "")
                 )
         else:
             lines.append("  (none configured)")
-        latest_review = padj.get("latest_review") if isinstance(padj.get("latest_review"), dict) else {}
-        lines.append("")
-        lines.append("LATEST POST-CAL DECISION REVIEW")
-        if latest_review:
-            lines.append(f"  Run: {latest_review.get('run_no') or '(n/a)'}")
-            lines.append(f"  Headline: {latest_review.get('headline') or '(n/a)'}")
-            lines.append(f"  Overall pass: {'YES' if latest_review.get('overall_pass') else 'NO'}")
-            lines.append(f"  Health: {latest_review.get('postcal_health') or '(n/a)'}")
-            for label, key in (
-                ("Promoted", "promoted_codes"),
-                ("Manual only", "manual_only_codes"),
-                ("Invalidated", "invalidated_codes"),
-                ("Suspended", "suspended_codes"),
-            ):
-                values = ", ".join(str(code).strip().upper() for code in list(latest_review.get(key) or []) if str(code).strip()) or "(none)"
-                lines.append(f"  {label}: {values}")
-            if str(latest_review.get("message") or "").strip():
-                lines.append("  Review message:")
-                for line in str(latest_review.get("message") or "").splitlines():
-                    lines.append(f"    {line}")
-        else:
-            lines.append("  (no post-cal decision review recorded)")
-        lines.append("")
-        lines.append("POST-CAL CARRY-FORWARD HISTORY")
-        history_rows = list(padj.get("history") or [])
-        if history_rows:
-            for item in history_rows:
-                if not isinstance(item, dict):
-                    continue
-                pass_txt = ""
-                if item.get("pass") is True:
-                    pass_txt = " | PASS"
-                elif item.get("pass") is False:
-                    pass_txt = " | FAIL"
-                lines.append(
-                    f"  Run {item.get('run_no') or '?'} | "
-                    f"{item.get('pollutant') or 'Pollutant'} | "
-                    f"{item.get('event') or '(event)'}{pass_txt} | "
-                    f"{item.get('policy_mode') or 'NO_POLICY'}"
-                )
-                if str(item.get("detail") or "").strip():
-                    lines.append(f"    Detail: {item.get('detail')}")
-                if str(item.get("method_effective") or "").strip():
-                    lines.append(f"    Method: {item.get('method_effective')}")
-                if str(item.get("reason") or "").strip():
-                    lines.append(f"    Reason: {item.get('reason')}")
-        else:
-            lines.append("  (no recorded post-cal carry-forward events)")
         lines.append("")
         lines.append("ASSUMPTIONS / FLAGS")
         if snapshot.get("assumptions"):
@@ -18835,10 +18639,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return "Pollutant calculation chain"
         if section_u == "pollutant_adjustment":
             return "Pollutant bias / drift adjustments"
-        if section_u == "pollutant_adjustment_review":
-            return "Post-cal decision review"
-        if section_u == "pollutant_adjustment_history":
-            return "Post-cal carry-forward history"
         if section_u == "assumption":
             return "Assumptions / flags"
         if section_u == "crosswalk_note":
@@ -18975,9 +18775,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ("Drift basis", str(padj.get("drift_basis") or "")),
                 ("Formula", str(padj.get("formula") or "")),
                 ("Elapsed active-run hours", str(padj.get("elapsed_hr") or "")),
-                ("Active run number", str(padj.get("active_run_no") or "")),
-                ("Post-cal history rows", str(padj.get("history_row_count") or 0)),
-                ("Decision review count", str(padj.get("decision_review_count") or 0)),
             ]
             for idx, (label, value) in enumerate(summary_rows, start=1):
                 if not str(value or "").strip():
@@ -19028,102 +18825,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "mass": str(item.get("elapsed_hr") or ""),
                     "mass_units": "",
                     "mass_status": str(item.get("enabled") or ""),
-                    "state": str(item.get("state") or ""),
-                    "source": str(item.get("source_label") or item.get("source") or ""),
-                    "effective": str(item.get("effective_label") or ""),
-                    "scope": str(item.get("scope") or ""),
-                    "active_now": str(item.get("active_now") or ""),
-                    "bias": str(item.get("bias") or ""),
-                    "drift_per_hr": str(item.get("drift_per_hr") or ""),
-                    "effective_after_run_no": str(item.get("effective_after_run_no") or ""),
-                    "expires_after_run_no": str(item.get("expires_after_run_no") or ""),
-                    "expires_after_postcal_run_no": str(item.get("expires_after_postcal_run_no") or ""),
-                    "source_run_no": str(item.get("source_run_no") or ""),
-                    "lifecycle_status": str(item.get("lifecycle_status") or ""),
-                    "status_reason": str(item.get("status_reason") or ""),
                     "note": str(item.get("note") or ""),
                     "updated_by": str(item.get("updated_by") or ""),
                     "updated_iso": str(item.get("updated_iso") or ""),
-                })
-            for idx, item in enumerate(list(padj.get("decision_reviews") or []), start=1):
-                if not isinstance(item, dict):
-                    continue
-                review_note_parts = []
-                for label, key in (
-                    ("Promoted", "promoted_codes"),
-                    ("Manual only", "manual_only_codes"),
-                    ("Invalidated", "invalidated_codes"),
-                    ("Suspended", "suspended_codes"),
-                ):
-                    values = ", ".join(str(code).strip().upper() for code in list(item.get(key) or []) if str(code).strip())
-                    if values:
-                        review_note_parts.append(f"{label}: {values}")
-                rows.append({
-                    **common,
-                    "section": "pollutant_adjustment_review",
-                    "section_label": _calc_audit_csv_section_label("pollutant_adjustment_review"),
-                    "row_type": "decision_review",
-                    "order": str(idx),
-                    "label": str(item.get("headline") or f"Run {item.get('run_no') or '?'} review"),
-                    "value": str(item.get("message") or ""),
-                    "pollutant": "",
-                    "raw": "",
-                    "dry": "",
-                    "corr": "",
-                    "units": "",
-                    "qd_dscfh": "",
-                    "heat_input_mmbtu_hr": "",
-                    "heat_input_basis": "",
-                    "fuel_flow": "",
-                    "fuel_flow_source": "",
-                    "mass": "",
-                    "mass_units": "",
-                    "mass_status": "",
-                    "event": "DECISION_REVIEW",
-                    "pass": ("" if item.get("overall_pass") is None else str(bool(item.get("overall_pass")))),
-                    "review_headline": str(item.get("headline") or ""),
-                    "review_overall_pass": ("" if item.get("overall_pass") is None else str(bool(item.get("overall_pass")))),
-                    "review_health": str(item.get("postcal_health") or ""),
-                    "note": " | ".join(review_note_parts),
-                })
-            for idx, item in enumerate(list(padj.get("history") or []), start=1):
-                if not isinstance(item, dict):
-                    continue
-                rows.append({
-                    **common,
-                    "section": "pollutant_adjustment_history",
-                    "section_label": _calc_audit_csv_section_label("pollutant_adjustment_history"),
-                    "row_type": "history_event",
-                    "order": str(idx),
-                    "label": f"Run {item.get('run_no') or '?'} {item.get('pollutant') or ''}".strip(),
-                    "value": str(item.get("detail") or ""),
-                    "pollutant": str(item.get("pollutant") or ""),
-                    "raw": "",
-                    "dry": "",
-                    "corr": "",
-                    "units": str(item.get("units") or ""),
-                    "qd_dscfh": "",
-                    "heat_input_mmbtu_hr": "",
-                    "heat_input_basis": "",
-                    "fuel_flow": str(item.get("bias") or ""),
-                    "fuel_flow_source": str(item.get("drift_per_hr") or ""),
-                    "mass": "",
-                    "mass_units": "",
-                    "mass_status": "",
-                    "event": str(item.get("event") or ""),
-                    "pass": ("" if item.get("pass") is None else str(bool(item.get("pass")))),
-                    "policy_mode": str(item.get("policy_mode") or ""),
-                    "method_effective": str(item.get("method_effective") or ""),
-                    "profile_id": str(item.get("profile_id") or ""),
-                    "track": str(item.get("track") or ""),
-                    "bias": str(item.get("bias") or ""),
-                    "drift_per_hr": str(item.get("drift_per_hr") or ""),
-                    "effective_after_run_no": str(item.get("effective_after_run_no") or ""),
-                    "source_run_no": str(item.get("source_run_no") or ""),
-                    "review_headline": str(item.get("review_headline") or ""),
-                    "review_overall_pass": ("" if item.get("review_overall_pass") is None else str(bool(item.get("review_overall_pass")))),
-                    "review_health": str(item.get("postcal_health") or ""),
-                    "note": str(item.get("reason") or ""),
                 })
         for row in rows:
             if isinstance(row, dict):
@@ -19258,28 +18962,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "mass",
             "mass_units",
             "mass_status",
-            "state",
-            "source",
-            "effective",
-            "scope",
-            "active_now",
-            "bias",
-            "drift_per_hr",
-            "event",
-            "pass",
-            "policy_mode",
-            "method_effective",
-            "profile_id",
-            "track",
-            "effective_after_run_no",
-            "expires_after_run_no",
-            "expires_after_postcal_run_no",
-            "source_run_no",
-            "review_headline",
-            "review_overall_pass",
-            "review_health",
-            "lifecycle_status",
-            "status_reason",
             "note",
             "updated_by",
             "updated_iso",
@@ -19288,7 +18970,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             writer = csv.DictWriter(fh, fieldnames=fieldnames)
             writer.writeheader()
             for row in csv_rows:
-                writer.writerow({key: ("" if row.get(key) is None else str(row.get(key))) for key in fieldnames})
+                writer.writerow({key: str(row.get(key) or "") for key in fieldnames})
         return json_path, csv_path
 
     def _diag_export_snapshot(fmt: str) -> Optional[Path]:
@@ -20477,253 +20159,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         rec = int(round(max(float(min_purge), purge_mult * max(t90s))))
         return max(0, rec)
 
-    def _ws_capture_transition_elapsed_seconds(sess: Dict[str, Any], expected_step: str) -> Optional[float]:
-        try:
-            blk = _ensure_daq_schema(sess)
-            ws = (blk.get("worksteps") or {})
-            ws_q = (ws.get("qaqc") or {})
-            step_u = str(expected_step or "").strip().upper()
-            trans = None
-            pre_map = {"ZERO": "zero_air", "MID": "mid_gas", "SPAN": "span_gas"}
-            post_map = {"POST_ZERO": "zero_air", "POST_SPAN": "span_gas"}
-            if step_u in pre_map:
-                trans = (ws_q.get("transitions") or {}).get(pre_map.get(step_u)) or {}
-            elif step_u in post_map:
-                postcal = ws.get("postcal") or {}
-                run_no = postcal.get("run_no")
-                prun = {}
-                if run_no not in (None, ""):
-                    try:
-                        prun = ((ws_q.get("post_runs") or {}).get(str(int(run_no))) or {})
-                    except Exception:
-                        prun = ((ws_q.get("post_runs") or {}).get(str(run_no)) or {})
-                trans = (prun.get("transitions") or {}).get(post_map.get(step_u)) or {}
-            start_epoch = _parse_float((trans or {}).get("start_epoch"))
-            if start_epoch is None:
-                return None
-            return max(0.0, time.time() - float(start_epoch))
-        except Exception:
-            return None
-
-    def _ws_capture_min_elapsed_seconds(sess: Dict[str, Any]) -> float:
-        """Minimum age of a gas-step transition before a stable window can unlock capture.
-
-        This keeps the capture/stability windows from reusing mostly pre-switch data,
-        which can otherwise appear "stable" immediately after the operator initiates
-        the next gas step.
-        """
-        try:
-            _, ws_cfg, _ = _ws_get_cfg(sess)
-            cap_s = max(1.0, float(ws_cfg.get("capture_window_s", 10)))
-        except Exception:
-            cap_s = 10.0
-        try:
-            _, ws_cfg, _ = _ws_get_cfg(sess)
-            stab_s = max(1.0, float(ws_cfg.get("stability_window_s", 15)))
-        except Exception:
-            stab_s = 15.0
-        return max(cap_s, stab_s)
-
-    def _ws_capture_gate_state(sess: Dict[str, Any], expected_step: str) -> Dict[str, Any]:
-        step_u = str(expected_step or "").strip().upper()
-        label = step_u.replace("_", " ") or "CAPTURE"
-        try:
-            blk = _ensure_daq_schema(sess)
-            ws = (blk.get("worksteps") or {})
-            ws_q = (ws.get("qaqc") or {})
-            postcal = ws.get("postcal") or {}
-            active_step = str((ws_q or {}).get("active_gas_step") or "").strip().upper()
-            selected = list(_selected_pollutants(sess) or [])
-            stable_cnt = 0
-            for code in selected:
-                if _ws_is_stable(sess, code):
-                    stable_cnt += 1
-            all_stable = bool(selected) and stable_cnt == len(selected)
-            rec_s = _ws_recommended_purge_seconds(sess)
-            elapsed_s = _ws_capture_transition_elapsed_seconds(sess, step_u)
-            min_elapsed_s = _ws_capture_min_elapsed_seconds(sess)
-            soak_ready = bool(
-                rec_s is not None
-                and elapsed_s is not None
-                and float(elapsed_s) >= float(rec_s)
-            )
-            fresh_window_ready = bool(
-                elapsed_s is not None
-                and float(elapsed_s) >= float(min_elapsed_s)
-            )
-            soak_remaining_s = None
-            if rec_s is not None and elapsed_s is not None:
-                soak_remaining_s = max(0, int(math.ceil(float(rec_s) - float(elapsed_s))))
-            fresh_remaining_s = None
-            if elapsed_s is not None:
-                fresh_remaining_s = max(0, int(math.ceil(float(min_elapsed_s) - float(elapsed_s))))
-
-            if step_u in ("POST_ZERO", "POST_SPAN") and not bool(postcal.get("required")):
-                return {
-                    "enabled": False,
-                    "reason": "No post-cal is currently required.",
-                    "active_step": active_step,
-                    "expected_step": step_u,
-                    "stable_count": stable_cnt,
-                    "selected_count": len(selected),
-                    "soak_ready": soak_ready,
-                    "soak_remaining_s": soak_remaining_s,
-                    "fresh_window_ready": fresh_window_ready,
-                    "fresh_window_remaining_s": fresh_remaining_s,
-                }
-
-            if active_step != step_u:
-                reason = ""
-                if active_step == "PURGE":
-                    try:
-                        end_ep = _parse_float(ws_runtime.get("purge_end_epoch"))
-                        rem = _remaining_s(float(end_ep)) if end_ep else 0
-                    except Exception:
-                        rem = 0
-                    if rem > 0:
-                        reason = f"Purge running ({int(rem)} s remaining)."
-                    else:
-                        reason = "Purge complete. Initiate the requested gas step."
-                elif active_step == "POSTCAL_REQUIRED":
-                    reason = "Post-cal is required. Initiate POST ZERO or POST SPAN."
-                elif active_step == "SAMPLE":
-                    reason = "Test run is active. End the run before capturing."
-                elif active_step:
-                    reason = f"Active step is {active_step.replace('_', ' ')}."
-                else:
-                    reason = f"Initiate {label}."
-                return {
-                    "enabled": False,
-                    "reason": reason,
-                    "active_step": active_step,
-                    "expected_step": step_u,
-                    "stable_count": stable_cnt,
-                    "selected_count": len(selected),
-                    "soak_ready": soak_ready,
-                    "soak_remaining_s": soak_remaining_s,
-                    "fresh_window_ready": fresh_window_ready,
-                    "fresh_window_remaining_s": fresh_remaining_s,
-                }
-
-            if soak_ready or (all_stable and fresh_window_ready):
-                if soak_ready and all_stable:
-                    reason = f"Ready ({stable_cnt}/{len(selected)} stable; soak met)."
-                elif soak_ready:
-                    reason = "Ready (recommended soak met)."
-                else:
-                    reason = f"Ready ({stable_cnt}/{len(selected)} stable)."
-                return {
-                    "enabled": True,
-                    "reason": reason,
-                    "active_step": active_step,
-                    "expected_step": step_u,
-                    "stable_count": stable_cnt,
-                    "selected_count": len(selected),
-                    "soak_ready": soak_ready,
-                    "soak_remaining_s": soak_remaining_s,
-                    "fresh_window_ready": fresh_window_ready,
-                    "fresh_window_remaining_s": fresh_remaining_s,
-                }
-
-            waiting_parts: List[str] = []
-            if fresh_remaining_s is not None and fresh_remaining_s > 0:
-                waiting_parts.append(f"{fresh_remaining_s} s fresh-window minimum remaining")
-            if soak_remaining_s is not None and soak_remaining_s > 0:
-                waiting_parts.append(f"{soak_remaining_s} s soak remaining")
-            elif rec_s is not None and elapsed_s is None:
-                waiting_parts.append("transition timer unavailable")
-            if selected:
-                waiting_parts.append(f"{stable_cnt}/{len(selected)} stable")
-            if not waiting_parts:
-                waiting_parts.append("waiting for stable window")
-            return {
-                "enabled": False,
-                "reason": "Wait: " + " | ".join(waiting_parts) + ".",
-                "active_step": active_step,
-                "expected_step": step_u,
-                "stable_count": stable_cnt,
-                "selected_count": len(selected),
-                "soak_ready": soak_ready,
-                "soak_remaining_s": soak_remaining_s,
-                "fresh_window_ready": fresh_window_ready,
-                "fresh_window_remaining_s": fresh_remaining_s,
-            }
-        except Exception:
-            return {
-                "enabled": False,
-                "reason": f"Unable to evaluate {label} readiness.",
-                "active_step": "",
-                "expected_step": step_u,
-                "stable_count": 0,
-                "selected_count": 0,
-                "soak_ready": False,
-                "soak_remaining_s": None,
-                "fresh_window_ready": False,
-                "fresh_window_remaining_s": None,
-            }
-
-    def _ws_set_widget_enabled(widget: Any, enabled: bool) -> None:
-        try:
-            if widget is None:
-                return
-            widget.configure(state=("normal" if enabled else "disabled"))
-        except Exception:
-            pass
-
-    def _ws_apply_capture_gate(sess: Dict[str, Any]) -> None:
-        try:
-            zero_gate = _ws_capture_gate_state(sess, "ZERO")
-            mid_gate = _ws_capture_gate_state(sess, "MID")
-            span_gate = _ws_capture_gate_state(sess, "SPAN")
-            post_zero_gate = _ws_capture_gate_state(sess, "POST_ZERO")
-            post_span_gate = _ws_capture_gate_state(sess, "POST_SPAN")
-
-            for row in list(ws_row_vars.values()):
-                if not isinstance(row, dict):
-                    continue
-                _ws_set_widget_enabled(row.get("zero_btn"), bool(zero_gate.get("enabled")))
-                if row.get("mid_btn") is not None:
-                    _ws_set_widget_enabled(row.get("mid_btn"), bool(mid_gate.get("enabled")))
-                _ws_set_widget_enabled(row.get("span_btn"), bool(span_gate.get("enabled")))
-
-            _ws_set_widget_enabled(btn_ws_post_zero_all, bool(post_zero_gate.get("enabled")))
-            _ws_set_widget_enabled(btn_ws_post_span_all, bool(post_span_gate.get("enabled")))
-            for row in list(ws_post_row_vars.values()):
-                if not isinstance(row, dict):
-                    continue
-                _ws_set_widget_enabled(row.get("zero_btn"), bool(post_zero_gate.get("enabled")))
-                _ws_set_widget_enabled(row.get("span_btn"), bool(post_span_gate.get("enabled")))
-
-            blk = _ensure_daq_schema(sess)
-            ws = (blk.get("worksteps") or {})
-            active_step = str((((ws.get("qaqc") or {}).get("active_gas_step")) or "")).strip().upper()
-            if active_step in ("ZERO", "MID", "SPAN", "POST_ZERO", "POST_SPAN"):
-                gate = _ws_capture_gate_state(sess, active_step)
-                ws_capture_gate_var.set(
-                    f"Capture gate: {active_step.replace('_', ' ')} | {str(gate.get('reason') or '').strip()}"
-                )
-            elif active_step == "PURGE":
-                try:
-                    end_ep = _parse_float(ws_runtime.get("purge_end_epoch"))
-                    rem = _remaining_s(float(end_ep)) if end_ep else 0
-                except Exception:
-                    rem = 0
-                if rem > 0:
-                    ws_capture_gate_var.set(f"Capture gate: PURGE | {int(rem)} s remaining")
-                else:
-                    ws_capture_gate_var.set("Capture gate: PURGE | initiate the next gas step")
-            elif active_step == "POSTCAL_REQUIRED":
-                ws_capture_gate_var.set("Capture gate: POST-CAL REQUIRED | initiate POST ZERO or POST SPAN")
-            elif active_step == "SAMPLE":
-                ws_capture_gate_var.set("Capture gate: SAMPLE | captures locked during test run")
-            else:
-                ws_capture_gate_var.set("Capture gate: initiate a gas step")
-        except Exception:
-            try:
-                ws_capture_gate_var.set("Capture gate: unavailable")
-            except Exception:
-                pass
-
     def _ws_update_status_indicators(sess: Dict[str, Any]) -> None:
         """Refresh Worksteps runtime labels (purge recommendation + stability)."""
         # purge recommendation
@@ -20759,10 +20194,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     ws_purge_timer_var.set(f"Timer: {rem} s remaining")
                 else:
                     ws_purge_timer_var.set("Timer: DONE")
-        except Exception:
-            pass
-        try:
-            _ws_apply_capture_gate(sess)
         except Exception:
             pass
 
@@ -21061,10 +20492,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _ensure_daq_schema(sess)
             _ws_save_cfg_from_ui(sess)
             ws, ws_cfg, ws_q = _ws_get_cfg(sess)
-            gate = _ws_capture_gate_state(sess, "ZERO")
-            if not bool(gate.get("enabled")):
-                messagebox.showwarning("Capture ZERO", str(gate.get("reason") or "ZERO capture is not ready."))
-                return
             was_complete = _ws_step_is_complete(ws_q, "zero", sess)
 
             w = float(ws_cfg.get("capture_window_s", 10))
@@ -21187,10 +20614,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _ensure_daq_schema(sess)
             _ws_save_cfg_from_ui(sess)
             ws, ws_cfg, ws_q = _ws_get_cfg(sess)
-            gate = _ws_capture_gate_state(sess, "MID")
-            if not bool(gate.get("enabled")):
-                messagebox.showwarning("Capture MID", str(gate.get("reason") or "MID capture is not ready."))
-                return
             cal_pts_eff = int(_cal_points_effective(sess) or 2)
             was_complete = _ws_step_is_complete(ws_q, "mid", sess) if cal_pts_eff >= 3 else False
 
@@ -21313,10 +20736,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _ensure_daq_schema(sess)
             _ws_save_cfg_from_ui(sess)
             ws, ws_cfg, ws_q = _ws_get_cfg(sess)
-            gate = _ws_capture_gate_state(sess, "SPAN")
-            if not bool(gate.get("enabled")):
-                messagebox.showwarning("Capture SPAN", str(gate.get("reason") or "SPAN capture is not ready."))
-                return
             was_complete = _ws_step_is_complete(ws_q, "span", sess)
 
             w = float(ws_cfg.get("capture_window_s", 10))
@@ -21480,98 +20899,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             return False
 
-    def _ws_build_postcal_outcome_summary(sess: Dict[str, Any], run_no: int) -> Dict[str, Any]:
-        blk = _ensure_daq_schema(sess)
-        ws = (blk.get("worksteps") or {})
-        ws_q = (ws.get("qaqc") or {})
-        prun = ((ws_q.get("post_runs") or {}).get(str(run_no)) or {})
-        if not isinstance(prun, dict):
-            return {}
-
-        selected = list(_selected_pollutants(sess) or [])
-        ch_valid = prun.get("channel_valid") if isinstance(prun.get("channel_valid"), dict) else {}
-        policy_by = prun.get("auto_apply_policy_by_channel") if isinstance(prun.get("auto_apply_policy_by_channel"), dict) else {}
-        promoted = prun.get("auto_promoted_adjustments") if isinstance(prun.get("auto_promoted_adjustments"), dict) else {}
-        suspended = prun.get("auto_suspended_adjustments") if isinstance(prun.get("auto_suspended_adjustments"), dict) else {}
-        skipped = prun.get("auto_skipped_adjustments") if isinstance(prun.get("auto_skipped_adjustments"), dict) else {}
-
-        def _fmt_codes(codes: Sequence[str]) -> str:
-            vals = [str(c or "").strip().upper() for c in codes if str(c or "").strip()]
-            return ", ".join(vals) if vals else "(none)"
-
-        rows: List[Dict[str, Any]] = []
-        for code in selected:
-            passed = bool(ch_valid.get(code, False))
-            policy = policy_by.get(code) if isinstance(policy_by.get(code), dict) else {}
-            policy_mode = str(policy.get("mode") or "").strip().upper()
-            action = ""
-            if code in promoted:
-                spec = promoted.get(code) if isinstance(promoted.get(code), dict) else {}
-                action = (
-                    f"promoted for next run "
-                    f"(bias={_fmt_num(spec.get('bias'), 3, '0.0')}, "
-                    f"drift/hr={_fmt_num(spec.get('drift_per_hr'), 3, '0.0')})"
-                )
-            elif code in suspended:
-                spec = suspended.get(code) if isinstance(suspended.get(code), dict) else {}
-                status_txt = str(spec.get("status") or "").strip().upper()
-                if status_txt == "DISABLED_AFTER_FAIL":
-                    action = "auto adjustment suspended; channel invalidated"
-                elif status_txt == "DISABLED_BY_POLICY":
-                    action = "auto adjustment disabled by method policy"
-                else:
-                    action = "auto adjustment suspended"
-            elif code in skipped:
-                action = "manual review only; no auto carry-forward"
-            elif not passed:
-                action = "channel invalidated"
-            else:
-                action = "validated; no carry-forward change"
-            rows.append({
-                "code": code,
-                "pass": bool(passed),
-                "policy_mode": policy_mode,
-                "action": action,
-            })
-
-        overall_pass = bool(prun.get("overall_pass"))
-        postcal_health = str(prun.get("postcal_health") or ("PASS" if overall_pass else "FAIL")).strip().upper() or ("PASS" if overall_pass else "FAIL")
-        invalidated = [code for code in selected if not bool(ch_valid.get(code, False))]
-        manual_only = [code for code in selected if code in skipped]
-        promoted_codes = [code for code in selected if code in promoted]
-        suspended_codes = [code for code in selected if code in suspended]
-
-        lines = [
-            f"Overall: {'PASS' if overall_pass else 'FAIL'} | Health: {postcal_health}",
-            f"Promoted for next run: {_fmt_codes(promoted_codes)}",
-            f"Manual only: {_fmt_codes(manual_only)}",
-            f"Invalidated: {_fmt_codes(invalidated)}",
-        ]
-        if suspended_codes:
-            lines.append(f"Auto suspended: {_fmt_codes(suspended_codes)}")
-        lines.append("")
-        for row in rows:
-            policy_label = str(row.get("policy_mode") or "NO_POLICY").strip().upper() or "NO_POLICY"
-            result_label = "PASS" if bool(row.get("pass")) else "FAIL"
-            lines.append(f"{row.get('code')}: {result_label} | {policy_label} | {row.get('action')}")
-        lines.append("")
-        lines.append("Use Pollutant Bias / Drift for the live adjustment ledger.")
-
-        return {
-            "run_no": int(run_no),
-            "overall_pass": bool(overall_pass),
-            "postcal_health": postcal_health,
-            "headline": f"RUN {int(run_no)} POST-CAL {'PASS' if overall_pass else 'FAIL'}",
-            "message": "\n".join(lines),
-            "promoted_codes": list(promoted_codes),
-            "manual_only_codes": list(manual_only),
-            "invalidated_codes": list(invalidated),
-            "suspended_codes": list(suspended_codes),
-            "rows": rows,
-        }
-
-    def _ws_finalize_postcal(sess: Dict[str, Any], run_no: int) -> Dict[str, Any]:
-        """Compute drift outcomes, invalidate channels as needed, and stage next-run adjustments."""
+    def _ws_finalize_postcal(sess: Dict[str, Any], run_no: int) -> None:
+        """Compute drift/bias outcomes, invalidate channels as needed, and clear the post-cal gate."""
         blk = _ensure_daq_schema(sess)
         ws = (blk.get("worksteps") or {})
         ws_q = (ws.get("qaqc") or {})
@@ -21579,7 +20908,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         post_runs = ws_q.get("post_runs") or {}
         prun = post_runs.get(str(run_no)) or {}
         if not isinstance(prun, dict):
-            return {}
+            return
 
         pre_zero_map = ws_q.get("zero") or {}
         pre_span_map = ws_q.get("span") or {}
@@ -21587,20 +20916,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         zmap = prun.get("zero") or {}
         smap = prun.get("span") or {}
         ch_valid = prun.get("channel_valid") or {}
-        comb_by = prun.get("combined_drift_ratio") if isinstance(prun.get("combined_drift_ratio"), dict) else {}
-        health_by = prun.get("health_by_channel") if isinstance(prun.get("health_by_channel"), dict) else {}
-
-        pa = _pa_block(sess)
-        pa_map = pa.get("channels")
-        if not isinstance(pa_map, dict):
-            pa_map = {}
-            pa["channels"] = pa_map
-        actor_txt = _pollutant_adjustment_actor(sess)
-        stamp_iso = _iso_now()
-        promoted: Dict[str, Dict[str, Any]] = {}
-        suspended: Dict[str, Dict[str, Any]] = {}
-        policy_by: Dict[str, Dict[str, Any]] = {}
-        skipped: Dict[str, Dict[str, Any]] = {}
 
         overall_pass = True
         for code in _selected_pollutants(sess):
@@ -21617,12 +20932,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 post_z = _parse_float(pz.get("meas"))
                 if pre_z is not None and post_z is not None:
                     pz["drift_abs"] = float(post_z) - float(pre_z)
-                zero_hours = _hours_between_iso(
-                    str((pre_zero_map.get(code) or {}).get("ts_iso") or ""),
-                    str(pz.get("ts_iso") or ""),
-                )
-                if pz.get("drift_abs") is not None and zero_hours is not None and float(zero_hours) > 0:
-                    pz["drift_rate_abs_per_hr"] = float(pz["drift_abs"]) / float(zero_hours)
             except Exception:
                 pass
             try:
@@ -21630,35 +20939,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 post_r = _parse_float(ps.get("recovery_pct"))
                 if pre_r is not None and post_r is not None:
                     ps["drift_recovery_pct"] = float(post_r) - float(pre_r)
-                span_hours = _hours_between_iso(
-                    str((pre_span_map.get(code) or {}).get("ts_iso") or ""),
-                    str(ps.get("ts_iso") or ""),
-                )
-                if ps.get("drift_recovery_pct") is not None and span_hours is not None and float(span_hours) > 0:
-                    ps["drift_rate_recovery_pct_per_hr"] = float(ps["drift_recovery_pct"]) / float(span_hours)
             except Exception:
                 pass
-
-            ratio = _qaqc_combined_ratio(
-                _parse_float(pz.get("drift_abs")),
-                _parse_float(ps.get("drift_recovery_pct")),
-                _parse_float(pz.get("tol_abs")),
-                _parse_float(ps.get("tol_pct")),
-            )
-            comb_by[code] = ratio
-            health_by[code] = _qaqc_health_from_ratio(ratio, hard_fail=(not ok))
-            policy = _postcal_carry_forward_policy(sess, code)
-            policy_by[code] = {
-                "mode": str(policy.get("policy_mode") or ""),
-                "allow_auto_promote": bool(policy.get("allow_auto_promote")),
-                "reason": str(policy.get("reason") or ""),
-                "display_method": str(policy.get("display_method") or ""),
-                "method_effective": str(policy.get("method_effective") or ""),
-                "profile_id": str(policy.get("profile_id") or ""),
-                "track": str(policy.get("track") or ""),
-                "policy_rule_id": str(policy.get("policy_rule_id") or ""),
-                "policy_matrix_version": str(policy.get("policy_matrix_version") or ""),
-            }
 
             ch_valid[code] = ok
             if not ok:
@@ -21668,119 +20950,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ws_q.setdefault("channel_valid", {})
                 ws_q["channel_valid"][code] = False
 
-                existing_spec = pa_map.get(code) if isinstance(pa_map.get(code), dict) else {}
-                if isinstance(existing_spec, dict) and str(existing_spec.get("source") or "").strip().upper() == "POSTCAL_AUTO":
-                    existing_spec["enabled"] = False
-                    existing_spec["effective_after_run_no"] = None
-                    existing_spec["expires_after_run_no"] = None
-                    existing_spec["expires_after_postcal_run_no"] = None
-                    existing_spec["lifecycle_status"] = "DISABLED_AFTER_FAIL"
-                    existing_spec["status_reason"] = f"Post-Cal Run {run_no} failed for this pollutant."
-                    existing_spec["updated_by"] = actor_txt
-                    existing_spec["updated_iso"] = stamp_iso
-                    existing_spec["note"] = (
-                        f"Auto-promoted adjustment suspended after Post-Cal Run {run_no} did not pass."
-                    )
-                    suspended[code] = {
-                        "source_run_no": existing_spec.get("source_run_no"),
-                        "status": "DISABLED_AFTER_FAIL",
-                    }
-                continue
-
-            if not bool(policy.get("allow_auto_promote")):
-                existing_spec = pa_map.get(code) if isinstance(pa_map.get(code), dict) else {}
-                disabled_existing_auto = False
-                if isinstance(existing_spec, dict) and str(existing_spec.get("source") or "").strip().upper() == "POSTCAL_AUTO":
-                    existing_spec["enabled"] = False
-                    existing_spec["effective_after_run_no"] = None
-                    existing_spec["expires_after_run_no"] = None
-                    existing_spec["expires_after_postcal_run_no"] = None
-                    existing_spec["lifecycle_status"] = "DISABLED_BY_POLICY"
-                    existing_spec["status_reason"] = str(policy.get("reason") or "")
-                    existing_spec["updated_by"] = actor_txt
-                    existing_spec["updated_iso"] = stamp_iso
-                    existing_spec["note"] = (
-                        f"Auto-promoted adjustment disabled by method policy after Post-Cal Run {run_no}: "
-                        f"{str(policy.get('reason') or '').strip()}"
-                    )
-                    disabled_existing_auto = True
-                    suspended[code] = {
-                        "source_run_no": existing_spec.get("source_run_no"),
-                        "status": "DISABLED_BY_POLICY",
-                        "policy_mode": str(policy.get("policy_mode") or ""),
-                        "reason": str(policy.get("reason") or ""),
-                    }
-                skipped[code] = {
-                    "status": str(policy.get("policy_mode") or "MANUAL_ONLY"),
-                    "method_effective": str(policy.get("method_effective") or ""),
-                    "profile_id": str(policy.get("profile_id") or ""),
-                    "track": str(policy.get("track") or ""),
-                    "reason": str(policy.get("reason") or ""),
-                    "disabled_existing_auto": bool(disabled_existing_auto),
-                }
-                continue
-
-            # Carry forward only the additive zero-based component into the next run.
-            post_z_val = _parse_float(pz.get("meas"))
-            zero_target = _parse_float(pz.get("target"), _parse_float((pre_zero_map.get(code) or {}).get("target"), 0.0))
-            drift_rate = _parse_float(pz.get("drift_rate_abs_per_hr"), 0.0) or 0.0
-            if post_z_val is None or zero_target is None:
-                continue
-            bias_next = float(zero_target) - float(post_z_val)
-            drift_next = -float(drift_rate)
-            auto_note = (
-                f"Auto-promoted from Post-Cal Run {run_no}: "
-                f"bias={_fmt_num(bias_next, 6, '0.0')}, "
-                f"drift/hr={_fmt_num(drift_next, 6, '0.0')}"
-            )
-            prev_spec = pa_map.get(code) if isinstance(pa_map.get(code), dict) else {}
-            next_spec = dict(prev_spec) if isinstance(prev_spec, dict) else {}
-            next_spec.update({
-                "enabled": True,
-                "bias": float(bias_next),
-                "drift_per_hr": float(drift_next),
-                "note": auto_note,
-                "updated_by": actor_txt,
-                "updated_iso": stamp_iso,
-                "source": "POSTCAL_AUTO",
-                "lifecycle_status": "",
-                "status_reason": "",
-                "source_run_no": int(run_no),
-                "effective_after_run_no": int(run_no),
-            })
-            _pollutant_adjustment_apply_scope_to_spec(
-                next_spec,
-                scope="UNTIL_NEXT_POSTCAL",
-                effective_after_run_no=int(run_no),
-            )
-            _pollutant_adjustment_attach_policy_metadata(next_spec, policy)
-            pa_map[code] = next_spec
-            promoted[code] = {
-                "bias": float(bias_next),
-                "drift_per_hr": float(drift_next),
-                "effective_after_run_no": int(run_no),
-                "scope": str(next_spec.get("scope") or ""),
-                "expires_after_run_no": next_spec.get("expires_after_run_no"),
-                "expires_after_postcal_run_no": next_spec.get("expires_after_postcal_run_no"),
-                "source_post_zero": float(post_z_val),
-                "target_zero": float(zero_target),
-                "policy_mode": str(policy.get("policy_mode") or ""),
-                "method_effective": str(policy.get("method_effective") or ""),
-                "profile_id": str(policy.get("profile_id") or ""),
-                "track": str(policy.get("track") or ""),
-                "policy_rule_id": str(policy.get("policy_rule_id") or ""),
-                "policy_matrix_version": str(policy.get("policy_matrix_version") or ""),
-            }
-
         prun["channel_valid"] = ch_valid
-        prun["combined_drift_ratio"] = comb_by
-        prun["health_by_channel"] = health_by
-        prun["auto_apply_policy_by_channel"] = policy_by
-        prun["auto_promoted_adjustments"] = promoted
-        prun["auto_suspended_adjustments"] = suspended
-        prun["auto_skipped_adjustments"] = skipped
-        if promoted:
-            pa["enabled"] = True
         
         # Overall post-cal health (PASS/WARN/FAIL)
         try:
@@ -21819,23 +20989,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         postcal["run_no"] = None
 
         _ws_log_event(sess, "POSTCAL_COMPLETE", {"run_no": run_no, "pass": bool(overall_pass), "channel_valid": dict(ch_valid)})
-        if promoted or suspended or skipped:
-            _ws_log_event(
-                sess,
-                "POSTCAL_AUTO_APPLY",
-                {
-                    "run_no": int(run_no),
-                    "effective_after_run_no": int(run_no),
-                    "policy_by_channel": dict(policy_by),
-                    "promoted": dict(promoted),
-                    "suspended": dict(suspended),
-                    "skipped": dict(skipped),
-                },
-            )
-        summary = _ws_build_postcal_outcome_summary(sess, run_no)
-        if summary:
-            prun["operator_review"] = dict(summary)
-        return summary
 
     def ws_post_initiate_zero_air() -> None:
         nonlocal sess
@@ -21971,7 +21124,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return
 
         try:
-            postcal_summary: Optional[Dict[str, Any]] = None
             sess = _load_session()
             if _mole_env_mode(sess) == "TRAINING":
                 try:
@@ -21980,7 +21132,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     if drv is not None and hasattr(drv, "get_manifold_mode"):
                         cur = str(drv.get_manifold_mode() or "")
                     cur_u = cur.strip().upper()
-                    if cur_u and cur_u not in ("ZERO", "POST_ZERO"):
+                    if cur_u and cur_u not in ("ZERO",):
                         ok = messagebox.askyesno("Training Coach", f"SIM gas mode is '{cur_u}'. Expected ZERO. Capture anyway?")
                         if not ok:
                             return
@@ -21989,10 +21141,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _ensure_daq_schema(sess)
             _ws_save_cfg_from_ui(sess)
             run_no, ws, ws_cfg, ws_q, prun = _ws_postcal_ctx(sess)
-            gate = _ws_capture_gate_state(sess, "POST_ZERO")
-            if not bool(gate.get("enabled")):
-                messagebox.showwarning("Post ZERO", str(gate.get("reason") or "POST ZERO capture is not ready."))
-                return
             was_complete = _ws_post_step_is_complete(prun.get("zero") or {}, sess)
             if run_no is None:
                 messagebox.showinfo("Post-Cal", "No post-cal is currently required (end a Test Run to trigger it).")
@@ -22080,13 +21228,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             # finalize if complete
             if _ws_postcal_is_complete(sess, run_no):
-                postcal_summary = _ws_finalize_postcal(sess, run_no)
+                _ws_finalize_postcal(sess, run_no)
 
             _save_session(sess)
             refresh_all()
-            if isinstance(postcal_summary, dict) and postcal_summary:
-                _show_postcal_outcome_review(postcal_summary)
-            elif now_complete and not was_complete:
+            if now_complete and not was_complete:
                 _show_simple_splash("POST-ZERO COMPLETE", "POST-ZERO COMPLETE", f"All analytes captured for Post-Zero (Run {run_no}).", auto_ms=5500)
         except Exception as e:
             messagebox.showerror("Post ZERO failed", str(e))
@@ -22098,7 +21244,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return
 
         try:
-            postcal_summary: Optional[Dict[str, Any]] = None
             sess = _load_session()
             if _mole_env_mode(sess) == "TRAINING":
                 try:
@@ -22107,7 +21252,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     if drv is not None and hasattr(drv, "get_manifold_mode"):
                         cur = str(drv.get_manifold_mode() or "")
                     cur_u = cur.strip().upper()
-                    if cur_u and cur_u not in ("SPAN", "POST_SPAN"):
+                    if cur_u and cur_u not in ("SPAN",):
                         ok = messagebox.askyesno("Training Coach", f"SIM gas mode is '{cur_u}'. Expected SPAN. Capture anyway?")
                         if not ok:
                             return
@@ -22116,10 +21261,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _ensure_daq_schema(sess)
             _ws_save_cfg_from_ui(sess)
             run_no, ws, ws_cfg, ws_q, prun = _ws_postcal_ctx(sess)
-            gate = _ws_capture_gate_state(sess, "POST_SPAN")
-            if not bool(gate.get("enabled")):
-                messagebox.showwarning("Post SPAN", str(gate.get("reason") or "POST SPAN capture is not ready."))
-                return
             was_complete = _ws_post_step_is_complete(prun.get("span") or {}, sess)
             if run_no is None:
                 messagebox.showinfo("Post-Cal", "No post-cal is currently required (end a Test Run to trigger it).")
@@ -22214,14 +21355,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             )
 
             if _ws_postcal_is_complete(sess, run_no):
-                postcal_summary = _ws_finalize_postcal(sess, run_no)
+                _ws_finalize_postcal(sess, run_no)
 
             _save_session(sess)
             refresh_all()
-            if isinstance(postcal_summary, dict) and postcal_summary:
-                _show_postcal_outcome_review(postcal_summary)
-            elif now_complete and not was_complete:
+            if now_complete and not was_complete:
                 _show_simple_splash("POST-SPAN COMPLETE", "POST-SPAN COMPLETE", f"All analytes captured for Post-Span (Run {run_no}).", auto_ms=5500)
+            try:
+                if _ws_postcal_is_complete(sess, run_no):
+                    _show_simple_splash("POST-CAL COMPLETE", "POST-CAL COMPLETE", f"Post-cal complete for Run {run_no}.", auto_ms=6000)
+            except Exception:
+                pass
         except Exception as e:
             messagebox.showerror("Post SPAN failed", str(e))
 
@@ -22594,135 +21738,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             try:
                 if auto_ms is not None:
                     win.after(int(auto_ms), _close)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    def _show_postcal_outcome_review(summary: Optional[Dict[str, Any]]) -> None:
-        try:
-            payload = dict(summary or {})
-            if not payload:
-                return
-            headline = str(payload.get("headline") or "POST-CAL COMPLETE").strip() or "POST-CAL COMPLETE"
-            message = str(payload.get("message") or "Post-cal complete.").strip() or "Post-cal complete."
-            win = tk.Toplevel(root)
-            win.title("POST-CAL DECISION REVIEW")
-            win.configure(bg=BG)
-            try:
-                win.attributes("-topmost", True)
-            except Exception:
-                pass
-            try:
-                win.transient(root)
-            except Exception:
-                pass
-            try:
-                sw = int(root.winfo_screenwidth() or 1024)
-                sh = int(root.winfo_screenheight() or 768)
-                w = max(420, min(860, sw - 60))
-                h = max(300, min(620, sh - 120))
-                sx = max(0, int((sw - w) / 2))
-                sy = max(0, int((sh - h) / 3))
-                win.geometry(f"{w}x{h}+{sx}+{sy}")
-                win.minsize(420, 300)
-            except Exception:
-                pass
-            try:
-                win.grab_set()
-            except Exception:
-                pass
-            try:
-                win.focus_force()
-                win.lift()
-            except Exception:
-                pass
-
-            outer = tk.Frame(win, bg=BG)
-            outer.pack(fill="both", expand=True)
-
-            tk.Label(
-                outer,
-                text=headline,
-                bg=BG,
-                fg=ACC2,
-                font=("Consolas", 18, "bold"),
-            ).pack(pady=(18, 8))
-
-            body = tk.Frame(outer, bg=BG)
-            body.pack(fill="both", expand=True, padx=18, pady=(0, 10))
-
-            ybar = tk.Scrollbar(body, orient="vertical")
-            ybar.pack(side="right", fill="y")
-
-            txt = tk.Text(
-                body,
-                bg=BG,
-                fg=FG,
-                insertbackground=FG,
-                font=("Consolas", 12),
-                wrap="word",
-                relief="flat",
-                bd=0,
-                padx=10,
-                pady=10,
-                yscrollcommand=ybar.set,
-            )
-            txt.pack(side="left", fill="both", expand=True)
-            ybar.configure(command=txt.yview)
-            txt.insert("1.0", message)
-            txt.configure(state="disabled")
-
-            btn_row = tk.Frame(outer, bg=BG)
-            btn_row.pack(fill="x", padx=18, pady=(0, 14))
-
-            accepted = {"done": False}
-
-            def _close_review() -> None:
-                try:
-                    if accepted["done"]:
-                        return
-                    accepted["done"] = True
-                except Exception:
-                    pass
-                _log_splash_acceptance("postcal_review", "POST-CAL DECISION REVIEW", headline, message, {
-                    "run_no": payload.get("run_no"),
-                    "overall_pass": payload.get("overall_pass"),
-                    "postcal_health": payload.get("postcal_health"),
-                })
-                try:
-                    win.grab_release()
-                except Exception:
-                    pass
-                try:
-                    win.destroy()
-                except Exception:
-                    pass
-
-            btn_accept = tk.Button(
-                btn_row,
-                text="ACKNOWLEDGE",
-                command=_close_review,
-                bg=BTN_BG,
-                fg=FG,
-                relief="flat",
-                font=("Consolas", 11, "bold"),
-                padx=18,
-                pady=6,
-            )
-            btn_accept.pack(pady=(0, 0))
-
-            try:
-                win.protocol("WM_DELETE_WINDOW", _close_review)
-            except Exception:
-                pass
-            for seq in ("<Escape>", "<Return>", "<KP_Enter>"):
-                try:
-                    win.bind(seq, lambda _e: _close_review())
-                except Exception:
-                    pass
-            try:
-                btn_accept.focus_set()
             except Exception:
                 pass
         except Exception:

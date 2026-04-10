@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from xml.sax.saxutils import escape as _xml_escape
 
 try:
     import mole_ftir_reference_v1 as mole_ftir_reference
@@ -766,7 +767,10 @@ def _pollutant_adjustment_summary(session: Dict[str, Any]) -> Dict[str, Any]:
         "decision_review_count": len(review_rows),
         "decision_reviews": review_rows,
         "latest_review": (review_rows[0] if review_rows else None),
-        "note": "Adjustments apply before dry normalization, O2 correction, and Method 19 calculations.",
+        "note": (
+            "Adjustments apply before dry normalization, O2 correction, and Method 19 calculations. "
+            "If O2 is adjusted, the adjusted O2 channel is used as the EPA 3A / 7E correction denominator."
+        ),
     }
 
 
@@ -1146,6 +1150,206 @@ def _worksteps_path_from_session(session: Dict[str, Any], cfg_path: Path, sessio
     return candidates[0]
 
 
+def _session_job_id(session: Dict[str, Any]) -> str:
+    return str(
+        ((session.get("project") or {}).get("job_id"))
+        or ((session.get("project_session") or {}).get("job_id"))
+        or session.get("job_id")
+        or ""
+    ).strip()
+
+
+def _session_run_id(session: Dict[str, Any], session_dir: Path) -> str:
+    return str(session.get("run_id") or session.get("session_id") or session_dir.name or "").strip()
+
+
+def _parse_run_id_dt(text: Any, tz_hint: Optional[timezone] = None) -> Optional[datetime]:
+    try:
+        m = re.search(r"__(\d{8}_\d{6})$", str(text or "").strip())
+        if not m:
+            return None
+        dt = datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
+        tzinfo = tz_hint or datetime.now().astimezone().tzinfo or timezone.utc
+        return dt.replace(tzinfo=tzinfo)
+    except Exception:
+        return None
+
+
+def _discover_job_session_profiles(session_dir: Path, job_id: str) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+    if not job_id:
+        return entries
+    try:
+        data_root = session_dir.parents[2]
+    except Exception:
+        return entries
+
+    seen: set[Tuple[str, str]] = set()
+    for base in (data_root / "sessions", data_root / "training" / "sessions"):
+        if not base.exists():
+            continue
+        for profile_path in base.rglob("session_profile.json"):
+            profile = _read_json(profile_path)
+            if not isinstance(profile, dict):
+                continue
+            profile_job_id = str(
+                profile.get("site_id")
+                or profile.get("job_id")
+                or str(profile.get("run_id") or "").split("__")[0]
+                or ""
+            ).strip()
+            if profile_job_id != job_id:
+                continue
+            profile_run_id = str(profile.get("run_id") or profile.get("session_id") or profile_path.parent.name or "").strip()
+            created_dt = _parse_iso_dt(profile.get("created_at")) or _parse_run_id_dt(profile_run_id)
+            if created_dt is None:
+                continue
+            key = (str(profile_path.parent.resolve()), profile_run_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            entries.append({
+                "run_id": profile_run_id,
+                "job_id": profile_job_id,
+                "created_dt": created_dt,
+                "created_ts_iso": created_dt.isoformat(),
+                "dir": str(profile_path.parent.resolve()),
+                "source": str(profile_path),
+            })
+    entries.sort(key=lambda item: (item.get("created_dt"), str(item.get("run_id") or ""), str(item.get("dir") or "")))
+    return entries
+
+
+def _build_session_time_scope(session: Dict[str, Any], session_dir: Path) -> Dict[str, Any]:
+    run_id = _session_run_id(session, session_dir)
+    job_id = _session_job_id(session)
+    profile = _read_json(session_dir / "session_profile.json") or {}
+    meta = session.get("meta") if isinstance(session.get("meta"), dict) else {}
+
+    profile_dt = _parse_iso_dt(profile.get("created_at"))
+    applied_dt = _parse_iso_dt(meta.get("applied_iso"))
+    tz_hint = None
+    for dt in (profile_dt, applied_dt):
+        if dt is not None and dt.tzinfo is not None:
+            tz_hint = dt.tzinfo
+            break
+    run_id_dt = _parse_run_id_dt(run_id, tz_hint=tz_hint)
+
+    start_dt = None
+    start_source = ""
+    for label, candidate in (
+        ("session_profile.created_at", profile_dt),
+        ("session.meta.applied_iso", applied_dt),
+        ("run_id suffix", run_id_dt),
+    ):
+        if candidate is not None:
+            start_dt = candidate
+            start_source = label
+            break
+
+    siblings = _discover_job_session_profiles(session_dir, job_id)
+    session_dir_resolved = str(session_dir.resolve())
+    current_index = None
+    for idx, entry in enumerate(siblings):
+        if str(entry.get("dir") or "") == session_dir_resolved:
+            current_index = idx
+            if start_dt is None:
+                start_dt = entry.get("created_dt")
+                start_source = "session profile scan"
+            break
+    if current_index is None and start_dt is not None:
+        for idx, entry in enumerate(siblings):
+            created_dt = entry.get("created_dt")
+            if isinstance(created_dt, datetime) and created_dt == start_dt and str(entry.get("run_id") or "") == run_id:
+                current_index = idx
+                break
+
+    next_entry = None
+    if current_index is not None:
+        if current_index + 1 < len(siblings):
+            next_entry = siblings[current_index + 1]
+    elif start_dt is not None:
+        for entry in siblings:
+            created_dt = entry.get("created_dt")
+            if isinstance(created_dt, datetime) and created_dt > start_dt:
+                next_entry = entry
+                break
+
+    end_dt = next_entry.get("created_dt") if isinstance(next_entry, dict) else None
+    status = "BOUNDED" if (start_dt is not None and end_dt is not None) else ("START_ONLY" if start_dt is not None else "UNSCOPED")
+    return {
+        "status": status,
+        "job_id": job_id,
+        "run_id": run_id,
+        "start_ts_iso": start_dt.isoformat() if isinstance(start_dt, datetime) else None,
+        "end_ts_iso": end_dt.isoformat() if isinstance(end_dt, datetime) else None,
+        "start_source": start_source or None,
+        "end_source": ("next session profile" if end_dt is not None else None),
+        "next_run_id": str(next_entry.get("run_id") or "") if isinstance(next_entry, dict) else None,
+        "sibling_session_count": len(siblings),
+    }
+
+
+def _load_scoped_worksteps(
+    session: Dict[str, Any],
+    *,
+    cfg_path: Path,
+    session_dir: Path,
+) -> Dict[str, Any]:
+    worksteps_path = _worksteps_path_from_session(session, cfg_path, session_dir)
+    all_rows = _read_jsonl(worksteps_path)
+    session_scope = _build_session_time_scope(session, session_dir)
+
+    try:
+        path_scope = "SESSION_LOCAL" if worksteps_path.resolve().is_relative_to(session_dir.resolve()) else "EXTERNAL"
+    except Exception:
+        path_scope = "EXTERNAL"
+
+    start_dt = _parse_iso_dt(session_scope.get("start_ts_iso"))
+    end_dt = _parse_iso_dt(session_scope.get("end_ts_iso"))
+    scoped_rows: List[Dict[str, Any]] = []
+    excluded_before = 0
+    excluded_after = 0
+    excluded_missing_ts = 0
+
+    if path_scope == "SESSION_LOCAL":
+        scoped_rows = list(all_rows)
+        scope_note = "Session-local worksteps file used directly."
+    elif start_dt is None:
+        scope_note = "External worksteps file has no reliable session window; report aggregation is suppressed."
+    else:
+        for row in all_rows:
+            evt_dt = _parse_iso_dt((row.get("ts_iso") if isinstance(row, dict) else None) or (row.get("timestamp") if isinstance(row, dict) else None))
+            if evt_dt is None:
+                excluded_missing_ts += 1
+                continue
+            if evt_dt < start_dt:
+                excluded_before += 1
+                continue
+            if end_dt is not None and evt_dt >= end_dt:
+                excluded_after += 1
+                continue
+            scoped_rows.append(row)
+        if end_dt is not None:
+            scope_note = "External worksteps file filtered to the current session window."
+        else:
+            scope_note = "External worksteps file filtered using the current session start; no upper bound was available."
+
+    return {
+        "path": worksteps_path,
+        "path_scope": path_scope,
+        "session_scope": session_scope,
+        "scope_note": scope_note,
+        "rows": scoped_rows,
+        "total_rows": all_rows,
+        "excluded_counts": {
+            "before_window": excluded_before,
+            "after_window": excluded_after,
+            "missing_ts": excluded_missing_ts,
+        },
+    }
+
+
 def _path_summary(path: Path, *, count: Optional[int] = None, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     info: Dict[str, Any] = {
         "path": str(path),
@@ -1230,16 +1434,23 @@ def _build_evidence_bundle(
     last_ts: Optional[str],
     health_counts: Dict[str, int],
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    worksteps_path = _worksteps_path_from_session(session, cfg_path, session_dir)
-    workstep_rows = _read_jsonl(worksteps_path)
+    scoped_worksteps = _load_scoped_worksteps(session, cfg_path=cfg_path, session_dir=session_dir)
+    worksteps_path = scoped_worksteps.get("path")
+    workstep_rows = scoped_worksteps.get("rows") if isinstance(scoped_worksteps.get("rows"), list) else []
+    all_workstep_rows = scoped_worksteps.get("total_rows") if isinstance(scoped_worksteps.get("total_rows"), list) else []
     raw_event_rows = _read_jsonl(raw_events_path)
     reference_rows = _read_jsonl(reference_path)
 
     workstep_event_counts: Dict[str, int] = {}
+    all_workstep_event_counts: Dict[str, int] = {}
     raw_event_counts: Dict[str, int] = {}
     step_eval_rows: List[Dict[str, Any]] = []
     latest_shadow: Optional[Dict[str, Any]] = None
     latest_mismatch: Optional[Dict[str, Any]] = None
+
+    for row in all_workstep_rows:
+        event = str(row.get("event") or "").strip().upper() or "(UNKNOWN)"
+        all_workstep_event_counts[event] = all_workstep_event_counts.get(event, 0) + 1
 
     for row in workstep_rows:
         event = str(row.get("event") or "").strip().upper() or "(UNKNOWN)"
@@ -1291,12 +1502,26 @@ def _build_evidence_bundle(
             "run_id": str(session.get("run_id") or ""),
             "session_dir": str(session_dir),
         },
+        "session_scope": dict(scoped_worksteps.get("session_scope") or {}),
         "sources": {
             "raw_samples": _path_summary(raw_samples_path, count=raw_count, extra={"first_ts": first_ts, "last_ts": last_ts}),
             "raw_events": _path_summary(raw_events_path, count=len(raw_event_rows)),
             "health_states": _path_summary(health_path, count=sum(int(v or 0) for v in (health_counts or {}).values()), extra={"counts": dict(health_counts or {})}),
             "reference_audit": _path_summary(reference_path, count=len(reference_rows), extra={"ok_count": reference_ok_count}),
-            "worksteps": _path_summary(worksteps_path, count=len(workstep_rows), extra={"event_counts": workstep_event_counts}),
+            "worksteps": _path_summary(
+                Path(str(worksteps_path)),
+                count=len(workstep_rows),
+                extra={
+                    "event_counts": workstep_event_counts,
+                    "total_count": len(all_workstep_rows),
+                    "total_event_counts": all_workstep_event_counts,
+                    "filtered_out_count": max(0, len(all_workstep_rows) - len(workstep_rows)),
+                    "excluded_counts": dict(scoped_worksteps.get("excluded_counts") or {}),
+                    "path_scope": scoped_worksteps.get("path_scope"),
+                    "scope_note": scoped_worksteps.get("scope_note"),
+                    "session_scope": dict(scoped_worksteps.get("session_scope") or {}),
+                },
+            ),
         },
         "counts": {
             "raw_samples": raw_count,
@@ -2456,33 +2681,91 @@ def _report_company_name_from_operator(operator: Any) -> Optional[str]:
     return raw.replace("_", " ").strip().title()
 
 
+def _report_builder_block(session: Dict[str, Any]) -> Dict[str, Any]:
+    blk = session.get("report_builder") if isinstance(session.get("report_builder"), dict) else {}
+    return blk if isinstance(blk, dict) else {}
+
+
+def _report_builder_subblock(session: Dict[str, Any], key: str) -> Dict[str, Any]:
+    blk = _report_builder_block(session)
+    sub = blk.get(key)
+    return sub if isinstance(sub, dict) else {}
+
+
+def _report_builder_list(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item or "").strip()]
+    txt = str(value or "").replace("\r", "\n").strip()
+    if not txt:
+        return []
+    return [str(item).strip() for item in re.split(r"[;\n]+", txt) if str(item or "").strip()]
+
+
+def _report_block_status(required: List[Any], optional: Optional[List[Any]] = None) -> str:
+    optional = optional or []
+    req_total = len(required)
+    req_filled = sum(1 for value in required if _has_value(value))
+    opt_filled = sum(1 for value in optional if _has_value(value))
+    if req_total > 0 and req_filled == req_total:
+        return "Available"
+    if req_filled > 0 or opt_filled > 0:
+        return "Partial"
+    return "Gap"
+
+
 def _report_parties_block(session: Dict[str, Any]) -> Dict[str, Any]:
     project = session.get("project") if isinstance(session.get("project"), dict) else {}
     intake = project.get("intake") if isinstance(project.get("intake"), dict) else {}
+    parties_in = _report_builder_subblock(session, "parties")
     operator_raw = project.get("operator")
     operator_display = _report_company_name_from_operator(operator_raw)
     site_facility = str(project.get("site_facility") or "").strip() or None
+    client_name = str(parties_in.get("client_name") or "").strip() or None
+    facility_owner_operator_name = str(parties_in.get("facility_owner_operator_name") or "").strip() or site_facility
+    test_company_name = str(parties_in.get("test_company_name") or "").strip() or operator_display
+    session_operator_name = str(parties_in.get("session_operator_name") or "").strip() or operator_display
+    laboratory_name = str(parties_in.get("laboratory_name") or "").strip() or None
+    observer_contacts = _report_builder_list(parties_in.get("observer_contacts"))
+    responsible_official_name = str(parties_in.get("responsible_official_name") or "").strip() or None
+    responsible_official_title = str(parties_in.get("responsible_official_title") or "").strip() or None
+    notes: List[str] = []
+    status = _report_block_status(
+        [
+            client_name,
+            facility_owner_operator_name,
+            test_company_name,
+            responsible_official_name,
+        ],
+        [
+            laboratory_name,
+            observer_contacts,
+            session_operator_name,
+            responsible_official_title,
+        ],
+    )
+    if status != "Available":
+        notes.append("Client, signatory, laboratory, or observer metadata is still incomplete.")
     return {
-        "status": "Partial" if operator_display or site_facility else "Gap",
-        "client_name": None,
-        "facility_owner_operator_name": site_facility,
-        "test_company_name": operator_display,
-        "session_operator_name": operator_display,
-        "laboratory_name": None,
-        "observer_contacts": [],
-        "responsible_official_name": None,
+        "status": status,
+        "client_name": client_name,
+        "facility_owner_operator_name": facility_owner_operator_name,
+        "test_company_name": test_company_name,
+        "session_operator_name": session_operator_name,
+        "laboratory_name": laboratory_name,
+        "observer_contacts": observer_contacts,
+        "responsible_official_name": responsible_official_name,
+        "responsible_official_title": responsible_official_title,
         "signatory_required": True,
         "site_contact_provided_flag": bool(((intake.get("items") or {}).get("SITE_CONTACT") or {}).get("provided")),
-        "notes": [
-            "Client / owner, laboratory, observer, and responsible official metadata are not normalized yet."
-        ],
-        "source": "session.project + session.project.intake",
+        "notes": notes,
+        "source": "session.report_builder.parties + session.project + session.project.intake",
     }
 
 
 def _report_process_control_block(session: Dict[str, Any]) -> Dict[str, Any]:
     source = session.get("source") if isinstance(session.get("source"), dict) else {}
     fuel = session.get("fuel") if isinstance(session.get("fuel"), dict) else {}
+    process_in = _report_builder_subblock(session, "process_control")
     exhaust_flow = source.get("exhaust_flow") if isinstance(source.get("exhaust_flow"), dict) else {}
     fuel_flow = source.get("fuel_flow") if isinstance(source.get("fuel_flow"), dict) else {}
 
@@ -2499,9 +2782,15 @@ def _report_process_control_block(session: Dict[str, Any]) -> Dict[str, Any]:
             narrative = (narrative + f"; unit {unit_desc}").strip("; ")
     if fuel.get("fuel_category"):
         narrative = (narrative + f"; fuel {fuel.get('fuel_category')}").strip("; ")
+    process_narrative = str(process_in.get("process_narrative") or "").strip() or narrative or None
+    control_equipment_description = str(process_in.get("control_equipment_description") or "").strip() or None
+    status = _report_block_status(
+        [process_narrative, control_equipment_description],
+        [source.get("notes"), source.get("manufacturer"), source.get("model_number")],
+    )
 
     return {
-        "status": "Partial" if narrative else "Gap",
+        "status": status,
         "process_description": {
             "source_category": source.get("source_category"),
             "application": source.get("application"),
@@ -2519,19 +2808,22 @@ def _report_process_control_block(session: Dict[str, Any]) -> Dict[str, Any]:
             "exhaust_flow_method": exhaust_flow.get("method"),
             "unit_notes": source.get("notes"),
         },
-        "process_narrative_seed": narrative or None,
+        "process_narrative_seed": process_narrative,
+        "process_narrative": process_narrative,
+        "control_equipment_description": control_equipment_description,
         "control_equipment": {
-            "status": "UNKNOWN",
-            "description": None,
+            "status": "DESCRIBED" if _has_value(control_equipment_description) else "UNKNOWN",
+            "description": control_equipment_description,
             "operating_parameters": [],
-            "note": "Control equipment description is not normalized in the current session schema.",
+            "note": None if _has_value(control_equipment_description) else "Control equipment description is not normalized in the current session schema.",
         },
-        "source": "session.source + session.fuel",
+        "source": "session.report_builder.process_control + session.source + session.fuel",
     }
 
 
 def _report_deviation_approval_block(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
     source = session.get("source") if isinstance(session.get("source"), dict) else {}
+    dev_in = _report_builder_subblock(session, "deviations_approvals")
     stack = source.get("stack") if isinstance(source.get("stack"), dict) else {}
     exhaust_flow = source.get("exhaust_flow") if isinstance(source.get("exhaust_flow"), dict) else {}
     static_files = ((evidence_bundle.get("static_artifacts") or {}).get("files") if isinstance(evidence_bundle.get("static_artifacts"), dict) else []) or []
@@ -2548,21 +2840,29 @@ def _report_deviation_approval_block(session: Dict[str, Any], evidence_bundle: D
         notes.append(f"Stack notes: {stack.get('hand_notes')}")
     if _has_value(((exhaust_flow.get("stack_measured") or {}).get("notes") if isinstance(exhaust_flow.get("stack_measured"), dict) else None)):
         notes.append(f"Method notes: {(exhaust_flow.get('stack_measured') or {}).get('notes')}")
+    planned_deviations = _report_builder_list(dev_in.get("planned_deviations"))
+    field_deviations = _report_builder_list(dev_in.get("field_deviations"))
+    alt_approvals = _report_builder_list(dev_in.get("alternative_method_approvals"))
+    impact_statement = str(dev_in.get("impact_statement") or "").strip() or None
+    status = "Available" if any([planned_deviations, field_deviations, alt_approvals, impact_statement]) else ("Partial" if notes or candidate_titles else "Gap")
+    if status != "Available" and not notes:
+        notes = ["No dedicated deviation/approval records are normalized in the current session schema."]
     return {
-        "status": "Partial" if notes or candidate_titles else "Gap",
-        "planned_deviations": [],
-        "field_deviations": [],
-        "alternative_method_approvals": [],
-        "impact_statement": None,
+        "status": status,
+        "planned_deviations": planned_deviations,
+        "field_deviations": field_deviations,
+        "alternative_method_approvals": alt_approvals,
+        "impact_statement": impact_statement,
         "candidate_evidence_titles": candidate_titles,
-        "notes": notes or ["No dedicated deviation/approval records are normalized in the current session schema."],
-        "source": "session.source.stack.hand_notes + session.source.exhaust_flow.stack_measured.notes + evidence_bundle.static_artifacts",
+        "notes": notes,
+        "source": "session.report_builder.deviations_approvals + session.source.stack.hand_notes + session.source.exhaust_flow.stack_measured.notes + evidence_bundle.static_artifacts",
     }
 
 
 def _report_correspondence_block(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
     project = session.get("project") if isinstance(session.get("project"), dict) else {}
     intake = project.get("intake") if isinstance(project.get("intake"), dict) else {}
+    corr_in = _report_builder_subblock(session, "correspondence")
     evidence_files = intake.get("evidence_files") if isinstance(intake.get("evidence_files"), list) else []
     static_files = ((evidence_bundle.get("static_artifacts") or {}).get("files") if isinstance(evidence_bundle.get("static_artifacts"), dict) else []) or []
     candidates = []
@@ -2580,23 +2880,39 @@ def _report_correspondence_block(session: Dict[str, Any], evidence_bundle: Dict[
                 "path": str(item.get("path") or item.get("full_path") or ""),
                 "source": "evidence_bundle.static_artifacts.files",
             })
+    notice_of_intent_date = str(corr_in.get("notice_of_intent_date") or "").strip() or None
+    agency_contact = str(corr_in.get("agency_contact") or "").strip() or None
+    approval_dates = _report_builder_list(corr_in.get("approval_dates"))
+    submission_status = str(corr_in.get("submission_status") or "").strip() or None
+    corr_notes = str(corr_in.get("notes") or "").strip()
+    status = "Available" if any([notice_of_intent_date, agency_contact, approval_dates, submission_status, corr_notes]) else ("Partial" if candidates else "Gap")
+    notes = [corr_notes] if corr_notes else (
+        ["Regulatory correspondence tracking is not normalized yet; candidates are inferred from evidence attachments."] if candidates else ["No normalized correspondence tracking exists in the current session schema."]
+    )
     return {
-        "status": "Partial" if candidates else "Gap",
-        "notice_of_intent_date": None,
-        "agency_contact": None,
-        "approval_dates": [],
-        "submission_status": None,
+        "status": status,
+        "notice_of_intent_date": notice_of_intent_date,
+        "agency_contact": agency_contact,
+        "approval_dates": approval_dates,
+        "submission_status": submission_status,
         "candidate_artifacts": candidates,
-        "notes": ["Regulatory correspondence tracking is not normalized yet; candidates are inferred from evidence attachments."] if candidates else ["No normalized correspondence tracking exists in the current session schema."],
-        "source": "session.project.intake.evidence_files + evidence_bundle.static_artifacts",
+        "notes": notes,
+        "source": "session.report_builder.correspondence + session.project.intake.evidence_files + evidence_bundle.static_artifacts",
     }
 
 
-def _report_run_aggregation(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
+def _report_run_aggregation(
+    session: Dict[str, Any],
+    evidence_bundle: Dict[str, Any],
+    *,
+    cfg_path: Path,
+    session_dir: Path,
+) -> Dict[str, Any]:
     planned_rows = _report_planned_run_rows(session)
-    worksteps = ((evidence_bundle.get("sources") or {}).get("worksteps") if isinstance(evidence_bundle.get("sources"), dict) else {}) or {}
-    worksteps_path = worksteps.get("path")
-    events = _read_jsonl(Path(str(worksteps_path))) if _has_value(worksteps_path) and Path(str(worksteps_path)).exists() else []
+    scoped_worksteps = _load_scoped_worksteps(session, cfg_path=cfg_path, session_dir=session_dir)
+    worksteps_path = scoped_worksteps.get("path")
+    worksteps_summary = ((evidence_bundle.get("sources") or {}).get("worksteps") if isinstance(evidence_bundle.get("sources"), dict) else {}) or {}
+    events = scoped_worksteps.get("rows") if isinstance(scoped_worksteps.get("rows"), list) else []
 
     rows_by_run: Dict[int, Dict[str, Any]] = {}
     current_run_no: Optional[int] = None
@@ -2688,7 +3004,15 @@ def _report_run_aggregation(session: Dict[str, Any], evidence_bundle: Dict[str, 
             row["date"] = None
         actual_rows.append(row)
 
-    coverage_note = "Run summaries are aggregated from workstep events." if actual_rows else "No actual run events were found; only planned Test Matrix rows are available."
+    if actual_rows:
+        coverage_note = "Run summaries are aggregated from session-scoped workstep events."
+    else:
+        if str(scoped_worksteps.get("path_scope") or "") == "EXTERNAL" and int(worksteps_summary.get("filtered_out_count") or 0) > 0:
+            coverage_note = "No actual run events were found within the current session window; external worksteps outside that window were excluded."
+        elif str(scoped_worksteps.get("path_scope") or "") == "EXTERNAL":
+            coverage_note = "No actual run events were found in the external worksteps source for this session window; only planned Test Matrix rows are available."
+        else:
+            coverage_note = "No actual run events were found; only planned Test Matrix rows are available."
     return {
         "status": "Partial" if actual_rows else ("Available" if planned_rows else "Gap"),
         "planned_runs": planned_rows,
@@ -2696,7 +3020,14 @@ def _report_run_aggregation(session: Dict[str, Any], evidence_bundle: Dict[str, 
         "run_count_planned": len(planned_rows),
         "run_count_actual": len(actual_rows),
         "coverage_note": coverage_note,
-        "source": "session.test_matrix.plan + evidence_bundle.sources.worksteps",
+        "source": "session.test_matrix.plan + session-scoped evidence_bundle.sources.worksteps",
+        "worksteps_path": str(worksteps_path) if _has_value(worksteps_path) else "",
+        "worksteps_path_scope": scoped_worksteps.get("path_scope"),
+        "worksteps_scope_note": scoped_worksteps.get("scope_note"),
+        "session_scope": dict(scoped_worksteps.get("session_scope") or {}),
+        "worksteps_total_events": int(worksteps_summary.get("total_count") or 0),
+        "worksteps_scoped_events": len(events),
+        "worksteps_filtered_out": int(worksteps_summary.get("filtered_out_count") or 0),
     }
 
 
@@ -2771,6 +3102,8 @@ def _report_appendix_manifest(
         ("F", "Report pack summary", "json", paths.summary_json, "report_pack_v1", "Compact report-pack summary"),
         ("F", "Report context", "json", paths.report_context_json, "report_context_v1", "Normalized final-report source object"),
         ("F", "Final test report", "md", paths.final_report_md, "final_report_v1", "Markdown render bound from report_context_v1 and the master template."),
+        ("F", "Final test report", "docx", paths.final_report_docx, "final_report_v1", "DOCX render bound from report_context_v1 and the master template."),
+        ("F", "Final test report", "pdf", paths.final_report_pdf, "final_report_v1", "PDF render bound from report_context_v1 and the master template."),
         ("F", "Evidence bundle", "json", paths.evidence_bundle_json, "report_pack_v1", "Evidence manifest source"),
         ("F", "Evidence step evaluation", "csv", paths.evidence_step_eval_csv, "report_pack_v1", "Calculation / step-evaluation support"),
         ("F", "Fuel analysis snapshot", "csv", paths.fuel_analysis_csv, "report_pack_v1", "Fuel analysis output"),
@@ -2827,7 +3160,7 @@ def _build_report_context(
     process_control = _report_process_control_block(session)
     deviations = _report_deviation_approval_block(session, evidence_bundle)
     correspondence = _report_correspondence_block(session, evidence_bundle)
-    run_aggregation = _report_run_aggregation(session, evidence_bundle)
+    run_aggregation = _report_run_aggregation(session, evidence_bundle, cfg_path=cfg_path, session_dir=session_dir)
 
     report_title = _first_present(
         project.get("project_name"),
@@ -3362,7 +3695,11 @@ def _write_final_report_markdown(
     lines.append(f"- Prepared for: {_md_scalar(_ctx_value(cover, 'prepared_for'))}")
     lines.append(f"- Prepared by: {_md_scalar(_ctx_value(cover, 'prepared_by'))}")
     lines.append(f"- Report revision / date: {_md_scalar(_ctx_value(cover, 'report_revision'))} / {_md_scalar(_ctx_value(cover, 'issue_date'))}")
-    lines.append(f"- Responsible official: {_md_scalar(_ctx_value(cover, 'responsible_official'))}")
+    responsible_official = _md_scalar(_ctx_value(cover, "responsible_official"))
+    responsible_title = _md_scalar(parties.get("responsible_official_title"))
+    if responsible_title != "N/A":
+        responsible_official = f"{responsible_official} ({responsible_title})" if responsible_official != "N/A" else responsible_title
+    lines.append(f"- Responsible official: {responsible_official}")
     lines.append("")
     lines.append("## 1. Introduction")
     lines.append("")
@@ -3467,7 +3804,11 @@ def _write_final_report_markdown(
     lines.append("")
     lines.append("### 4.4 Deviations, alternatives, and approvals")
     lines.append("")
-    lines.append(f"- Deviations / approvals: {_md_scalar(deviations)}")
+    lines.append(f"- Planned deviations: {_md_scalar((deviations.get('planned_deviations') if isinstance(deviations, dict) else None))}")
+    lines.append(f"- Field deviations: {_md_scalar((deviations.get('field_deviations') if isinstance(deviations, dict) else None))}")
+    lines.append(f"- Alternative method / approval references: {_md_scalar((deviations.get('alternative_method_approvals') if isinstance(deviations, dict) else None))}")
+    lines.append(f"- Impact statement: {_md_scalar((deviations.get('impact_statement') if isinstance(deviations, dict) else None))}")
+    lines.append(f"- Candidate evidence titles: {_md_scalar((deviations.get('candidate_evidence_titles') if isinstance(deviations, dict) else None))}")
     lines.append("")
     lines.append("## 5. QA/QC Activities")
     lines.append("")
@@ -3489,6 +3830,12 @@ def _write_final_report_markdown(
     lines.append("")
     lines.append("## 6. Appendices")
     lines.append("")
+    lines.append(f"- Notice of intent date: {_md_scalar((correspondence.get('notice_of_intent_date') if isinstance(correspondence, dict) else None))}")
+    lines.append(f"- Agency contact: {_md_scalar((correspondence.get('agency_contact') if isinstance(correspondence, dict) else None))}")
+    lines.append(f"- Approval dates: {_md_scalar((correspondence.get('approval_dates') if isinstance(correspondence, dict) else None))}")
+    lines.append(f"- Submission status: {_md_scalar((correspondence.get('submission_status') if isinstance(correspondence, dict) else None))}")
+    lines.append(f"- Correspondence notes: {_md_scalar((correspondence.get('notes') if isinstance(correspondence, dict) else None))}")
+    lines.append("")
     lines.append(_md_table(
         ["Appendix", "Appendix title", "Document title", "Type", "Status", "Path", "SHA-256"],
         appendix_table_rows,
@@ -3506,14 +3853,259 @@ def _write_final_report_markdown(
     paths.final_report_md.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
 
 
+def _strip_markdown_text(text: Any) -> str:
+    s = str(text or "")
+    s = s.replace("`", "")
+    s = s.replace("**", "")
+    s = s.replace("__", "")
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _parse_markdown_table(lines: List[str]) -> Tuple[List[str], List[List[str]]]:
+    rows: List[List[str]] = []
+    for raw in lines:
+        line = str(raw or "").strip()
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.strip("|").split("|")]
+        rows.append([_strip_markdown_text(p) for p in parts])
+    if not rows:
+        return [], []
+    headers = rows[0]
+    body: List[List[str]] = []
+    for row in rows[1:]:
+        if row and all(re.fullmatch(r"[:\- ]+", str(cell or "")) for cell in row):
+            continue
+        body.append(row)
+    return headers, body
+
+
+def _parse_markdown_report_blocks(markdown_text: str) -> List[Dict[str, Any]]:
+    lines = markdown_text.splitlines()
+    blocks: List[Dict[str, Any]] = []
+    i = 0
+    while i < len(lines):
+        raw = str(lines[i] or "")
+        stripped = raw.strip()
+        if not stripped:
+            i += 1
+            continue
+        head = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if head:
+            blocks.append({
+                "type": "heading",
+                "level": len(head.group(1)),
+                "text": _strip_markdown_text(head.group(2)),
+            })
+            i += 1
+            continue
+        if stripped.startswith("|"):
+            table_lines: List[str] = []
+            while i < len(lines) and str(lines[i] or "").strip().startswith("|"):
+                table_lines.append(str(lines[i] or ""))
+                i += 1
+            headers, rows = _parse_markdown_table(table_lines)
+            if headers:
+                blocks.append({"type": "table", "headers": headers, "rows": rows})
+            continue
+        if stripped.startswith("- "):
+            items: List[str] = []
+            while i < len(lines):
+                probe = str(lines[i] or "").strip()
+                if not probe.startswith("- "):
+                    break
+                items.append(_strip_markdown_text(probe[2:]))
+                i += 1
+            if items:
+                blocks.append({"type": "bullet_list", "items": items})
+            continue
+        para_parts = [stripped]
+        i += 1
+        while i < len(lines):
+            probe = str(lines[i] or "").strip()
+            if not probe:
+                break
+            if probe.startswith("|") or probe.startswith("- ") or re.match(r"^(#{1,6})\s+(.+)$", probe):
+                break
+            para_parts.append(probe)
+            i += 1
+        blocks.append({"type": "paragraph", "text": _strip_markdown_text(" ".join(para_parts))})
+    return blocks
+
+
+def _remove_if_exists(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
+
+def _write_final_report_docx(paths: "ReportPackPaths", summary: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        from docx import Document
+        from docx.shared import Inches, Pt
+    except Exception as exc:
+        _remove_if_exists(paths.final_report_docx)
+        return {"status": "skipped", "reason": f"python-docx not available: {exc}", "path": str(paths.final_report_docx)}
+
+    try:
+        markdown_text = paths.final_report_md.read_text(encoding="utf-8")
+        blocks = _parse_markdown_report_blocks(markdown_text)
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin = Inches(0.6)
+            section.bottom_margin = Inches(0.6)
+            section.left_margin = Inches(0.7)
+            section.right_margin = Inches(0.7)
+
+        normal_style = doc.styles["Normal"]
+        normal_style.font.name = "Calibri"
+        normal_style.font.size = Pt(10)
+
+        title_set = False
+        for block in blocks:
+            btype = block.get("type")
+            if btype == "heading":
+                level = int(block.get("level") or 1)
+                text = str(block.get("text") or "").strip()
+                if not text:
+                    continue
+                doc.add_heading(text, level=0 if (level == 1 and not title_set) else min(max(level, 1), 4))
+                title_set = True
+            elif btype == "paragraph":
+                text = str(block.get("text") or "").strip()
+                if text:
+                    doc.add_paragraph(text)
+            elif btype == "bullet_list":
+                for item in block.get("items") or []:
+                    txt = str(item or "").strip()
+                    if txt:
+                        doc.add_paragraph(txt, style="List Bullet")
+            elif btype == "table":
+                headers = [str(v or "") for v in (block.get("headers") or [])]
+                rows = [list(r) for r in (block.get("rows") or [])]
+                if not headers:
+                    continue
+                table = doc.add_table(rows=1, cols=len(headers))
+                table.style = "Table Grid"
+                hdr = table.rows[0].cells
+                for idx, value in enumerate(headers):
+                    hdr[idx].text = value
+                for row in rows:
+                    cells = table.add_row().cells
+                    for idx in range(len(headers)):
+                        cells[idx].text = str(row[idx] if idx < len(row) else "")
+                doc.add_paragraph("")
+
+        core = doc.core_properties
+        core.title = "MOLE DAS Final Test Report"
+        core.subject = "Formal deliverable generated from report_context_v1"
+        core.author = str((((summary.get("session") or {}).get("operator")) if isinstance(summary.get("session"), dict) else "") or "MOLE DAS")
+        doc.save(str(paths.final_report_docx))
+        return {
+            "status": "generated",
+            "path": str(paths.final_report_docx),
+            "bytes": paths.final_report_docx.stat().st_size if paths.final_report_docx.exists() else 0,
+        }
+    except Exception as exc:
+        _remove_if_exists(paths.final_report_docx)
+        return {"status": "failed", "reason": str(exc), "path": str(paths.final_report_docx)}
+
+
+def _write_final_report_pdf(paths: "ReportPackPaths") -> Dict[str, Any]:
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception as exc:
+        _remove_if_exists(paths.final_report_pdf)
+        return {"status": "skipped", "reason": f"reportlab not available: {exc}", "path": str(paths.final_report_pdf)}
+
+    try:
+        markdown_text = paths.final_report_md.read_text(encoding="utf-8")
+        blocks = _parse_markdown_report_blocks(markdown_text)
+        styles = getSampleStyleSheet()
+        h1 = ParagraphStyle("FinalReportH1", parent=styles["Title"], spaceAfter=10)
+        h2 = ParagraphStyle("FinalReportH2", parent=styles["Heading2"], spaceBefore=8, spaceAfter=6)
+        h3 = ParagraphStyle("FinalReportH3", parent=styles["Heading3"], spaceBefore=6, spaceAfter=4)
+        body = ParagraphStyle("FinalReportBody", parent=styles["BodyText"], fontName="Helvetica", fontSize=9, leading=12, spaceAfter=4)
+        bullet = ParagraphStyle("FinalReportBullet", parent=body, leftIndent=14, firstLineIndent=0)
+        doc = SimpleDocTemplate(
+            str(paths.final_report_pdf),
+            pagesize=letter,
+            leftMargin=0.6 * inch,
+            rightMargin=0.6 * inch,
+            topMargin=0.6 * inch,
+            bottomMargin=0.6 * inch,
+        )
+        story: List[Any] = []
+        title_set = False
+        for block in blocks:
+            btype = block.get("type")
+            if btype == "heading":
+                level = int(block.get("level") or 1)
+                text = _xml_escape(str(block.get("text") or ""))
+                if not text:
+                    continue
+                style = h1 if (level == 1 and not title_set) else (h2 if level <= 2 else h3)
+                title_set = True
+                story.append(Paragraph(text, style))
+                story.append(Spacer(1, 0.08 * inch))
+            elif btype == "paragraph":
+                text = _xml_escape(str(block.get("text") or ""))
+                if text:
+                    story.append(Paragraph(text, body))
+                    story.append(Spacer(1, 0.04 * inch))
+            elif btype == "bullet_list":
+                for item in block.get("items") or []:
+                    txt = _xml_escape(str(item or ""))
+                    if txt:
+                        story.append(Paragraph(txt, bullet, bulletText="\u2022"))
+                story.append(Spacer(1, 0.04 * inch))
+            elif btype == "table":
+                headers = [str(v or "") for v in (block.get("headers") or [])]
+                rows = [list(r) for r in (block.get("rows") or [])]
+                if not headers:
+                    continue
+                data: List[List[Any]] = [[Paragraph(_xml_escape(v), body) for v in headers]]
+                for row in rows:
+                    data.append([Paragraph(_xml_escape(str(row[idx] if idx < len(row) else "")), body) for idx in range(len(headers))])
+                table = Table(data, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d9d9d9")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#666666")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]))
+                story.append(table)
+                story.append(Spacer(1, 0.08 * inch))
+        doc.build(story)
+        return {
+            "status": "generated",
+            "path": str(paths.final_report_pdf),
+            "bytes": paths.final_report_pdf.stat().st_size if paths.final_report_pdf.exists() else 0,
+        }
+    except Exception as exc:
+        _remove_if_exists(paths.final_report_pdf)
+        return {"status": "failed", "reason": str(exc), "path": str(paths.final_report_pdf)}
+
+
 def _write_final_report_index(
     paths: "ReportPackPaths",
     report_context: Dict[str, Any],
     summary: Dict[str, Any],
+    render_status: Optional[Dict[str, Any]] = None,
 ) -> None:
     _ensure_dir(paths.final_report_dir)
     files: List[Dict[str, Any]] = []
-    for p in [paths.final_report_md, paths.report_context_json]:
+    for p in [paths.final_report_md, paths.final_report_docx, paths.final_report_pdf, paths.report_context_json]:
         if not p.exists():
             continue
         try:
@@ -3530,10 +4122,13 @@ def _write_final_report_index(
         "contract_version": "final_report_v1",
         "export_dir": str(paths.final_report_dir),
         "markdown_path": str(paths.final_report_md),
+        "docx_path": str(paths.final_report_docx),
+        "pdf_path": str(paths.final_report_pdf),
         "source_report_context_json": str(paths.report_context_json),
         "source_report_pack_dir": str(paths.out_dir),
         "coverage": report_context.get("coverage"),
         "template_contract": report_context.get("template_contract"),
+        "render_status": render_status or {},
         "files": files,
     }
     paths.final_report_index_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -3551,6 +4146,8 @@ class ReportPackPaths:
     summary_json: Path
     report_context_json: Path
     final_report_md: Path
+    final_report_docx: Path
+    final_report_pdf: Path
     final_report_index_json: Path
     evidence_bundle_json: Path
     evidence_step_eval_csv: Path
@@ -3623,6 +4220,8 @@ def generate_report_pack_v1(
         summary_json=out_dir / "summary.json",
         report_context_json=out_dir / "report_context.json",
         final_report_md=final_report_dir / "final_test_report_v1.md",
+        final_report_docx=final_report_dir / "final_test_report_v1.docx",
+        final_report_pdf=final_report_dir / "final_test_report_v1.pdf",
         final_report_index_json=final_report_dir / "index.json",
         evidence_bundle_json=out_dir / "evidence_bundle.json",
         evidence_step_eval_csv=out_dir / "evidence_step_eval.csv",
@@ -3898,6 +4497,10 @@ def generate_report_pack_v1(
             "worksteps": {
                 "path": str((evidence_bundle.get("sources") or {}).get("worksteps", {}).get("path") or ""),
                 "count": (evidence_bundle.get("sources") or {}).get("worksteps", {}).get("count"),
+                "total_count": (evidence_bundle.get("sources") or {}).get("worksteps", {}).get("total_count"),
+                "filtered_out_count": (evidence_bundle.get("sources") or {}).get("worksteps", {}).get("filtered_out_count"),
+                "path_scope": (evidence_bundle.get("sources") or {}).get("worksteps", {}).get("path_scope"),
+                "session_scope": (evidence_bundle.get("sources") or {}).get("worksteps", {}).get("session_scope"),
             },
             "raw_samples": {
                 "path": str(raw_samples_path),
@@ -4760,8 +5363,10 @@ def generate_report_pack_v1(
     }
     paths.report_context_json.write_text(json.dumps(report_context, indent=2), encoding="utf-8")
     _write_final_report_markdown(paths, report_context, summary)
+    _write_final_report_docx(paths, summary)
+    _write_final_report_pdf(paths)
 
-    # Rebuild once so the manifest sees report_context.json and final_test_report_v1.md.
+    # Rebuild once so the manifest sees report_context.json and final-report artifacts.
     report_context = _build_report_context(
         session=session,
         summary=summary,
@@ -4775,17 +5380,31 @@ def generate_report_pack_v1(
         "json_path": str(paths.report_context_json),
         "coverage": report_context.get("coverage"),
     }
+    docx_status = _write_final_report_docx(paths, summary)
+    pdf_status = _write_final_report_pdf(paths)
     summary["final_report"] = {
         "contract_version": "final_report_v1",
         "export_dir": str(paths.final_report_dir),
         "markdown_path": str(paths.final_report_md),
+        "docx_path": str(paths.final_report_docx),
+        "pdf_path": str(paths.final_report_pdf),
         "index_path": str(paths.final_report_index_json),
         "source_report_context_json": str(paths.report_context_json),
         "source_report_pack_dir": str(paths.out_dir),
+        "render_status": {
+            "docx": docx_status,
+            "pdf": pdf_status,
+        },
     }
     paths.report_context_json.write_text(json.dumps(report_context, indent=2), encoding="utf-8")
     _write_final_report_markdown(paths, report_context, summary)
-    _write_final_report_index(paths, report_context, summary)
+    docx_status = _write_final_report_docx(paths, summary)
+    pdf_status = _write_final_report_pdf(paths)
+    summary["final_report"]["render_status"] = {
+        "docx": docx_status,
+        "pdf": pdf_status,
+    }
+    _write_final_report_index(paths, report_context, summary, render_status=summary["final_report"]["render_status"])
     paths.summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     # Index JSON (hashes)
@@ -4797,6 +5416,8 @@ def generate_report_pack_v1(
         paths.summary_json,
         paths.report_context_json,
         paths.final_report_md,
+        paths.final_report_docx,
+        paths.final_report_pdf,
         paths.final_report_index_json,
         paths.evidence_bundle_json,
         paths.evidence_step_eval_csv,
