@@ -104,6 +104,62 @@ def _read_json(path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
+def _has_value(v: Any) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, str):
+        return bool(v.strip())
+    if isinstance(v, (list, tuple, set, dict)):
+        return len(v) > 0
+    return True
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if _has_value(value):
+            return value
+    return None
+
+
+def _ctx_field(
+    value: Any = None,
+    source: str = "",
+    status: Optional[str] = None,
+    note: str = "",
+) -> Dict[str, Any]:
+    resolved_status = str(status or ("Available" if _has_value(value) else "Gap")).strip() or "Gap"
+    return {
+        "status": resolved_status,
+        "value": value,
+        "source": str(source or ""),
+        "note": str(note or ""),
+    }
+
+
+def _ctx_counts(node: Any) -> Dict[str, int]:
+    counts = {"Available": 0, "Partial": 0, "Gap": 0}
+
+    def _walk(obj: Any) -> None:
+        if isinstance(obj, dict):
+            if (
+                obj.get("status") in counts
+                and "value" in obj
+                and "source" in obj
+                and "note" in obj
+            ):
+                counts[str(obj.get("status"))] += 1
+                return
+            for val in obj.values():
+                _walk(val)
+            return
+        if isinstance(obj, list):
+            for item in obj:
+                _walk(item)
+
+    _walk(node)
+    return counts
+
+
 def _read_jsonl(path: Path) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     try:
@@ -2286,6 +2342,1203 @@ def _score_test_matrix(session: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _report_template_contract() -> Dict[str, Any]:
+    docs_dir = Path(__file__).resolve().parent.parent / "docs"
+    master_template = docs_dir / "MOLE_DAS_MASTER_TEST_REPORT_TEMPLATE_2026_04_09.md"
+    crosswalk = docs_dir / "MOLE_DAS_TEST_REPORT_DATA_ELEMENTS_CROSSWALK_2026_04_09.md"
+    assessment = docs_dir / "epa_emissions_performance_test_structural_assessment.md"
+    return {
+        "master_template": {
+            "name": "MOLE DAS Master Test Report Template",
+            "version": "2026_04_09",
+            "path": str(master_template),
+            "exists": master_template.exists(),
+        },
+        "crosswalk": {
+            "name": "MOLE DAS Test Report Data Elements Crosswalk",
+            "version": "2026_04_09",
+            "path": str(crosswalk),
+            "exists": crosswalk.exists(),
+        },
+        "structural_assessment": {
+            "name": "EPA Emissions Performance Test Structural Assessment",
+            "path": str(assessment),
+            "exists": assessment.exists(),
+        },
+    }
+
+
+def _report_limit_lookup(session: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    reg = session.get("regulatory") if isinstance(session.get("regulatory"), dict) else {}
+    limits = reg.get("limits") if isinstance(reg.get("limits"), list) else []
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    for row in limits:
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("pollutant") or "").strip().upper()
+        if not code:
+            continue
+        out.setdefault(code, []).append(row)
+    return out
+
+
+def _report_pollutant_method_rows(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    pres = _pollutant_prescriptions(session)
+    limits_by_code = _report_limit_lookup(session)
+    for code in _selected_pollutants(session):
+        cfg = pres.get(code) if isinstance(pres.get(code), dict) else {}
+        rows.append({
+            "pollutant": code,
+            "method": str(cfg.get("method_selected") or ""),
+            "instrument": _first_present(cfg.get("instrument_id"), cfg.get("instrument_channel"), cfg.get("channel_id")),
+            "units": str(cfg.get("expected_units") or ""),
+            "compliance_basis": [
+                {
+                    "limit_type": str(lim.get("limit_type") or ""),
+                    "value": lim.get("value"),
+                    "units": str(lim.get("units") or ""),
+                    "basis": str(lim.get("basis") or ""),
+                    "avg_time": str(lim.get("avg_time") or ""),
+                    "o2_ref_pct": lim.get("o2_ref_pct"),
+                }
+                for lim in limits_by_code.get(code, [])
+                if isinstance(lim, dict)
+            ],
+            "source": "session.pollutants.prescriptions + session.regulatory.limits",
+        })
+    return rows
+
+
+def _report_planned_run_rows(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+    tm = session.get("test_matrix") if isinstance(session.get("test_matrix"), dict) else {}
+    plan = tm.get("plan") if isinstance(tm.get("plan"), dict) else {}
+    run_durations = plan.get("run_durations_min") if isinstance(plan.get("run_durations_min"), list) else []
+    sample_runs = int(_safe_float(plan.get("sample_runs")) or 0)
+    minutes_per_run = _safe_float(plan.get("minutes_per_run"))
+    rows: List[Dict[str, Any]] = []
+    if run_durations:
+        for idx, dur in enumerate(run_durations):
+            rows.append({
+                "run_no": idx + 1,
+                "planned_duration_min": _safe_float(dur),
+                "date": None,
+                "start": None,
+                "stop": None,
+                "status": "PLANNED",
+                "source": "session.test_matrix.plan.run_durations_min",
+            })
+        return rows
+    if sample_runs > 0 and minutes_per_run is not None:
+        for idx in range(sample_runs):
+            rows.append({
+                "run_no": idx + 1,
+                "planned_duration_min": minutes_per_run,
+                "date": None,
+                "start": None,
+                "stop": None,
+                "status": "PLANNED",
+                "source": "session.test_matrix.plan.sample_runs + minutes_per_run",
+            })
+    return rows
+
+
+def _safe_slug(text: Any) -> str:
+    s = str(text or "").strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "_", s)
+    return s.strip("_")
+
+
+def _report_company_name_from_operator(operator: Any) -> Optional[str]:
+    raw = str(operator or "").strip()
+    if not raw:
+        return None
+    return raw.replace("_", " ").strip().title()
+
+
+def _report_parties_block(session: Dict[str, Any]) -> Dict[str, Any]:
+    project = session.get("project") if isinstance(session.get("project"), dict) else {}
+    intake = project.get("intake") if isinstance(project.get("intake"), dict) else {}
+    operator_raw = project.get("operator")
+    operator_display = _report_company_name_from_operator(operator_raw)
+    site_facility = str(project.get("site_facility") or "").strip() or None
+    return {
+        "status": "Partial" if operator_display or site_facility else "Gap",
+        "client_name": None,
+        "facility_owner_operator_name": site_facility,
+        "test_company_name": operator_display,
+        "session_operator_name": operator_display,
+        "laboratory_name": None,
+        "observer_contacts": [],
+        "responsible_official_name": None,
+        "signatory_required": True,
+        "site_contact_provided_flag": bool(((intake.get("items") or {}).get("SITE_CONTACT") or {}).get("provided")),
+        "notes": [
+            "Client / owner, laboratory, observer, and responsible official metadata are not normalized yet."
+        ],
+        "source": "session.project + session.project.intake",
+    }
+
+
+def _report_process_control_block(session: Dict[str, Any]) -> Dict[str, Any]:
+    source = session.get("source") if isinstance(session.get("source"), dict) else {}
+    fuel = session.get("fuel") if isinstance(session.get("fuel"), dict) else {}
+    exhaust_flow = source.get("exhaust_flow") if isinstance(source.get("exhaust_flow"), dict) else {}
+    fuel_flow = source.get("fuel_flow") if isinstance(source.get("fuel_flow"), dict) else {}
+
+    narrative_parts = [
+        str(source.get("service_class") or "").strip(),
+        str(source.get("source_category") or "").strip(),
+        f"used for {str(source.get('application') or source.get('source_application') or '').strip()}".strip(),
+    ]
+    narrative_parts = [part for part in narrative_parts if part and part != "used for"]
+    narrative = " ".join(narrative_parts).strip()
+    if source.get("manufacturer") or source.get("model_number"):
+        unit_desc = " ".join([part for part in [str(source.get("manufacturer") or "").strip(), str(source.get("model_number") or "").strip()] if part]).strip()
+        if unit_desc:
+            narrative = (narrative + f"; unit {unit_desc}").strip("; ")
+    if fuel.get("fuel_category"):
+        narrative = (narrative + f"; fuel {fuel.get('fuel_category')}").strip("; ")
+
+    return {
+        "status": "Partial" if narrative else "Gap",
+        "process_description": {
+            "source_category": source.get("source_category"),
+            "application": source.get("application"),
+            "service_class": source.get("service_class"),
+            "output_type": source.get("output_type"),
+            "manufacturer": source.get("manufacturer"),
+            "model_number": source.get("model_number"),
+            "serial_number": source.get("serial_number"),
+            "asset_tag": source.get("asset_tag"),
+            "engine_cycle": source.get("engine_cycle"),
+            "engine_cyl_count": _first_present(source.get("engine_cyl_count"), source.get("cyl_count")),
+            "fuel_category": fuel.get("fuel_category"),
+            "fuel_flow_basis": fuel_flow.get("basis"),
+            "fuel_flow_units": fuel_flow.get("units"),
+            "exhaust_flow_method": exhaust_flow.get("method"),
+            "unit_notes": source.get("notes"),
+        },
+        "process_narrative_seed": narrative or None,
+        "control_equipment": {
+            "status": "UNKNOWN",
+            "description": None,
+            "operating_parameters": [],
+            "note": "Control equipment description is not normalized in the current session schema.",
+        },
+        "source": "session.source + session.fuel",
+    }
+
+
+def _report_deviation_approval_block(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
+    source = session.get("source") if isinstance(session.get("source"), dict) else {}
+    stack = source.get("stack") if isinstance(source.get("stack"), dict) else {}
+    exhaust_flow = source.get("exhaust_flow") if isinstance(source.get("exhaust_flow"), dict) else {}
+    static_files = ((evidence_bundle.get("static_artifacts") or {}).get("files") if isinstance(evidence_bundle.get("static_artifacts"), dict) else []) or []
+    candidate_titles = []
+    for item in static_files:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("name") or "")
+        title_l = title.lower()
+        if any(tok in title_l for tok in ["deviation", "approval", "alt method", "alternate method", "agency", "permit", "notice"]):
+            candidate_titles.append(title)
+    notes = []
+    if _has_value(stack.get("hand_notes")):
+        notes.append(f"Stack notes: {stack.get('hand_notes')}")
+    if _has_value(((exhaust_flow.get("stack_measured") or {}).get("notes") if isinstance(exhaust_flow.get("stack_measured"), dict) else None)):
+        notes.append(f"Method notes: {(exhaust_flow.get('stack_measured') or {}).get('notes')}")
+    return {
+        "status": "Partial" if notes or candidate_titles else "Gap",
+        "planned_deviations": [],
+        "field_deviations": [],
+        "alternative_method_approvals": [],
+        "impact_statement": None,
+        "candidate_evidence_titles": candidate_titles,
+        "notes": notes or ["No dedicated deviation/approval records are normalized in the current session schema."],
+        "source": "session.source.stack.hand_notes + session.source.exhaust_flow.stack_measured.notes + evidence_bundle.static_artifacts",
+    }
+
+
+def _report_correspondence_block(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
+    project = session.get("project") if isinstance(session.get("project"), dict) else {}
+    intake = project.get("intake") if isinstance(project.get("intake"), dict) else {}
+    evidence_files = intake.get("evidence_files") if isinstance(intake.get("evidence_files"), list) else []
+    static_files = ((evidence_bundle.get("static_artifacts") or {}).get("files") if isinstance(evidence_bundle.get("static_artifacts"), dict) else []) or []
+    candidates = []
+    for item in evidence_files:
+        if _has_value(item):
+            candidates.append({"title": Path(str(item)).name, "path": str(item), "source": "session.project.intake.evidence_files"})
+    for item in static_files:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("name") or "")
+        title_l = title.lower()
+        if any(tok in title_l for tok in ["notice", "agency", "permit", "cedri", "ert", "email", "correspondence", "approval"]):
+            candidates.append({
+                "title": title,
+                "path": str(item.get("path") or item.get("full_path") or ""),
+                "source": "evidence_bundle.static_artifacts.files",
+            })
+    return {
+        "status": "Partial" if candidates else "Gap",
+        "notice_of_intent_date": None,
+        "agency_contact": None,
+        "approval_dates": [],
+        "submission_status": None,
+        "candidate_artifacts": candidates,
+        "notes": ["Regulatory correspondence tracking is not normalized yet; candidates are inferred from evidence attachments."] if candidates else ["No normalized correspondence tracking exists in the current session schema."],
+        "source": "session.project.intake.evidence_files + evidence_bundle.static_artifacts",
+    }
+
+
+def _report_run_aggregation(session: Dict[str, Any], evidence_bundle: Dict[str, Any]) -> Dict[str, Any]:
+    planned_rows = _report_planned_run_rows(session)
+    worksteps = ((evidence_bundle.get("sources") or {}).get("worksteps") if isinstance(evidence_bundle.get("sources"), dict) else {}) or {}
+    worksteps_path = worksteps.get("path")
+    events = _read_jsonl(Path(str(worksteps_path))) if _has_value(worksteps_path) and Path(str(worksteps_path)).exists() else []
+
+    rows_by_run: Dict[int, Dict[str, Any]] = {}
+    current_run_no: Optional[int] = None
+
+    def _ensure_row(run_no: int) -> Dict[str, Any]:
+        row = rows_by_run.get(run_no)
+        if row is None:
+            plan_row = next((r for r in planned_rows if int(r.get("run_no") or 0) == run_no), {})
+            row = {
+                "run_no": run_no,
+                "planned_duration_min": plan_row.get("planned_duration_min"),
+                "start_ts_iso": None,
+                "end_ts_iso": None,
+                "actual_duration_min": None,
+                "postcal_required": False,
+                "postcal_complete": False,
+                "event_counts": {},
+                "post_zero_pollutants": [],
+                "post_span_pollutants": [],
+                "status": "PLANNED",
+                "source": "worksteps",
+            }
+            rows_by_run[run_no] = row
+        return row
+
+    def _infer_run_no(evt: Dict[str, Any]) -> Optional[int]:
+        payload = evt.get("payload") if isinstance(evt.get("payload"), dict) else {}
+        run_no = payload.get("run_no")
+        if run_no is not None:
+            try:
+                return int(run_no)
+            except Exception:
+                pass
+        idx = payload.get("active_run_index")
+        if idx is not None:
+            try:
+                return int(idx) + 1
+            except Exception:
+                pass
+        return current_run_no
+
+    for evt in events:
+        if not isinstance(evt, dict):
+            continue
+        event_name = str(evt.get("event") or evt.get("type") or "").strip().upper()
+        ts_iso = str(evt.get("ts_iso") or "")
+        payload = evt.get("payload") if isinstance(evt.get("payload"), dict) else {}
+        run_no = _infer_run_no(evt)
+
+        if event_name == "TEST_START":
+            run_no = run_no or 1
+            row = _ensure_row(run_no)
+            row["start_ts_iso"] = ts_iso or row.get("start_ts_iso")
+            row["status"] = "STARTED"
+            current_run_no = run_no
+        elif event_name == "TEST_END":
+            run_no = run_no or current_run_no or 1
+            row = _ensure_row(run_no)
+            row["end_ts_iso"] = ts_iso or row.get("end_ts_iso")
+            row["status"] = "COMPLETED"
+            current_run_no = None
+        elif run_no is not None:
+            row = _ensure_row(run_no)
+            counts = row.get("event_counts") if isinstance(row.get("event_counts"), dict) else {}
+            counts[event_name] = int(counts.get(event_name) or 0) + 1
+            row["event_counts"] = counts
+            if event_name == "POSTCAL_REQUIRED":
+                row["postcal_required"] = True
+            elif event_name == "POSTCAL_COMPLETE":
+                row["postcal_complete"] = True
+            elif event_name == "CAPTURE_POST_ZERO":
+                pol = str(payload.get("pollutant") or "").strip().upper()
+                if pol and pol not in row["post_zero_pollutants"]:
+                    row["post_zero_pollutants"].append(pol)
+            elif event_name == "CAPTURE_POST_SPAN":
+                pol = str(payload.get("pollutant") or "").strip().upper()
+                if pol and pol not in row["post_span_pollutants"]:
+                    row["post_span_pollutants"].append(pol)
+
+    actual_rows: List[Dict[str, Any]] = []
+    for run_no in sorted(rows_by_run):
+        row = rows_by_run[run_no]
+        start_dt = _parse_iso_dt(row.get("start_ts_iso"))
+        end_dt = _parse_iso_dt(row.get("end_ts_iso"))
+        if start_dt and end_dt:
+            row["actual_duration_min"] = round((end_dt - start_dt).total_seconds() / 60.0, 3)
+            row["date"] = start_dt.date().isoformat()
+        else:
+            row["date"] = None
+        actual_rows.append(row)
+
+    coverage_note = "Run summaries are aggregated from workstep events." if actual_rows else "No actual run events were found; only planned Test Matrix rows are available."
+    return {
+        "status": "Partial" if actual_rows else ("Available" if planned_rows else "Gap"),
+        "planned_runs": planned_rows,
+        "actual_runs": actual_rows,
+        "run_count_planned": len(planned_rows),
+        "run_count_actual": len(actual_rows),
+        "coverage_note": coverage_note,
+        "source": "session.test_matrix.plan + evidence_bundle.sources.worksteps",
+    }
+
+
+def _appendix_entry(
+    appendix: str,
+    title: str,
+    artifact_type: str,
+    path: Any,
+    source: str,
+    note: str = "",
+) -> Dict[str, Any]:
+    p = None
+    exists = False
+    sha256 = ""
+    bytes_size = None
+    try:
+        if _has_value(path):
+            p = Path(str(path)).expanduser()
+            exists = p.exists()
+            if exists and p.is_file():
+                bytes_size = p.stat().st_size
+                sha256 = _sha256_file(p)
+    except Exception:
+        exists = False
+        sha256 = ""
+        bytes_size = None
+    return {
+        "appendix": appendix,
+        "appendix_title": {
+            "A": "Regulatory and administrative support",
+            "B": "Source and sampling location support",
+            "C": "Method and instrument support",
+            "D": "QA/QC support",
+            "E": "Field and raw data",
+            "F": "Calculations and report outputs",
+        }.get(str(appendix or "").upper(), ""),
+        "title": title,
+        "artifact_type": artifact_type,
+        "path": str(p) if p is not None else str(path or ""),
+        "exists": exists,
+        "sha256": sha256,
+        "bytes": bytes_size,
+        "include_in_final_report": bool(exists),
+        "status": "AVAILABLE" if exists else "MISSING",
+        "assignment_basis": source,
+        "source": source,
+        "note": note,
+    }
+
+
+def _report_appendix_manifest(
+    paths: "ReportPackPaths",
+    evidence_bundle: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+    sources = evidence_bundle.get("sources") if isinstance(evidence_bundle.get("sources"), dict) else {}
+
+    for appendix, title, artifact_type, path, source, note in [
+        ("D", "Analyzer validity summary", "csv", paths.analyzer_validity_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Test matrix scorecard", "csv", paths.test_matrix_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "QA/QC events", "csv", paths.qaqc_events_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Spike recovery snapshot", "csv", paths.spike_recovery_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Side-by-side snapshot", "csv", paths.side_by_side_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Reference audit trace", "csv", paths.reference_trace_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Reference audit acceptance", "csv", paths.reference_acceptance_csv, "report_pack_v1", "QA/QC support export"),
+        ("D", "Reference audit latest snapshot", "json", paths.reference_latest_json, "report_pack_v1", "QA/QC support export"),
+        ("E", "Workstep log", "jsonl", ((sources.get("worksteps") or {}).get("path") if isinstance(sources.get("worksteps"), dict) else ""), "evidence_bundle.sources.worksteps", "Field and activity log"),
+        ("E", "Raw samples", "jsonl", ((sources.get("raw_samples") or {}).get("path") if isinstance(sources.get("raw_samples"), dict) else ""), "evidence_bundle.sources.raw_samples", "Raw sample evidence"),
+        ("E", "Raw events", "jsonl", ((sources.get("raw_events") or {}).get("path") if isinstance(sources.get("raw_events"), dict) else ""), "evidence_bundle.sources.raw_events", "Runner event evidence"),
+        ("E", "Health states", "jsonl", ((sources.get("health_states") or {}).get("path") if isinstance(sources.get("health_states"), dict) else ""), "evidence_bundle.sources.health_states", "Channel health trace"),
+        ("E", "Reference audit raw trace", "jsonl", ((sources.get("reference_audit") or {}).get("path") if isinstance(sources.get("reference_audit"), dict) else ""), "evidence_bundle.sources.reference_audit", "Reference audit raw evidence"),
+        ("F", "Report pack summary", "json", paths.summary_json, "report_pack_v1", "Compact report-pack summary"),
+        ("F", "Report context", "json", paths.report_context_json, "report_context_v1", "Normalized final-report source object"),
+        ("F", "Final test report", "md", paths.final_report_md, "final_report_v1", "Markdown render bound from report_context_v1 and the master template."),
+        ("F", "Evidence bundle", "json", paths.evidence_bundle_json, "report_pack_v1", "Evidence manifest source"),
+        ("F", "Evidence step evaluation", "csv", paths.evidence_step_eval_csv, "report_pack_v1", "Calculation / step-evaluation support"),
+        ("F", "Fuel analysis snapshot", "csv", paths.fuel_analysis_csv, "report_pack_v1", "Fuel analysis output"),
+        ("F", "Pollutant adjustments snapshot", "csv", paths.pollutant_adjustments_csv, "report_pack_v1", "Bias / drift adjustment output"),
+        ("F", "Pollutant adjustment history", "csv", paths.pollutant_adjustment_history_csv, "report_pack_v1", "Bias / drift history"),
+        ("F", "Regulatory snapshot", "csv", paths.regulatory_snapshot_csv, "report_pack_v1", "Regulatory comparison output"),
+        ("F", "Reference audit sources", "csv", paths.reference_sources_csv, "report_pack_v1", "Reference source mapping"),
+        ("F", "Reference offset recommendations", "csv", paths.reference_offsets_csv, "report_pack_v1", "Reference offset recommendation output"),
+        ("F", "Reference offset recommendations", "json", paths.reference_offsets_json, "report_pack_v1", "Reference offset recommendation output"),
+        ("F", "Report pack PDF", "pdf", paths.pdf_path, "report_pack_v1", "Compact report-pack PDF"),
+    ]:
+        entries.append(_appendix_entry(appendix, title, artifact_type, path, source, note))
+
+    static_block = evidence_bundle.get("static_artifacts") if isinstance(evidence_bundle.get("static_artifacts"), dict) else {}
+    for item in static_block.get("files") or []:
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category") or "STATIC_ARTIFACT")
+        title = str(item.get("title") or item.get("name") or category)
+        entries.append(_appendix_entry(
+            appendix="B",
+            title=title,
+            artifact_type=str(item.get("artifact_type") or item.get("type") or "file"),
+            path=item.get("path") or item.get("full_path"),
+            source="evidence_bundle.static_artifacts.files",
+            note=f"Static artifact category: {category}",
+        ))
+    return entries
+
+
+def _build_report_context(
+    session: Dict[str, Any],
+    summary: Dict[str, Any],
+    evidence_bundle: Dict[str, Any],
+    paths: "ReportPackPaths",
+    cfg_path: Path,
+    session_dir: Path,
+) -> Dict[str, Any]:
+    project = session.get("project") if isinstance(session.get("project"), dict) else {}
+    source = session.get("source") if isinstance(session.get("source"), dict) else {}
+    stack = source.get("stack") if isinstance(source.get("stack"), dict) else {}
+    intake = project.get("intake") if isinstance(project.get("intake"), dict) else {}
+    regulatory = session.get("regulatory") if isinstance(session.get("regulatory"), dict) else {}
+    site = session.get("site_conditions") if isinstance(session.get("site_conditions"), dict) else {}
+    location = site.get("location") if isinstance(site.get("location"), dict) else {}
+    weather = site.get("weather_compile") if isinstance(site.get("weather_compile"), dict) else {}
+    fuel = session.get("fuel") if isinstance(session.get("fuel"), dict) else {}
+    run_rows = _report_planned_run_rows(session)
+    pollutant_rows = _report_pollutant_method_rows(session)
+    rules = regulatory.get("selected_rule_ids") if isinstance(regulatory.get("selected_rule_ids"), list) else []
+    regulatory_rows = ((summary.get("regulatory_snapshot") or {}).get("rows") if isinstance(summary.get("regulatory_snapshot"), dict) else []) or []
+    appendix_entries = _report_appendix_manifest(paths, evidence_bundle)
+    report_parties = _report_parties_block(session)
+    process_control = _report_process_control_block(session)
+    deviations = _report_deviation_approval_block(session, evidence_bundle)
+    correspondence = _report_correspondence_block(session, evidence_bundle)
+    run_aggregation = _report_run_aggregation(session, evidence_bundle)
+
+    report_title = _first_present(
+        project.get("project_name"),
+        project.get("job_id"),
+        "MOLE DAS Test Report",
+    )
+    unit_asset = " / ".join([part for part in [
+        " ".join([part for part in [str(source.get("manufacturer") or "").strip(), str(source.get("model_number") or "").strip()] if part]),
+        str(project.get("asset_unit_id") or "").strip(),
+    ] if part])
+    if not unit_asset:
+        unit_asset = None
+
+    planned_schedule_note = ""
+    if run_rows:
+        durations = [str(_fmt_num(row.get("planned_duration_min"), 3, "")).rstrip("0").rstrip(".") for row in run_rows]
+        durations = [d for d in durations if d]
+        planned_schedule_note = (
+            f"{len(run_rows)} planned run(s)"
+            + (f"; durations (min): {', '.join(durations)}" if durations else "")
+        )
+
+    actual_run_rows = run_aggregation.get("actual_runs") if isinstance(run_aggregation.get("actual_runs"), list) else []
+    planned_run_rows = run_aggregation.get("planned_runs") if isinstance(run_aggregation.get("planned_runs"), list) else run_rows
+    run_schedule_status = str(run_aggregation.get("status") or ("Available" if planned_run_rows else "Gap"))
+    results_status = "Partial" if regulatory_rows else "Gap"
+    actual_dates = None
+    if actual_run_rows:
+        start_candidates = [str(row.get("start_ts_iso") or "").strip() for row in actual_run_rows if _has_value(row.get("start_ts_iso"))]
+        end_candidates = [str(row.get("end_ts_iso") or "").strip() for row in actual_run_rows if _has_value(row.get("end_ts_iso"))]
+        actual_dates = {
+            "first_ts": min(start_candidates) if start_candidates else None,
+            "last_ts": max(end_candidates) if end_candidates else None,
+        }
+    if not actual_dates or not (_has_value(actual_dates.get("first_ts")) or _has_value(actual_dates.get("last_ts"))):
+        raw_samples = ((summary.get("evidence") or {}).get("raw_samples") if isinstance(summary.get("evidence"), dict) else {}) or {}
+        first_ts = raw_samples.get("first_ts")
+        last_ts = raw_samples.get("last_ts")
+        if _has_value(first_ts) or _has_value(last_ts):
+            actual_dates = {"first_ts": first_ts, "last_ts": last_ts}
+
+    responsible_groups = {
+        "client_name": report_parties.get("client_name"),
+        "facility_owner_operator_name": report_parties.get("facility_owner_operator_name"),
+        "test_company_name": report_parties.get("test_company_name"),
+        "session_operator_name": report_parties.get("session_operator_name"),
+        "laboratory_name": report_parties.get("laboratory_name"),
+        "observer_contacts": report_parties.get("observer_contacts"),
+    }
+    run_matrix_value = {
+        "planned_runs": planned_run_rows,
+        "actual_runs": actual_run_rows,
+        "coverage_note": run_aggregation.get("coverage_note"),
+    }
+    block_status_counts = {"Available": 0, "Partial": 0, "Gap": 0}
+    for block in (report_parties, process_control, deviations, correspondence, run_aggregation):
+        status = str(block.get("status") or "")
+        if status in block_status_counts:
+            block_status_counts[status] += 1
+
+    sections: Dict[str, Any] = {
+        "cover_certification": {
+            "report_title": _ctx_field(report_title, "session.project.project_name / session.project.job_id", "Available", "Working title for final report generation."),
+            "facility_site": _ctx_field(project.get("site_facility"), "session.project.site_facility"),
+            "unit_asset": _ctx_field(unit_asset, "session.source.manufacturer + session.source.model_number + session.project.asset_unit_id"),
+            "job_id": _ctx_field(project.get("job_id"), "session.project.job_id"),
+            "test_dates": _ctx_field(actual_dates, "summary.evidence.raw_samples.first_ts/last_ts", "Gap" if not actual_dates else "Partial", "Actual report-ready run timestamps are not yet normalized; this uses raw evidence timestamps when present."),
+            "prepared_for": _ctx_field(report_parties.get("client_name"), report_parties.get("source") or "report.parties.client_name", "Partial" if _has_value(report_parties.get("facility_owner_operator_name")) else "Gap", "Uses normalized parties block. Client legal name is still missing unless separately captured."),
+            "prepared_by": _ctx_field(report_parties.get("test_company_name"), report_parties.get("source") or "report.parties.test_company_name", report_parties.get("status"), "Uses normalized parties block."),
+            "report_revision": _ctx_field("DRAFT / report_pack_v1", "report_context.defaults", "Partial", "Final revision management is not normalized yet."),
+            "issue_date": _ctx_field(str(summary.get("generated_iso") or "")[:10], "summary.generated_iso", "Available"),
+            "responsible_official": _ctx_field(report_parties.get("responsible_official_name"), report_parties.get("source") or "report.parties.responsible_official", report_parties.get("status"), "Responsible official / signatory metadata flows from the normalized parties block."),
+        },
+        "introduction": {
+            "purpose_objective": _ctx_field(
+                intake.get("regulatory_purpose"),
+                "session.project.intake.regulatory_purpose",
+                "Partial" if _has_value(intake.get("regulatory_purpose")) else "Gap",
+                "Structured regulatory-purpose fields exist, but a report-ready objective narrative is not generated yet.",
+            ),
+            "responsible_groups": _ctx_field(
+                responsible_groups,
+                report_parties.get("source") or "report.parties",
+                report_parties.get("status"),
+                "Uses the normalized parties block. Missing legal/client/laboratory/observer details remain explicit gaps there.",
+            ),
+            "facility_source_identification": _ctx_field(
+                {
+                    "facility_site": project.get("site_facility"),
+                    "source_category": source.get("source_category"),
+                    "application": source.get("application"),
+                    "service_class": source.get("service_class"),
+                    "asset_unit_id": project.get("asset_unit_id"),
+                    "coordinates": {"lat": location.get("lat"), "lon": location.get("lon"), "datum": location.get("datum")},
+                    "elevation_ft_msl": location.get("elevation_ft_msl"),
+                },
+                "session.project + session.source + session.site_conditions.location",
+                "Available",
+            ),
+            "pollutants_and_methods": _ctx_field(
+                pollutant_rows,
+                "session.pollutants.prescriptions + session.regulatory.limits",
+                "Available" if pollutant_rows else "Gap",
+            ),
+            "test_schedule": _ctx_field(
+                run_rows,
+                "session.test_matrix.plan",
+                run_schedule_status,
+                "Planned run schedule is available from the Test Matrix. Actual run timestamps are not normalized yet." if run_rows else "No planned run schedule found in Test Matrix.",
+            ),
+        },
+        "plant_and_sampling_location": {
+            "process_source_description": _ctx_field(
+                process_control.get("process_description"),
+                process_control.get("source") or "session.source + session.fuel",
+                process_control.get("status"),
+            ),
+            "process_narrative": _ctx_field(process_control.get("process_narrative_seed"), process_control.get("source") or "report.process.description", process_control.get("status"), "Uses normalized process/source metadata to build a narrative seed."),
+            "control_equipment_description": _ctx_field(process_control.get("control_equipment"), process_control.get("source") or "report.control_equipment", "Partial", "Control equipment is normalized as an explicit placeholder block until detailed control metadata is captured."),
+            "stack_sampling_location": _ctx_field(
+                {
+                    "shape": stack.get("shape"),
+                    "diameter_in": stack.get("diameter_in"),
+                    "width_in": stack.get("width_in"),
+                    "height_in": stack.get("height_in"),
+                    "port_count": stack.get("port_count"),
+                    "port_angles_deg": stack.get("port_angles_deg"),
+                    "port_height_ft_agl": stack.get("port_height_ft_agl"),
+                    "upstream_diameters": stack.get("upstream_diameters"),
+                    "downstream_diameters": stack.get("downstream_diameters"),
+                    "traverse_scheme": stack.get("traverse_scheme"),
+                },
+                "session.source.stack",
+                "Available",
+            ),
+            "sampling_location_adequacy": _ctx_field(
+                {
+                    "traverse_scheme": stack.get("traverse_scheme"),
+                    "upstream_diameters": stack.get("upstream_diameters"),
+                    "downstream_diameters": stack.get("downstream_diameters"),
+                    "unstratified_7e": stack.get("unstratified_7e"),
+                },
+                "session.source.stack",
+                "Partial",
+                "Geometry inputs exist, but no final adequacy narrative or reviewer statement is generated yet.",
+            ),
+        },
+        "summary_and_results": {
+            "run_matrix": _ctx_field(
+                run_matrix_value,
+                run_aggregation.get("source") or "session.test_matrix.plan",
+                run_schedule_status,
+                run_aggregation.get("coverage_note") or planned_schedule_note or "Run matrix uses planned Test Matrix rows until actual run aggregation is implemented.",
+            ),
+            "operating_conditions_summary": _ctx_field(
+                {
+                    "actual_runs": actual_run_rows,
+                    "weather_context": {
+                        "mode": site.get("mode"),
+                        "provider": weather.get("provider"),
+                        "station_id": weather.get("station_id"),
+                    },
+                } if actual_run_rows else None,
+                run_aggregation.get("source") or "aggregated run metrics",
+                "Partial" if actual_run_rows else "Gap",
+                "Actual run timing is normalized from worksteps. Detailed averaged operating metrics are still pending.",
+            ),
+            "results_summary": _ctx_field(
+                regulatory_rows,
+                "summary.regulatory_snapshot.rows",
+                results_status,
+                "Regulatory comparison rows are available, but a full final-report results table and average aggregation are not normalized yet.",
+            ),
+            "compliance_discussion_basis": _ctx_field(
+                {
+                    "selected_rule_ids": rules,
+                    "overall_pass": (summary.get("session") or {}).get("overall_pass"),
+                    "regulatory_status": (summary.get("regulatory_snapshot") or {}).get("status"),
+                },
+                "session.regulatory + summary.session + summary.regulatory_snapshot",
+                "Partial" if rules else "Gap",
+                "Rules and comparison output exist, but no final compliance narrative is generated yet.",
+            ),
+        },
+        "sampling_and_analytical_procedures": {
+            "methods_used": _ctx_field(
+                pollutant_rows,
+                "session.pollutants.prescriptions",
+                "Available" if pollutant_rows else "Gap",
+            ),
+            "sample_system_and_analyzers": _ctx_field(
+                {
+                    "exhaust_flow_method": ((source.get("exhaust_flow") or {}).get("method") if isinstance(source.get("exhaust_flow"), dict) else None),
+                    "fuel_flow_basis": ((source.get("fuel_flow") or {}).get("basis") if isinstance(source.get("fuel_flow"), dict) else None),
+                    "channels": [
+                        {
+                            "pollutant": row.get("pollutant"),
+                            "instrument": row.get("instrument"),
+                            "units": row.get("units"),
+                        }
+                        for row in pollutant_rows
+                    ],
+                },
+                "session.source + session.pollutants.prescriptions",
+                "Partial" if pollutant_rows else "Gap",
+                "Analyzer and sample-system fields exist, but no narrative / schematic reference binding is generated yet.",
+            ),
+            "calibration_gas_summary": _ctx_field(
+                [
+                    {
+                        "pollutant": code,
+                        "zero_cylinder_id": str((cfg.get("zero_cylinder_id") or "")),
+                        "span_cylinder_id": str((cfg.get("span_cylinder_id") or "")),
+                        "mid_cylinder_id": str((cfg.get("mid_cylinder_id") or "")),
+                    }
+                    for code, cfg in sorted(_pollutant_prescriptions(session).items())
+                    if isinstance(cfg, dict)
+                ],
+                "session.pollutants.prescriptions[*].*_cylinder_id",
+                "Partial",
+                "Cylinder IDs exist per pollutant, but certificate linkage and unified calibration-gas tables are not normalized yet.",
+            ),
+            "deviations_alternatives_approvals": _ctx_field(
+                deviations,
+                deviations.get("source") or "report.deviations",
+                deviations.get("status"),
+                "Uses the normalized deviations / approvals block.",
+            ),
+        },
+        "qaqc_activities": {
+            "pre_test_checks": _ctx_field(
+                (summary.get("test_matrix") or {}).get("tests"),
+                "summary.test_matrix.tests",
+                "Available" if _has_value((summary.get("test_matrix") or {}).get("tests")) else "Gap",
+            ),
+            "during_test_qaqc": _ctx_field(
+                {
+                    "analyzer_validity": summary.get("analyzer_validity"),
+                    "reference_audit": summary.get("reference_audit"),
+                    "side_by_side": ((summary.get("qaqc") or {}).get("side_by_side") if isinstance(summary.get("qaqc"), dict) else {}),
+                    "weather_traceability": {
+                        "mode": site.get("mode"),
+                        "provider": weather.get("provider"),
+                        "station_id": weather.get("station_id"),
+                        "last_fetch_iso": weather.get("last_fetch_iso"),
+                    },
+                },
+                "summary.analyzer_validity + summary.reference_audit + summary.qaqc.side_by_side + session.site_conditions.weather_compile",
+                "Available",
+            ),
+            "post_test_checks": _ctx_field(
+                {
+                    "pollutant_adjustments": summary.get("pollutant_adjustments"),
+                    "spike_recovery": ((summary.get("qaqc") or {}).get("spike_recovery") if isinstance(summary.get("qaqc"), dict) else {}),
+                },
+                "summary.pollutant_adjustments + summary.qaqc.spike_recovery",
+                "Available",
+            ),
+            "qaqc_exceptions": _ctx_field(
+                {
+                    "failed_test_matrix_items": [
+                        row for row in ((summary.get("test_matrix") or {}).get("tests") or [])
+                        if isinstance(row, dict) and str(row.get("status") or "").upper() == "FAIL"
+                    ],
+                    "degraded_pollutants": [
+                        {"pollutant": code, "state": row.get("state"), "reason": row.get("reason")}
+                        for code, row in (((summary.get("analyzer_validity") or {}).get("per_pollutant") or {}).items())
+                        if isinstance(row, dict) and str(row.get("state") or "").upper() not in {"VALID", "OK"}
+                    ],
+                },
+                "summary.test_matrix.tests + summary.analyzer_validity.per_pollutant",
+                "Partial",
+                "Exception evidence exists, but narrative collation and impact statements are not generated yet.",
+            ),
+        },
+        "appendices": {
+            "appendix_manifest": _ctx_field(
+                appendix_entries,
+                "report_pack outputs + evidence bundle sources/static artifacts",
+                "Partial" if appendix_entries else "Gap",
+                "Manifest entries are generated from current pack outputs and evidence with explicit appendix titles and assignment basis.",
+            ),
+            "regulatory_and_correspondence": _ctx_field(
+                correspondence,
+                correspondence.get("source") or "report.correspondence",
+                correspondence.get("status"),
+                "Uses the normalized correspondence block.",
+            ),
+        },
+        "implementation_gaps": _ctx_field(
+            [
+                {
+                    "id": "report_parties_and_certification_metadata",
+                    "status": report_parties.get("status"),
+                    "note": "Parties are now normalized into a structured block, but client/legal signatory metadata is still incomplete.",
+                },
+                {
+                    "id": "process_and_control_narrative",
+                    "status": process_control.get("status"),
+                    "note": "Process/source description is normalized, but control-equipment detail remains an explicit placeholder.",
+                },
+                {
+                    "id": "deviations_and_approvals",
+                    "status": deviations.get("status"),
+                    "note": "Deviation and approval candidates are now normalized from session notes and evidence attachments, but formal approval records are still incomplete.",
+                },
+                {
+                    "id": "regulatory_correspondence_tracking",
+                    "status": correspondence.get("status"),
+                    "note": "Correspondence candidates are now normalized from intake evidence and static artifacts, but formal tracking fields remain incomplete.",
+                },
+                {
+                    "id": "appendix_assignment_model",
+                    "status": "Partial",
+                    "note": "A manifest is now generated with appendix titles, inclusion flags, and assignment basis, but the assignment rules are still heuristic.",
+                },
+                {
+                    "id": "run_summary_aggregation",
+                    "status": run_aggregation.get("status"),
+                    "note": "Run summaries are now aggregated from worksteps, but per-run averaged operating metrics are still not normalized.",
+                },
+            ],
+            "report-crosswalk-2026-04-09",
+            "Partial",
+            "These are the tracked implementation gaps remaining between report-pack output and the master final report structure.",
+        ),
+    }
+
+    normalized_blocks = {
+        "report_parties": report_parties,
+        "process_control": process_control,
+        "deviations_approvals": deviations,
+        "regulatory_correspondence": correspondence,
+        "run_aggregation": run_aggregation,
+    }
+    coverage = _ctx_counts(sections)
+    return {
+        "contract_version": "report_context_v1",
+        "generated_iso": _now_iso(),
+        "template_contract": _report_template_contract(),
+        "session_identity": {
+            "job_id": project.get("job_id"),
+            "run_id": (summary.get("session") or {}).get("run_id"),
+            "session_dir": str(session_dir),
+            "config_path": str(cfg_path),
+            "report_pack_dir": str(paths.out_dir),
+        },
+        "coverage": {
+            "field_status_counts": coverage,
+            "available_fields": coverage.get("Available", 0),
+            "partial_fields": coverage.get("Partial", 0),
+            "gap_fields": coverage.get("Gap", 0),
+            "normalized_block_status_counts": block_status_counts,
+        },
+        "sections": sections,
+        "normalized_blocks": normalized_blocks,
+    }
+
+
+def _md_scalar(value: Any) -> str:
+    if value is None:
+        return "N/A"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, float):
+        return _fmt_num(value, 3, "")
+    if isinstance(value, (int,)):
+        return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        return text if text else "N/A"
+    if isinstance(value, list):
+        parts = [_md_scalar(item) for item in value if _has_value(item)]
+        return ", ".join([p for p in parts if p and p != "N/A"]) or "N/A"
+    if isinstance(value, dict):
+        parts: List[str] = []
+        for key, item in value.items():
+            if not _has_value(item):
+                continue
+            if isinstance(item, (dict, list)):
+                continue
+            label = str(key).replace("_", " ").strip()
+            parts.append(f"{label}: {_md_scalar(item)}")
+        return "; ".join(parts) if parts else "N/A"
+    return str(value)
+
+
+def _md_table(headers: List[str], rows: List[List[Any]]) -> str:
+    safe_headers = [str(h or "").strip() or " " for h in headers]
+    lines = [
+        "| " + " | ".join(safe_headers) + " |",
+        "| " + " | ".join(["---"] * len(safe_headers)) + " |",
+    ]
+    for row in rows or []:
+        cells = [_md_scalar(cell).replace("\n", " ").replace("|", "\\|") for cell in row]
+        lines.append("| " + " | ".join(cells) + " |")
+    if len(lines) == 2:
+        lines.append("| " + " | ".join(["N/A"] * len(safe_headers)) + " |")
+    return "\n".join(lines)
+
+
+def _write_final_report_markdown(
+    paths: "ReportPackPaths",
+    report_context: Dict[str, Any],
+    summary: Dict[str, Any],
+) -> None:
+    _ensure_dir(paths.final_report_dir)
+    sections = report_context.get("sections") if isinstance(report_context.get("sections"), dict) else {}
+    blocks = report_context.get("normalized_blocks") if isinstance(report_context.get("normalized_blocks"), dict) else {}
+    cover = sections.get("cover_certification") if isinstance(sections.get("cover_certification"), dict) else {}
+    intro = sections.get("introduction") if isinstance(sections.get("introduction"), dict) else {}
+    plant = sections.get("plant_and_sampling_location") if isinstance(sections.get("plant_and_sampling_location"), dict) else {}
+    results = sections.get("summary_and_results") if isinstance(sections.get("summary_and_results"), dict) else {}
+    procedures = sections.get("sampling_and_analytical_procedures") if isinstance(sections.get("sampling_and_analytical_procedures"), dict) else {}
+    qaqc = sections.get("qaqc_activities") if isinstance(sections.get("qaqc_activities"), dict) else {}
+    appendices = sections.get("appendices") if isinstance(sections.get("appendices"), dict) else {}
+
+    def _ctx_value(container: Dict[str, Any], key: str) -> Any:
+        node = container.get(key) if isinstance(container.get(key), dict) else {}
+        return node.get("value")
+
+    pollutant_rows = _ctx_value(intro, "pollutants_and_methods") or []
+    run_matrix = _ctx_value(results, "run_matrix") or {}
+    actual_runs = run_matrix.get("actual_runs") if isinstance(run_matrix, dict) else []
+    planned_runs = run_matrix.get("planned_runs") if isinstance(run_matrix, dict) else []
+    run_rows = actual_runs or planned_runs or []
+    results_rows = _ctx_value(results, "results_summary") or []
+    appendix_rows = _ctx_value(appendices, "appendix_manifest") or []
+    methods_rows = _ctx_value(procedures, "methods_used") or []
+    deviations = _ctx_value(procedures, "deviations_alternatives_approvals") or {}
+    correspondence = _ctx_value(appendices, "regulatory_and_correspondence") or {}
+    parties = blocks.get("report_parties") if isinstance(blocks.get("report_parties"), dict) else {}
+    process_control = blocks.get("process_control") if isinstance(blocks.get("process_control"), dict) else {}
+    run_aggregation = blocks.get("run_aggregation") if isinstance(blocks.get("run_aggregation"), dict) else {}
+    template_contract = report_context.get("template_contract") if isinstance(report_context.get("template_contract"), dict) else {}
+    session_identity = report_context.get("session_identity") if isinstance(report_context.get("session_identity"), dict) else {}
+
+    pollutant_table_rows = []
+    for row in pollutant_rows:
+        if not isinstance(row, dict):
+            continue
+        basis = row.get("compliance_basis") if isinstance(row.get("compliance_basis"), list) else []
+        basis_text = "; ".join(
+            [
+                " ".join(
+                    [
+                        _md_scalar(item.get("limit_type")),
+                        _md_scalar(item.get("value")),
+                        _md_scalar(item.get("units")),
+                        f"({ _md_scalar(item.get('basis')) })" if _has_value(item.get("basis")) else "",
+                    ]
+                ).strip()
+                for item in basis
+                if isinstance(item, dict)
+            ]
+        ) or "N/A"
+        pollutant_table_rows.append([
+            row.get("pollutant"),
+            row.get("method"),
+            row.get("instrument"),
+            row.get("units"),
+            basis_text,
+        ])
+
+    run_table_rows = []
+    for row in run_rows:
+        if not isinstance(row, dict):
+            continue
+        methods_text = ", ".join([str(pol.get("pollutant") or "") for pol in pollutant_rows if isinstance(pol, dict)]) or "N/A"
+        run_table_rows.append([
+            row.get("run_no"),
+            row.get("date"),
+            row.get("start_ts_iso") or row.get("start"),
+            row.get("end_ts_iso") or row.get("stop"),
+            methods_text,
+            row.get("operating_level"),
+            row.get("status"),
+        ])
+
+    results_table_rows = []
+    for row in results_rows:
+        if not isinstance(row, dict):
+            continue
+        results_table_rows.append([
+            row.get("pollutant") or row.get("code"),
+            row.get("run1") or row.get("current_value"),
+            row.get("run2"),
+            row.get("run3"),
+            row.get("avg") or row.get("average"),
+            row.get("units"),
+            row.get("limit_value") or row.get("limit"),
+            row.get("status"),
+        ])
+
+    methods_table_rows = []
+    for row in methods_rows:
+        if not isinstance(row, dict):
+            continue
+        methods_table_rows.append([
+            row.get("pollutant"),
+            row.get("method"),
+            "Current session basis",
+            "Yes" if _has_value((deviations.get("candidate_evidence_titles") if isinstance(deviations, dict) else [])) else "No",
+            "Appendix C",
+        ])
+
+    appendix_table_rows = []
+    for row in appendix_rows:
+        if not isinstance(row, dict):
+            continue
+        appendix_table_rows.append([
+            row.get("appendix"),
+            row.get("appendix_title"),
+            row.get("title"),
+            row.get("artifact_type"),
+            row.get("status"),
+            row.get("path"),
+            row.get("sha256"),
+        ])
+
+    lines: List[str] = []
+    lines.append(f"# {_md_scalar(_ctx_value(cover, 'report_title'))}")
+    lines.append("")
+    lines.append("Generated from `report_context_v1` and the MOLE DAS master test report template contract.")
+    lines.append("")
+    lines.append("## Cover / Certification")
+    lines.append("")
+    lines.append(f"- Facility / site: {_md_scalar(_ctx_value(cover, 'facility_site'))}")
+    lines.append(f"- Unit / asset: {_md_scalar(_ctx_value(cover, 'unit_asset'))}")
+    lines.append(f"- Job ID: {_md_scalar(_ctx_value(cover, 'job_id'))}")
+    lines.append(f"- Test dates: {_md_scalar(_ctx_value(cover, 'test_dates'))}")
+    lines.append(f"- Prepared for: {_md_scalar(_ctx_value(cover, 'prepared_for'))}")
+    lines.append(f"- Prepared by: {_md_scalar(_ctx_value(cover, 'prepared_by'))}")
+    lines.append(f"- Report revision / date: {_md_scalar(_ctx_value(cover, 'report_revision'))} / {_md_scalar(_ctx_value(cover, 'issue_date'))}")
+    lines.append(f"- Responsible official: {_md_scalar(_ctx_value(cover, 'responsible_official'))}")
+    lines.append("")
+    lines.append("## 1. Introduction")
+    lines.append("")
+    lines.append("### 1.1 Purpose and objective")
+    lines.append("")
+    lines.append(f"- Regulatory purpose: {_md_scalar(_ctx_value(intro, 'purpose_objective'))}")
+    lines.append("")
+    lines.append("### 1.2 Responsible groups")
+    lines.append("")
+    lines.append(f"- Facility owner / operator: {_md_scalar(parties.get('facility_owner_operator_name'))}")
+    lines.append(f"- Test company: {_md_scalar(parties.get('test_company_name'))}")
+    lines.append(f"- Laboratory: {_md_scalar(parties.get('laboratory_name'))}")
+    lines.append(f"- Observer contacts: {_md_scalar(parties.get('observer_contacts'))}")
+    lines.append("")
+    lines.append("### 1.3 Facility and source identification")
+    lines.append("")
+    lines.append(f"- Source identification: {_md_scalar(_ctx_value(intro, 'facility_source_identification'))}")
+    lines.append("")
+    lines.append("### 1.4 Pollutants and methods summary")
+    lines.append("")
+    lines.append(_md_table(
+        ["Pollutant", "Method", "Analyzer / Instrument", "Units", "Compliance basis"],
+        pollutant_table_rows,
+    ))
+    lines.append("")
+    lines.append("### 1.5 Test dates and schedule")
+    lines.append("")
+    lines.append(f"- Schedule note: {_md_scalar((run_aggregation.get('coverage_note') if isinstance(run_aggregation, dict) else None))}")
+    lines.append("")
+    lines.append("## 2. Plant and Sampling Location Description")
+    lines.append("")
+    lines.append("### 2.1 Process and source description")
+    lines.append("")
+    lines.append(f"- Process/source description: {_md_scalar(process_control.get('process_description'))}")
+    lines.append(f"- Process narrative: {_md_scalar(process_control.get('process_narrative_seed'))}")
+    lines.append("")
+    lines.append("### 2.2 Control equipment description")
+    lines.append("")
+    lines.append(f"- Control equipment: {_md_scalar(process_control.get('control_equipment'))}")
+    lines.append("")
+    lines.append("### 2.3 Stack / duct and sampling location description")
+    lines.append("")
+    stack_desc = _ctx_value(plant, "stack_sampling_location") or {}
+    lines.append(_md_table(
+        ["Item", "Value"],
+        [
+            ["Stack shape", stack_desc.get("shape") if isinstance(stack_desc, dict) else None],
+            ["Diameter / width / height", _md_scalar({"diameter_in": stack_desc.get("diameter_in"), "width_in": stack_desc.get("width_in"), "height_in": stack_desc.get("height_in")}) if isinstance(stack_desc, dict) else None],
+            ["Port count / angles", _md_scalar({"port_count": stack_desc.get("port_count"), "port_angles_deg": stack_desc.get("port_angles_deg")}) if isinstance(stack_desc, dict) else None],
+            ["Port height AGL", stack_desc.get("port_height_ft_agl") if isinstance(stack_desc, dict) else None],
+            ["Upstream disturbance distance", stack_desc.get("upstream_diameters") if isinstance(stack_desc, dict) else None],
+            ["Downstream disturbance distance", stack_desc.get("downstream_diameters") if isinstance(stack_desc, dict) else None],
+            ["Traverse basis", stack_desc.get("traverse_scheme") if isinstance(stack_desc, dict) else None],
+        ],
+    ))
+    lines.append("")
+    lines.append("### 2.4 Sampling-location adequacy narrative")
+    lines.append("")
+    lines.append(f"- Adequacy basis: {_md_scalar(_ctx_value(plant, 'sampling_location_adequacy'))}")
+    lines.append("")
+    lines.append("## 3. Summary and Discussion of Results")
+    lines.append("")
+    lines.append("### 3.1 Test matrix")
+    lines.append("")
+    lines.append(_md_table(
+        ["Run", "Date", "Start", "Stop", "Pollutants / Methods", "Operating level", "Status"],
+        run_table_rows,
+    ))
+    lines.append("")
+    lines.append("### 3.2 Operating conditions summary")
+    lines.append("")
+    lines.append(f"- Operating summary source: {_md_scalar(_ctx_value(results, 'operating_conditions_summary'))}")
+    lines.append("")
+    lines.append("### 3.3 Results summary")
+    lines.append("")
+    lines.append(_md_table(
+        ["Pollutant", "Run 1", "Run 2", "Run 3", "Average", "Units", "Limit", "Pass / Fail"],
+        results_table_rows,
+    ))
+    lines.append("")
+    lines.append("### 3.4 Discussion of results")
+    lines.append("")
+    lines.append(f"- Compliance discussion basis: {_md_scalar(_ctx_value(results, 'compliance_discussion_basis'))}")
+    lines.append(f"- Pollutant adjustments summary: {_md_scalar(((summary.get('pollutant_adjustments') or {}).get('row_count') if isinstance(summary.get('pollutant_adjustments'), dict) else None))} adjustment row(s)")
+    lines.append("")
+    lines.append("## 4. Sampling and Analytical Procedures")
+    lines.append("")
+    lines.append("### 4.1 Test methods used")
+    lines.append("")
+    lines.append(_md_table(
+        ["Pollutant / Parameter", "Method", "Basis / Version", "Deviations?", "Reference appendix"],
+        methods_table_rows,
+    ))
+    lines.append("")
+    lines.append("### 4.2 Sampling system and analyzer configuration")
+    lines.append("")
+    lines.append(f"- Sampling system / analyzers: {_md_scalar(_ctx_value(procedures, 'sample_system_and_analyzers'))}")
+    lines.append("")
+    lines.append("### 4.3 Analytical procedure details")
+    lines.append("")
+    lines.append(f"- Calibration gas summary: {_md_scalar(_ctx_value(procedures, 'calibration_gas_summary'))}")
+    lines.append("")
+    lines.append("### 4.4 Deviations, alternatives, and approvals")
+    lines.append("")
+    lines.append(f"- Deviations / approvals: {_md_scalar(deviations)}")
+    lines.append("")
+    lines.append("## 5. QA/QC Activities")
+    lines.append("")
+    lines.append("### 5.1 Pre-test checks")
+    lines.append("")
+    lines.append(f"- Pre-test checks: {_md_scalar(_ctx_value(qaqc, 'pre_test_checks'))}")
+    lines.append("")
+    lines.append("### 5.2 During-test QA/QC")
+    lines.append("")
+    lines.append(f"- During-test QA/QC: {_md_scalar(_ctx_value(qaqc, 'during_test_qaqc'))}")
+    lines.append("")
+    lines.append("### 5.3 Post-test checks")
+    lines.append("")
+    lines.append(f"- Post-test checks: {_md_scalar(_ctx_value(qaqc, 'post_test_checks'))}")
+    lines.append("")
+    lines.append("### 5.4 QA/QC exceptions")
+    lines.append("")
+    lines.append(f"- QA/QC exceptions: {_md_scalar(_ctx_value(qaqc, 'qaqc_exceptions'))}")
+    lines.append("")
+    lines.append("## 6. Appendices")
+    lines.append("")
+    lines.append(_md_table(
+        ["Appendix", "Appendix title", "Document title", "Type", "Status", "Path", "SHA-256"],
+        appendix_table_rows,
+    ))
+    lines.append("")
+    lines.append("## Generation Metadata")
+    lines.append("")
+    lines.append(f"- Report context contract: {_md_scalar(report_context.get('contract_version'))}")
+    lines.append(f"- Master template path: {_md_scalar((((template_contract.get('master_template') or {}) if isinstance(template_contract.get('master_template'), dict) else {}).get('path')))}")
+    lines.append(f"- Crosswalk path: {_md_scalar((((template_contract.get('crosswalk') or {}) if isinstance(template_contract.get('crosswalk'), dict) else {}).get('path')))}")
+    lines.append(f"- Run ID: {_md_scalar(session_identity.get('run_id'))}")
+    lines.append(f"- Session dir: {_md_scalar(session_identity.get('session_dir'))}")
+    lines.append(f"- Regulatory correspondence block: {_md_scalar(correspondence)}")
+    lines.append("")
+    paths.final_report_md.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+
+
+def _write_final_report_index(
+    paths: "ReportPackPaths",
+    report_context: Dict[str, Any],
+    summary: Dict[str, Any],
+) -> None:
+    _ensure_dir(paths.final_report_dir)
+    files: List[Dict[str, Any]] = []
+    for p in [paths.final_report_md, paths.report_context_json]:
+        if not p.exists():
+            continue
+        try:
+            files.append({
+                "name": p.name,
+                "path": str(p),
+                "sha256": _sha256_file(p),
+                "bytes": p.stat().st_size,
+            })
+        except Exception:
+            continue
+    payload = {
+        "generated_iso": summary.get("generated_iso"),
+        "contract_version": "final_report_v1",
+        "export_dir": str(paths.final_report_dir),
+        "markdown_path": str(paths.final_report_md),
+        "source_report_context_json": str(paths.report_context_json),
+        "source_report_pack_dir": str(paths.out_dir),
+        "coverage": report_context.get("coverage"),
+        "template_contract": report_context.get("template_contract"),
+        "files": files,
+    }
+    paths.final_report_index_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 # -----------------------------
 # Main generator
 # -----------------------------
@@ -2294,7 +3547,11 @@ def _score_test_matrix(session: Dict[str, Any]) -> Dict[str, Any]:
 @dataclass
 class ReportPackPaths:
     out_dir: Path
+    final_report_dir: Path
     summary_json: Path
+    report_context_json: Path
+    final_report_md: Path
+    final_report_index_json: Path
     evidence_bundle_json: Path
     evidence_step_eval_csv: Path
     analyzer_validity_csv: Path
@@ -2352,10 +3609,21 @@ def generate_report_pack_v1(
 
     # Output folder
     out_dir = _ensure_dir(session_dir / "exports" / "report_pack_v1")
+    final_report_dir = _ensure_dir(session_dir / "exports" / "final_report_v1")
+    legacy_final_report_md = out_dir / "final_test_report_v1.md"
+    try:
+        if legacy_final_report_md.exists():
+            legacy_final_report_md.unlink()
+    except Exception:
+        pass
 
     paths = ReportPackPaths(
         out_dir=out_dir,
+        final_report_dir=final_report_dir,
         summary_json=out_dir / "summary.json",
+        report_context_json=out_dir / "report_context.json",
+        final_report_md=final_report_dir / "final_test_report_v1.md",
+        final_report_index_json=final_report_dir / "index.json",
         evidence_bundle_json=out_dir / "evidence_bundle.json",
         evidence_step_eval_csv=out_dir / "evidence_step_eval.csv",
         analyzer_validity_csv=out_dir / "analyzer_validity.csv",
@@ -3476,6 +4744,50 @@ def generate_report_pack_v1(
     # PDF (optional)
     _write_pdf(paths, summary)
 
+    # Report context (built after pack outputs so appendix manifest sees the final files)
+    report_context = _build_report_context(
+        session=session,
+        summary=summary,
+        evidence_bundle=evidence_bundle,
+        paths=paths,
+        cfg_path=cfg_path,
+        session_dir=session_dir,
+    )
+    summary["report_context"] = {
+        "contract_version": report_context.get("contract_version"),
+        "json_path": str(paths.report_context_json),
+        "coverage": report_context.get("coverage"),
+    }
+    paths.report_context_json.write_text(json.dumps(report_context, indent=2), encoding="utf-8")
+    _write_final_report_markdown(paths, report_context, summary)
+
+    # Rebuild once so the manifest sees report_context.json and final_test_report_v1.md.
+    report_context = _build_report_context(
+        session=session,
+        summary=summary,
+        evidence_bundle=evidence_bundle,
+        paths=paths,
+        cfg_path=cfg_path,
+        session_dir=session_dir,
+    )
+    summary["report_context"] = {
+        "contract_version": report_context.get("contract_version"),
+        "json_path": str(paths.report_context_json),
+        "coverage": report_context.get("coverage"),
+    }
+    summary["final_report"] = {
+        "contract_version": "final_report_v1",
+        "export_dir": str(paths.final_report_dir),
+        "markdown_path": str(paths.final_report_md),
+        "index_path": str(paths.final_report_index_json),
+        "source_report_context_json": str(paths.report_context_json),
+        "source_report_pack_dir": str(paths.out_dir),
+    }
+    paths.report_context_json.write_text(json.dumps(report_context, indent=2), encoding="utf-8")
+    _write_final_report_markdown(paths, report_context, summary)
+    _write_final_report_index(paths, report_context, summary)
+    paths.summary_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
     # Index JSON (hashes)
     index: Dict[str, Any] = {
         "generated_iso": summary.get("generated_iso"),
@@ -3483,6 +4795,9 @@ def generate_report_pack_v1(
     }
     for p in [
         paths.summary_json,
+        paths.report_context_json,
+        paths.final_report_md,
+        paths.final_report_index_json,
         paths.evidence_bundle_json,
         paths.evidence_step_eval_csv,
         paths.analyzer_validity_csv,
@@ -3926,14 +5241,14 @@ def main() -> int:
         raise SystemExit("Provide --config or --session-dir")
 
     if cfg_path is not None:
-        session = json.loads(cfg_path.read_text(encoding="utf-8"))
+        session = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
     else:
         # Try to find runner_config.json inside session dir
         rc = Path(sess_dir) / "runner_config.json"  # type: ignore[arg-type]
         if not rc.exists():
             raise SystemExit(f"runner_config.json not found in: {sess_dir}")
         cfg_path = rc
-    session = json.loads(rc.read_text(encoding="utf-8-sig"))
+        session = json.loads(rc.read_text(encoding="utf-8-sig"))
 
     out = generate_report_pack_v1(session=session, cfg_path=cfg_path, session_dir=sess_dir, master_db_path=db_path)
     print(f"Report pack written to: {out}")

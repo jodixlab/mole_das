@@ -56,6 +56,8 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         "ok": False,
         "session_dir": "",
         "summary_path": "",
+        "final_report_path": "",
+        "final_report_index_path": "",
         "bootstrap_stdout": "",
         "bootstrap_stderr": "",
         "report_stdout": "",
@@ -104,6 +106,46 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         out["error"] = f"expected report pack summary not found: {summary_path}"
         return out
 
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        out["error"] = f"failed to load report pack summary: {type(e).__name__}: {e}"
+        return out
+
+    final_report = summary.get("final_report") if isinstance(summary, dict) else {}
+    if not isinstance(final_report, dict):
+        out["error"] = "summary.json missing final_report block"
+        return out
+
+    md_path_raw = final_report.get("markdown_path")
+    idx_path_raw = final_report.get("index_path")
+    if not md_path_raw or not idx_path_raw:
+        out["error"] = "summary.json final_report block missing markdown_path or index_path"
+        return out
+
+    final_report_path = Path(str(md_path_raw))
+    final_report_index_path = Path(str(idx_path_raw))
+    out["final_report_path"] = str(final_report_path)
+    out["final_report_index_path"] = str(final_report_index_path)
+
+    if not final_report_path.exists():
+        out["error"] = f"expected final report not found: {final_report_path}"
+        return out
+    if not final_report_index_path.exists():
+        out["error"] = f"expected final report index not found: {final_report_index_path}"
+        return out
+
+    try:
+        final_index = json.loads(final_report_index_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        out["error"] = f"failed to load final report index: {type(e).__name__}: {e}"
+        return out
+
+    file_names = {str(item.get('name') or '') for item in (final_index.get("files") or []) if isinstance(item, dict)}
+    if "final_test_report_v1.md" not in file_names:
+        out["error"] = "final report index does not include final_test_report_v1.md"
+        return out
+
     out["ok"] = True
     return out
 
@@ -115,6 +157,10 @@ def _format_integration_report(result: Dict[str, Any]) -> str:
         lines.append(f"  session: {result.get('session_dir')}")
     if result.get("summary_path"):
         lines.append(f"  summary: {result.get('summary_path')}")
+    if result.get("final_report_path"):
+        lines.append(f"  final_report: {result.get('final_report_path')}")
+    if result.get("final_report_index_path"):
+        lines.append(f"  final_report_index: {result.get('final_report_index_path')}")
     if result.get("error"):
         lines.append(f"  error: {result.get('error')}")
     return "\n".join(lines)
