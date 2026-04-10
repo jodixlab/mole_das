@@ -212,6 +212,11 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "notes": str(block.get("notes") or "").strip(),
         "review_notes": str(block.get("review_notes") or "").strip(),
         "reviewer": str(block.get("reviewer") or "").strip(),
+        "review_locked": bool(block.get("review_locked")),
+        "review_lock_by": str(block.get("review_lock_by") or "").strip(),
+        "review_lock_iso": str(block.get("review_lock_iso") or "").strip(),
+        "review_unlock_by": str(block.get("review_unlock_by") or "").strip(),
+        "review_unlock_iso": str(block.get("review_unlock_iso") or "").strip(),
         "exclusions": _normalize_exclusions(block.get("exclusions")),
     }
 
@@ -628,4 +633,9 @@ def build_validation_package(
         "excluded_count": len(excluded_rows),
         "review_notes": str(normalized.get("review_notes") or "").strip(),
         "reviewer": str(normalized.get("reviewer") or "").strip(),
+        "review_locked": bool(normalized.get("review_locked")),
+        "review_lock_by": str(normalized.get("review_lock_by") or "").strip(),
+        "review_lock_iso": str(normalized.get("review_lock_iso") or "").strip(),
+        "review_unlock_by": str(normalized.get("review_unlock_by") or "").strip(),
+        "review_unlock_iso": str(normalized.get("review_unlock_iso") or "").strip(),
     }

@@ -3387,6 +3387,11 @@ def _build_report_context(
                     "coverage_note": ftir_validation.get("coverage_note"),
                     "review_notes": ftir_validation.get("review_notes"),
                     "reviewer": ftir_validation.get("reviewer"),
+                    "review_locked": ftir_validation.get("review_locked"),
+                    "review_lock_by": ftir_validation.get("review_lock_by"),
+                    "review_lock_iso": ftir_validation.get("review_lock_iso"),
+                    "review_unlock_by": ftir_validation.get("review_unlock_by"),
+                    "review_unlock_iso": ftir_validation.get("review_unlock_iso"),
                     "excluded_rows": ftir_validation.get("excluded_rows"),
                     "method301": ftir_validation.get("method301"),
                 } if ftir_validation else None,
@@ -3855,6 +3860,9 @@ def _write_final_report_markdown(
     lines.append(f"- Coverage note: {_md_scalar((ftir_validation_summary.get('coverage_note') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Reviewer: {_md_scalar((ftir_validation_summary.get('reviewer') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Reviewer notes: {_md_scalar((ftir_validation_summary.get('review_notes') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Review locked: {_md_scalar((ftir_validation_summary.get('review_locked') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Lock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_lock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_lock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
+    lines.append(f"- Last unlock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_unlock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_unlock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
     method301_rows = []
     for row in list((ftir_validation_summary.get("method301") if isinstance(ftir_validation_summary, dict) else []) or []):
         if not isinstance(row, dict):
@@ -4675,6 +4683,11 @@ def generate_report_pack_v1(
             "excluded_count": ftir_validation_summary.get("excluded_count"),
             "review_notes": ftir_validation_summary.get("review_notes"),
             "reviewer": ftir_validation_summary.get("reviewer"),
+            "review_locked": ftir_validation_summary.get("review_locked"),
+            "review_lock_by": ftir_validation_summary.get("review_lock_by"),
+            "review_lock_iso": ftir_validation_summary.get("review_lock_iso"),
+            "review_unlock_by": ftir_validation_summary.get("review_unlock_by"),
+            "review_unlock_iso": ftir_validation_summary.get("review_unlock_iso"),
             "config": ftir_validation_summary.get("config"),
             "ftir_source": ftir_validation_summary.get("ftir_source"),
             "mole_source": ftir_validation_summary.get("mole_source"),

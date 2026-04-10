@@ -136,6 +136,9 @@ class FtirValidationTests(unittest.TestCase):
                 "analytes": ["NO"],
                 "review_notes": "Reviewer excluded first window.",
                 "reviewer": "peer_scientist",
+                "review_locked": True,
+                "review_lock_by": "peer_scientist",
+                "review_lock_iso": "2026-04-10T18:05:00Z",
                 "exclusions": {
                     excluded_key: {
                         "reason": "startup stabilization",
@@ -154,6 +157,8 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(len(payload.get("excluded_rows") or []), 1)
             self.assertEqual((payload.get("excluded_rows") or [])[0].get("reason"), "startup stabilization")
             self.assertEqual(payload.get("review_notes"), "Reviewer excluded first window.")
+            self.assertTrue(payload.get("review_locked"))
+            self.assertEqual(payload.get("review_lock_by"), "peer_scientist")
             row = (payload.get("method301") or [])[0]
             self.assertEqual(row.get("paired_window_count"), 5)
             self.assertEqual(row.get("excluded_window_count"), 1)
