@@ -10251,7 +10251,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     ftir_windows_vscroll.pack(side="right", fill="y")
     ftir_windows_hscroll = tk.Scrollbar(ftir_windows_body, orient="horizontal")
     ftir_windows_hscroll.pack(side="bottom", fill="x")
-    ftir_windows_cols = ("run_no", "label", "analyte", "status", "review", "reason", "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference")
+    ftir_windows_cols = ("run_no", "label", "analyte", "status", "qa", "review", "reason", "offset_s", "drift_s", "coverage", "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference")
     ftir_windows_tree = ttk.Treeview(ftir_windows_body, columns=ftir_windows_cols, show="headings", height=8)
     ftir_windows_tree.pack(side="left", fill="both", expand=True)
     ftir_windows_tree.configure(yscrollcommand=ftir_windows_vscroll.set, xscrollcommand=ftir_windows_hscroll.set)
@@ -10262,8 +10262,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ("label", "Label", 160),
         ("analyte", "Analyte", 80),
         ("status", "Status", 120),
+        ("qa", "QA", 90),
         ("review", "Review", 90),
         ("reason", "Reason", 220),
+        ("offset_s", "Offset (s)", 85),
+        ("drift_s", "Drift (s)", 85),
+        ("coverage", "Coverage M/F", 110),
         ("mole_count", "MOLE N", 70),
         ("ftir_count", "FTIR N", 70),
         ("mole_avg", "MOLE Avg", 100),
@@ -10271,7 +10275,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ("difference", "Diff", 100),
     ]:
         ftir_windows_tree.heading(col, text=txt)
-        ftir_windows_tree.column(col, width=width, stretch=(col in ("label", "status", "reason")))
+        ftir_windows_tree.column(col, width=width, stretch=(col in ("label", "status", "reason", "coverage")))
     ftir_review_ctrls = tk.Frame(report_builder_validation_wrap, bg=BG)
     ftir_review_ctrls.pack(fill="x", pady=(6, 0))
     tk.Label(ftir_review_ctrls, text="Selected-row exclusion reason:", fg=FG, bg=BG, font=("Consolas", 9)).pack(side="left")
@@ -15068,12 +15072,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 preview = {}
             ftir_src = preview.get("ftir_source") if isinstance(preview.get("ftir_source"), dict) else {}
             mole_src = preview.get("mole_source") if isinstance(preview.get("mole_source"), dict) else {}
+            qa = preview.get("qa") if isinstance(preview.get("qa"), dict) else {}
+            import_preview = qa.get("import_preview") if isinstance(qa.get("import_preview"), dict) else {}
             aligned_rows = list(preview.get("aligned_rows") or [])
-            paired_rows = [row for row in aligned_rows if bool(row.get("paired"))]
-            excluded_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
+            unpaired_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
             snap = preview.get("review_snapshot") if isinstance(preview.get("review_snapshot"), dict) else {}
             sign = preview.get("signoff") if isinstance(preview.get("signoff"), dict) else {}
-            var_ftir_validation_review_status.set(
+            qa_counts = qa.get("row_status_counts") if isinstance(qa.get("row_status_counts"), dict) else {}
+            auto_map = import_preview.get("autodetected_columns_used") if isinstance(import_preview.get("autodetected_columns_used"), dict) else {}
+            blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
+            status_lines = [
                 " | ".join([
                     f"Source: {source_label}",
                     f"Status: {preview.get('status') or '(n/a)'}",
@@ -15083,13 +15092,33 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     f"Aligned rows: {len(aligned_rows)}",
                     f"Excluded rows: {int(preview.get('excluded_count') or 0)}",
                     f"Signoff: {str(sign.get('decision') or 'UNSIGNED').strip().upper() or 'UNSIGNED'}",
-                    f"Unpaired/excluded candidates: {len(excluded_rows)}",
+                    f"Unpaired candidates: {len(unpaired_rows)}",
                     f"FTIR records: {int((ftir_src.get('record_count') or 0) if isinstance(ftir_src, dict) else 0)}",
                     f"MOLE rows: {int((mole_src.get('record_count') or 0) if isinstance(mole_src, dict) else 0)}",
                     (f"Snapshot: {str(snap.get('snapshot_iso') or '').strip()}" if str(snap.get("snapshot_iso") or "").strip() else ""),
-                    str(preview.get("coverage_note") or "").strip(),
-                ]).strip(" |")
-            )
+                ]).strip(" |"),
+            ]
+            if qa:
+                status_lines.append(
+                    " | ".join([
+                        f"Lock ready: {'YES' if bool(qa.get('lock_ready')) else 'NO'}",
+                        f"Signoff ready: {'YES' if bool(qa.get('signoff_ready')) else 'NO'}",
+                        f"QA pass/warn/error: {int(qa_counts.get('PASS') or 0)}/{int(qa_counts.get('WARN') or 0)}/{int(qa_counts.get('ERROR') or 0)}",
+                        f"Timestamp: {str(import_preview.get('timestamp_column') or '(n/a)')}",
+                    ])
+                )
+                if auto_map:
+                    status_lines.append(
+                        "Auto-map preview: "
+                        + ", ".join([f"{code}->{col}" for code, col in sorted(auto_map.items())])
+                    )
+                if blocking_issues:
+                    status_lines.append("Blocking issues: " + " ; ".join(blocking_issues))
+                if qa_warnings:
+                    status_lines.append("Warnings: " + " ; ".join(qa_warnings))
+            if str(preview.get("coverage_note") or "").strip():
+                status_lines.append(str(preview.get("coverage_note") or "").strip())
+            var_ftir_validation_review_status.set("\n".join([line for line in status_lines if line]))
             for row in list(preview.get("method301") or []):
                 if not isinstance(row, dict):
                     continue
@@ -15119,8 +15148,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         str(row.get("label") or ""),
                         str(row.get("analyte") or ""),
                         str(row.get("status") or ""),
+                        str(row.get("qa_status") or ""),
                         "EXCLUDED" if bool(row.get("excluded")) else "INCLUDED",
                         str(row.get("exclusion_reason") or ""),
+                        _fmt_num(row.get("offset_seconds_adjusted"), 2, ""),
+                        _fmt_num(row.get("drift_seconds_adjusted"), 2, ""),
+                        (
+                            f"{_fmt_num(row.get('mole_coverage_ratio'), 2, '')}/{_fmt_num(row.get('ftir_coverage_ratio'), 2, '')}"
+                            if row.get("mole_coverage_ratio") is not None or row.get("ftir_coverage_ratio") is not None
+                            else ""
+                        ),
                         int(row.get("mole_count") or 0),
                         int(row.get("ftir_count") or 0),
                         _fmt_num(row.get("mole_avg"), 4, ""),
@@ -15130,7 +15167,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 )
                 ftir_validation_preview_rows[str(iid)] = dict(row)
             if not aligned_rows:
-                ftir_windows_tree.insert("", "end", values=("", "", "", "NO ALIGNED WINDOWS", "", "", 0, 0, "", "", ""))
+                ftir_windows_tree.insert("", "end", values=("", "", "", "NO ALIGNED WINDOWS", "", "", "", "", "", "", 0, 0, "", "", ""))
             if not list(preview.get("method301") or []):
                 ftir_stats_tree.insert("", "end", values=("", 0, "", "", "", "", "", "", "NO STATS"))
         except Exception as e:
@@ -15553,11 +15590,20 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     lines.append(f"  reason: {pdf_row.get('reason')}")
             if isinstance(ftir_blk, dict) and ftir_blk:
                 sign = ftir_blk.get("signoff") if isinstance(ftir_blk.get("signoff"), dict) else {}
+                qa = ftir_blk.get("qa") if isinstance(ftir_blk.get("qa"), dict) else {}
                 lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
                 lines.append(f"- FTIR validation source: {ftir_blk.get('source') or '(n/a)'}")
                 lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
                 lines.append(f"- FTIR validation excluded rows: {ftir_blk.get('excluded_count') or 0}")
+                if isinstance(qa, dict) and qa:
+                    lines.append(f"- FTIR validation QA summary: {qa.get('summary') or '(n/a)'}")
+                    lines.append(f"- FTIR validation lock ready: {'YES' if bool(qa.get('lock_ready')) else 'NO'}")
+                    lines.append(f"- FTIR validation signoff ready: {'YES' if bool(qa.get('signoff_ready')) else 'NO'}")
+                    if list(qa.get("blocking_issues") or []):
+                        lines.append(f"  blocking issues: {len(list(qa.get('blocking_issues') or []))}")
+                    if list(qa.get("warnings") or []):
+                        lines.append(f"  warnings: {len(list(qa.get('warnings') or []))}")
                 lines.append(f"- FTIR validation review locked: {'YES' if bool(ftir_blk.get('review_locked')) else 'NO'}")
                 if bool(ftir_blk.get('review_locked')):
                     lines.append(f"  locked by: {ftir_blk.get('review_lock_by') or '(n/a)'} @ {ftir_blk.get('review_lock_iso') or '(n/a)'}")
@@ -15617,6 +15663,22 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             blk["review_lock_iso"] = now_iso()
             sess["ftir_validation"] = blk
             preview = _build_ftir_validation_preview_payload(sess)
+            qa = preview.get("qa") if isinstance(preview.get("qa"), dict) else {}
+            blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
+            if blocking_issues:
+                if not messagebox.askyesno(
+                    "FTIR Validation Review",
+                    "FTIR validation QA is not lock-ready.\n\n"
+                    + "\n".join([f"- {item}" for item in blocking_issues])
+                    + ("\n\nWarnings:\n" + "\n".join([f"- {item}" for item in qa_warnings]) if qa_warnings else "")
+                    + "\n\nLock review anyway?",
+                ):
+                    blk["review_locked"] = False
+                    blk["review_lock_by"] = ""
+                    blk["review_lock_iso"] = ""
+                    sess["ftir_validation"] = blk
+                    return
             blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, preview)
             sess["ftir_validation"] = blk
             _save_session(sess)
@@ -15647,6 +15709,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 raise ValueError("Accepted FTIR validation signoff requires a formal or informed-comparison basis.")
             if decision == "REJECTED" and basis != "REJECTED_NOT_ACCEPTED":
                 raise ValueError("Rejected FTIR validation signoff requires basis REJECTED_NOT_ACCEPTED.")
+            snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
+            qa = snap_payload.get("qa") if isinstance(snap_payload.get("qa"), dict) else {}
+            blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            if decision == "ACCEPTED" and blocking_issues:
+                if not messagebox.askyesno(
+                    "FTIR Validation Signoff",
+                    "FTIR validation QA is not signoff-ready.\n\n"
+                    + "\n".join([f"- {item}" for item in blocking_issues])
+                    + "\n\nSign off anyway?",
+                ):
+                    return
             signoff = {
                 "decision": decision,
                 "basis": basis,
@@ -15656,7 +15729,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "note": note,
             }
             blk["signoff"] = signoff
-            snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
             snap_payload["signoff"] = dict(signoff)
             blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, snap_payload)
             sess["ftir_validation"] = blk

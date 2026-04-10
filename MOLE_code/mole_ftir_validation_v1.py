@@ -18,6 +18,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 VALIDATION_MODES = ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON")
 COMMON_TS_COLUMNS = ("ts_iso", "ts_utc", "timestamp", "datetime", "date_time", "time")
+QA_MIN_ROWS_PER_SIDE = 2
+QA_MIN_WINDOW_COVERAGE_RATIO = 0.50
+QA_MAX_ABS_OFFSET_SECONDS = 30.0
+QA_MAX_ABS_DRIFT_SECONDS = 15.0
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -36,6 +40,10 @@ def _fmt_num(value: Any, precision: int = 6) -> str:
         return f"{float(value):.{precision}f}"
     except Exception:
         return ""
+
+
+def _canon_name(value: Any) -> str:
+    return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
 
 def _parse_iso_dt(text: Any) -> Optional[datetime]:
@@ -58,6 +66,15 @@ def _normalize_iso(dt: Optional[datetime]) -> Optional[str]:
         if dt is None:
             return None
         return dt.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    except Exception:
+        return None
+
+
+def _time_delta_seconds(left: Optional[datetime], right: Optional[datetime]) -> Optional[float]:
+    try:
+        if left is None or right is None:
+            return None
+        return float((left - right).total_seconds())
     except Exception:
         return None
 
@@ -92,6 +109,221 @@ def _sniff_delimiter(path: Path, configured: str) -> str:
         return str(dialect.delimiter or ",")
     except Exception:
         return ","
+
+
+def _guess_timestamp_column(headers: Iterable[str]) -> str:
+    header_list = [str(col or "").strip() for col in headers if str(col or "").strip()]
+    canon_map = {_canon_name(col): col for col in header_list}
+    for col in COMMON_TS_COLUMNS:
+        found = canon_map.get(_canon_name(col))
+        if found:
+            return found
+    for col in header_list:
+        canon = _canon_name(col)
+        if canon in ("sampletime", "samptime", "recordtime", "stacktime"):
+            return col
+        if "timestamp" in canon or ("date" in canon and "time" in canon):
+            return col
+    for col in header_list:
+        canon = _canon_name(col)
+        if canon.endswith("time") or canon.startswith("time"):
+            return col
+    return ""
+
+
+def _guess_column_map(headers: Iterable[str], analytes: Iterable[str]) -> Dict[str, str]:
+    header_list = [str(col or "").strip() for col in headers if str(col or "").strip()]
+    canon_headers = {col: _canon_name(col) for col in header_list}
+    out: Dict[str, str] = {}
+    for analyte in analytes:
+        code = str(analyte or "").strip().upper()
+        if not code:
+            continue
+        code_canon = _canon_name(code)
+        exact = next((col for col, canon in canon_headers.items() if canon == code_canon), "")
+        if exact:
+            out[code] = exact
+            continue
+        candidates = [
+            col
+            for col, canon in canon_headers.items()
+            if code_canon and code_canon in canon and not any(tok in canon for tok in ("time", "date"))
+        ]
+        if candidates:
+            out[code] = sorted(candidates, key=lambda item: (len(item), item.lower()))[0]
+    return out
+
+
+def _series_stats(rows: Iterable[Dict[str, Any]], value_getter: Optional[Any] = None) -> Dict[str, Any]:
+    items = list(rows or [])
+    times = [row.get("ts_dt") for row in items if isinstance(row.get("ts_dt"), datetime)]
+    times = sorted(times)
+    out = {
+        "count": len(items),
+        "first_dt": times[0] if times else None,
+        "last_dt": times[-1] if times else None,
+        "midpoint_dt": None,
+        "span_seconds": None,
+        "values": [],
+    }
+    if times:
+        out["midpoint_dt"] = times[0] + ((times[-1] - times[0]) / 2)
+        out["span_seconds"] = max(0.0, float((times[-1] - times[0]).total_seconds()))
+    vals: List[float] = []
+    for row in items:
+        try:
+            value = value_getter(row) if callable(value_getter) else row.get("value")
+        except Exception:
+            value = None
+        fv = _safe_float(value)
+        if fv is not None:
+            vals.append(float(fv))
+    out["values"] = vals
+    return out
+
+
+def _row_qa_eval(row: Dict[str, Any]) -> Tuple[str, List[str]]:
+    flags: List[str] = []
+    if not bool(row.get("paired")):
+        status = str(row.get("status") or "NO_DATA").strip().upper() or "NO_DATA"
+        return ("ERROR", [status])
+
+    mole_count = int(row.get("mole_count") or 0)
+    ftir_count = int(row.get("ftir_count") or 0)
+    if mole_count < QA_MIN_ROWS_PER_SIDE:
+        flags.append("LOW_MOLE_COUNT")
+    if ftir_count < QA_MIN_ROWS_PER_SIDE:
+        flags.append("LOW_FTIR_COUNT")
+
+    mole_cov = _safe_float(row.get("mole_coverage_ratio"))
+    ftir_cov = _safe_float(row.get("ftir_coverage_ratio"))
+    if mole_cov is not None and mole_cov < QA_MIN_WINDOW_COVERAGE_RATIO:
+        flags.append("LOW_MOLE_COVERAGE")
+    if ftir_cov is not None and ftir_cov < QA_MIN_WINDOW_COVERAGE_RATIO:
+        flags.append("LOW_FTIR_COVERAGE")
+
+    offset_adj = _safe_float(row.get("offset_seconds_adjusted"))
+    if offset_adj is not None and abs(offset_adj) > QA_MAX_ABS_OFFSET_SECONDS:
+        flags.append("HIGH_TIME_OFFSET")
+
+    drift_adj = _safe_float(row.get("drift_seconds_adjusted"))
+    if drift_adj is not None and abs(drift_adj) > QA_MAX_ABS_DRIFT_SECONDS:
+        flags.append("HIGH_TIME_DRIFT")
+
+    if any(flag in ("HIGH_TIME_OFFSET", "HIGH_TIME_DRIFT") for flag in flags):
+        return ("ERROR", flags)
+    if flags:
+        return ("WARN", flags)
+    return ("PASS", flags)
+
+
+def _build_validation_qa(
+    cfg: Dict[str, Any],
+    ftir_summary: Dict[str, Any],
+    mole_summary: Dict[str, Any],
+    windows: Dict[str, Any],
+    aligned_rows: Iterable[Dict[str, Any]],
+    method301: Iterable[Dict[str, Any]],
+) -> Dict[str, Any]:
+    rows = [dict(row) for row in list(aligned_rows or []) if isinstance(row, dict)]
+    included_rows = [row for row in rows if not bool(row.get("excluded"))]
+    row_status_counts: Dict[str, int] = {}
+    blocking_issues: List[str] = []
+    warnings: List[str] = []
+    for row in included_rows:
+        qa_status = str(row.get("qa_status") or "NO_DATA").strip().upper() or "NO_DATA"
+        row_status_counts[qa_status] = int(row_status_counts.get(qa_status) or 0) + 1
+
+    unresolved = list(ftir_summary.get("unresolved_analytes") or []) if isinstance(ftir_summary, dict) else []
+    auto_cols = dict(ftir_summary.get("autodetected_columns_used") or {}) if isinstance(ftir_summary, dict) else {}
+    ts_col = str(ftir_summary.get("timestamp_column") or "").strip() if isinstance(ftir_summary, dict) else ""
+    suggested_ts = str(ftir_summary.get("suggested_timestamp_column") or "").strip() if isinstance(ftir_summary, dict) else ""
+
+    if not ts_col:
+        blocking_issues.append("FTIR timestamp column is not resolved.")
+    elif suggested_ts and ts_col == suggested_ts:
+        warnings.append(f"Using auto-detected FTIR timestamp column: {ts_col}.")
+
+    if unresolved:
+        blocking_issues.append(f"FTIR analyte columns unresolved: {', '.join([str(v) for v in unresolved])}.")
+    if auto_cols:
+        warnings.append(
+            "Using auto-detected FTIR analyte columns: "
+            + ", ".join([f"{code}->{col}" for code, col in sorted(auto_cols.items())])
+        )
+
+    if str(ftir_summary.get("status") or "").strip() != "Available":
+        blocking_issues.append(str(ftir_summary.get("note") or "FTIR import is not available.").strip())
+    if str(mole_summary.get("status") or "").strip() != "Available":
+        blocking_issues.append(str(mole_summary.get("note") or "MOLE raw evidence is not available.").strip())
+    if str(windows.get("status") or "").strip() != "Available":
+        blocking_issues.append(str(windows.get("note") or "Comparison windows are not available.").strip())
+
+    error_rows = [row for row in included_rows if str(row.get("qa_status") or "").strip().upper() == "ERROR"]
+    warn_rows = [row for row in included_rows if str(row.get("qa_status") or "").strip().upper() == "WARN"]
+    if error_rows:
+        blocking_issues.append(f"{len(error_rows)} included FTIR comparison row(s) failed alignment QA.")
+    if warn_rows:
+        warnings.append(f"{len(warn_rows)} included FTIR comparison row(s) have QA warnings.")
+
+    method_rows = [row for row in list(method301 or []) if isinstance(row, dict)]
+    if not method_rows:
+        blocking_issues.append("No FTIR validation statistics were produced from the current aligned rows.")
+    elif str(cfg.get("validation_mode") or "").strip().upper() == "METHOD_301_FORMAL":
+        insufficient = [
+            str(row.get("analyte") or "").strip().upper()
+            for row in method_rows
+            if str(row.get("overall_status") or "").strip().upper() == "INSUFFICIENT_FORMAL_WINDOWS"
+        ]
+        if insufficient:
+            warnings.append(
+                "Formal Method 301 validation does not yet have six included comparison windows for: "
+                + ", ".join([code for code in insufficient if code])
+            )
+
+    lock_ready = len(blocking_issues) == 0
+    signoff_ready = lock_ready and not any(
+        str(row.get("overall_status") or "").strip().upper() in ("NO_DATA", "GAP")
+        for row in method_rows
+    )
+    summary_parts = [
+        f"lock ready: {'YES' if lock_ready else 'NO'}",
+        f"signoff ready: {'YES' if signoff_ready else 'NO'}",
+        f"qa rows pass/warn/error: {int(row_status_counts.get('PASS') or 0)}/{int(row_status_counts.get('WARN') or 0)}/{int(row_status_counts.get('ERROR') or 0)}",
+    ]
+    if auto_cols:
+        summary_parts.append(
+            "auto-map: " + ", ".join([f"{code}->{col}" for code, col in sorted(auto_cols.items())])
+        )
+    if ts_col:
+        summary_parts.append(f"timestamp: {ts_col}")
+    return {
+        "thresholds": {
+            "min_rows_per_side": QA_MIN_ROWS_PER_SIDE,
+            "min_window_coverage_ratio": QA_MIN_WINDOW_COVERAGE_RATIO,
+            "max_abs_offset_seconds": QA_MAX_ABS_OFFSET_SECONDS,
+            "max_abs_drift_seconds": QA_MAX_ABS_DRIFT_SECONDS,
+        },
+        "import_preview": {
+            "timestamp_column": ts_col,
+            "timestamp_candidates": list(ftir_summary.get("timestamp_candidates") or []),
+            "suggested_timestamp_column": suggested_ts,
+            "configured_column_map": dict(ftir_summary.get("configured_column_map") or {}),
+            "effective_column_map": dict(ftir_summary.get("effective_column_map") or {}),
+            "column_map_suggestions": dict(ftir_summary.get("column_map_suggestions") or {}),
+            "autodetected_columns_used": auto_cols,
+            "unresolved_analytes": unresolved,
+            "headers": list(ftir_summary.get("headers") or []),
+        },
+        "row_status_counts": row_status_counts,
+        "error_row_count": len(error_rows),
+        "warning_row_count": len(warn_rows),
+        "blocking_issues": blocking_issues,
+        "warnings": warnings,
+        "lock_ready": lock_ready,
+        "signoff_ready": signoff_ready,
+        "summary": " | ".join(summary_parts),
+    }
 
 
 def _normalize_column_map(value: Any) -> Dict[str, str]:
@@ -267,6 +499,7 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
     analytes = [str(code or "").strip().upper() for code in (cfg.get("analytes") or []) if str(code or "").strip()]
     column_map = cfg.get("column_map") if isinstance(cfg.get("column_map"), dict) else {}
     out_rows: List[Dict[str, Any]] = []
+    header_keys: set[str] = set()
     summary = {
         "status": "Gap",
         "path": str(src),
@@ -274,6 +507,15 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "record_count": 0,
         "delimiter": None,
         "timestamp_column": str(cfg.get("ftir_timestamp_column") or ""),
+        "suggested_timestamp_column": "",
+        "timestamp_candidates": [],
+        "headers": [],
+        "requested_analytes": analytes,
+        "configured_column_map": dict(column_map),
+        "column_map_suggestions": {},
+        "effective_column_map": {},
+        "autodetected_columns_used": {},
+        "unresolved_analytes": [],
         "analytes_found": [],
         "note": "",
     }
@@ -283,29 +525,70 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         if src.suffix.lower() == ".jsonl":
+            ts_col = str(cfg.get("ftir_timestamp_column") or "").strip()
             for idx, line in enumerate(src.read_text(encoding="utf-8-sig", errors="replace").splitlines(), start=1):
                 if not line.strip():
                     continue
                 row = json.loads(line)
-                ts_col = str(cfg.get("ftir_timestamp_column") or "").strip()
+                header_keys.update([str(key or "").strip() for key in row.keys() if str(key or "").strip()])
                 ts_val = row.get(ts_col) if ts_col else None
                 if ts_val in (None, ""):
-                    for col in COMMON_TS_COLUMNS:
-                        if row.get(col) not in (None, ""):
-                            ts_val = row.get(col)
-                            summary["timestamp_column"] = col
-                            break
-                dt = _parse_iso_dt(ts_val)
-                if dt is None:
+                    guess = _guess_timestamp_column(header_keys)
+                    if guess and row.get(guess) not in (None, ""):
+                        ts_col = guess
+                        summary["timestamp_column"] = guess
+                        ts_val = row.get(guess)
+                src_dt = _parse_iso_dt(ts_val)
+                if src_dt is None:
                     continue
-                dt = dt + timedelta(seconds=float(cfg.get("time_offset_seconds") or 0.0))
+                dt = src_dt + timedelta(seconds=float(cfg.get("time_offset_seconds") or 0.0))
+                suggestions = _guess_column_map(header_keys, analytes)
+                effective_map = dict(column_map)
+                auto_used: Dict[str, str] = {}
+                for code in analytes:
+                    if code not in effective_map:
+                        direct = code if code in row else ""
+                        if direct:
+                            effective_map[code] = direct
+                        elif suggestions.get(code):
+                            effective_map[code] = suggestions[code]
+                            auto_used[code] = suggestions[code]
                 values: Dict[str, float] = {}
                 for code in analytes:
-                    col = str(column_map.get(code) or code)
+                    col = str(effective_map.get(code) or code)
                     fv = _safe_float(row.get(col))
                     if fv is not None:
                         values[code] = fv
-                out_rows.append({"ts_dt": dt, "ts_iso": _normalize_iso(dt), "values": values, "row_index": idx})
+                out_rows.append({
+                    "source_ts_dt": src_dt,
+                    "source_ts_iso": _normalize_iso(src_dt),
+                    "ts_dt": dt,
+                    "ts_iso": _normalize_iso(dt),
+                    "values": values,
+                    "row_index": idx,
+                })
+            headers = sorted(header_keys)
+            summary["headers"] = headers
+            summary["timestamp_candidates"] = [
+                col for col in headers if col in COMMON_TS_COLUMNS or _guess_timestamp_column([col]) == col
+            ]
+            summary["suggested_timestamp_column"] = _guess_timestamp_column(headers)
+            if not summary["timestamp_column"]:
+                summary["timestamp_column"] = str(summary.get("suggested_timestamp_column") or "")
+            suggestions = _guess_column_map(headers, analytes)
+            effective_map = dict(column_map)
+            auto_used = {}
+            for code in analytes:
+                if code not in effective_map:
+                    direct = code if code in headers else ""
+                    if direct:
+                        effective_map[code] = direct
+                    elif suggestions.get(code):
+                        effective_map[code] = suggestions[code]
+                        auto_used[code] = suggestions[code]
+            summary["column_map_suggestions"] = suggestions
+            summary["effective_column_map"] = effective_map
+            summary["autodetected_columns_used"] = auto_used
         else:
             delim = _sniff_delimiter(src, str(cfg.get("ftir_delimiter") or "AUTO"))
             summary["delimiter"] = "TSV" if delim == "\t" else delim
@@ -313,36 +596,77 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 reader = csv.DictReader(fh, delimiter=delim)
                 ts_col = str(cfg.get("ftir_timestamp_column") or "").strip()
                 header = list(reader.fieldnames or [])
+                summary["headers"] = header
+                summary["timestamp_candidates"] = [
+                    col for col in header if col in COMMON_TS_COLUMNS or _guess_timestamp_column([col]) == col
+                ]
+                summary["suggested_timestamp_column"] = _guess_timestamp_column(header)
                 if ts_col and ts_col not in header:
                     ts_col = ""
                 if not ts_col:
-                    for col in COMMON_TS_COLUMNS:
-                        if col in header:
-                            ts_col = col
-                            break
+                    ts_col = str(summary.get("suggested_timestamp_column") or "")
                 summary["timestamp_column"] = ts_col
+                suggestions = _guess_column_map(header, analytes)
+                effective_map = dict(column_map)
+                auto_used = {}
+                for code in analytes:
+                    if code not in effective_map:
+                        direct = code if code in header else ""
+                        if direct:
+                            effective_map[code] = direct
+                        elif suggestions.get(code):
+                            effective_map[code] = suggestions[code]
+                            auto_used[code] = suggestions[code]
+                summary["column_map_suggestions"] = suggestions
+                summary["effective_column_map"] = effective_map
+                summary["autodetected_columns_used"] = auto_used
                 for idx, row in enumerate(reader, start=2):
-                    dt = _parse_iso_dt(row.get(ts_col) if ts_col else None)
-                    if dt is None:
+                    src_dt = _parse_iso_dt(row.get(ts_col) if ts_col else None)
+                    if src_dt is None:
                         continue
-                    dt = dt + timedelta(seconds=float(cfg.get("time_offset_seconds") or 0.0))
+                    dt = src_dt + timedelta(seconds=float(cfg.get("time_offset_seconds") or 0.0))
                     values: Dict[str, float] = {}
                     for code in analytes:
-                        col = str(column_map.get(code) or code)
+                        col = str(effective_map.get(code) or code)
                         fv = _safe_float(row.get(col))
                         if fv is not None:
                             values[code] = fv
-                    out_rows.append({"ts_dt": dt, "ts_iso": _normalize_iso(dt), "values": values, "row_index": idx})
+                    out_rows.append({
+                        "source_ts_dt": src_dt,
+                        "source_ts_iso": _normalize_iso(src_dt),
+                        "ts_dt": dt,
+                        "ts_iso": _normalize_iso(dt),
+                        "values": values,
+                        "row_index": idx,
+                    })
     except Exception as e:
         summary["status"] = "Gap"
         summary["note"] = f"FTIR ingest failed: {e}"
         return {"rows": [], "summary": summary}
 
     analytes_found = sorted({code for row in out_rows for code in (row.get("values") or {}).keys()})
+    effective_map = dict(summary.get("effective_column_map") or {})
     summary["record_count"] = len(out_rows)
     summary["analytes_found"] = analytes_found
+    summary["unresolved_analytes"] = [
+        code for code in analytes if str(effective_map.get(code) or "").strip() not in list(summary.get("headers") or [])
+    ]
     summary["status"] = "Available" if out_rows else "Gap"
-    summary["note"] = "FTIR ingest complete." if out_rows else "No FTIR rows were parsed."
+    note_parts = []
+    if out_rows:
+        note_parts.append("FTIR ingest complete.")
+    else:
+        note_parts.append("No FTIR rows were parsed.")
+    if summary["autodetected_columns_used"]:
+        note_parts.append(
+            "Auto-detected analyte columns: "
+            + ", ".join([f"{code}->{col}" for code, col in sorted((summary.get("autodetected_columns_used") or {}).items())])
+        )
+    if summary["unresolved_analytes"]:
+        note_parts.append(
+            "Unresolved analytes: " + ", ".join([str(v) for v in list(summary.get("unresolved_analytes") or [])])
+        )
+    summary["note"] = " ".join([part for part in note_parts if part])
     return {"rows": out_rows, "summary": summary}
 
 
@@ -455,41 +779,92 @@ def align_windows(
         if start_dt is None or end_dt is None or end_dt <= start_dt:
             continue
         for code in analytes:
-            mole_vals = [
-                float(row.get("value"))
+            mole_window_rows = [
+                row
                 for row in mole_list
                 if str(row.get("channel_id") or "").strip().upper() == code
                 and isinstance(row.get("ts_dt"), datetime)
                 and start_dt <= row["ts_dt"] < end_dt
             ]
-            ftir_vals = [
-                float((row.get("values") or {}).get(code))
+            ftir_window_rows = [
+                row
                 for row in ftir_list
                 if isinstance(row.get("ts_dt"), datetime)
                 and start_dt <= row["ts_dt"] < end_dt
                 and (row.get("values") or {}).get(code) is not None
             ]
-            mole_avg = _mean(mole_vals)
-            ftir_avg = _mean(ftir_vals)
-            out.append({
+            mole_stats = _series_stats(mole_window_rows, value_getter=lambda row: row.get("value"))
+            ftir_stats = _series_stats(ftir_window_rows, value_getter=lambda row: (row.get("values") or {}).get(code))
+            ftir_source_times = sorted([
+                row.get("source_ts_dt")
+                for row in ftir_window_rows
+                if isinstance(row.get("source_ts_dt"), datetime)
+            ])
+            ftir_source_first = ftir_source_times[0] if ftir_source_times else None
+            ftir_source_last = ftir_source_times[-1] if ftir_source_times else None
+            ftir_source_mid = ftir_source_first + ((ftir_source_last - ftir_source_first) / 2) if ftir_source_first and ftir_source_last else None
+            window_duration = max(0.0, float((end_dt - start_dt).total_seconds()))
+            mole_avg = _mean(mole_stats.get("values") or [])
+            ftir_avg = _mean(ftir_stats.get("values") or [])
+            row = {
                 "run_no": window.get("run_no"),
                 "label": window.get("label"),
                 "window_start_iso": window.get("window_start_iso"),
                 "window_end_iso": window.get("window_end_iso"),
+                "window_duration_seconds": window_duration,
                 "analyte": code,
                 "row_key": _row_key(window.get("run_no"), code, window.get("window_start_iso"), window.get("window_end_iso")),
-                "mole_count": len(mole_vals),
-                "ftir_count": len(ftir_vals),
+                "mole_count": int(mole_stats.get("count") or 0),
+                "ftir_count": int(ftir_stats.get("count") or 0),
                 "mole_avg": mole_avg,
                 "ftir_avg": ftir_avg,
                 "difference": (mole_avg - ftir_avg) if (mole_avg is not None and ftir_avg is not None) else None,
                 "paired": bool(mole_avg is not None and ftir_avg is not None),
+                "mole_first_iso": _normalize_iso(mole_stats.get("first_dt")),
+                "mole_last_iso": _normalize_iso(mole_stats.get("last_dt")),
+                "mole_midpoint_iso": _normalize_iso(mole_stats.get("midpoint_dt")),
+                "mole_span_seconds": mole_stats.get("span_seconds"),
+                "mole_coverage_ratio": (
+                    min(1.0, float(mole_stats.get("span_seconds") or 0.0) / window_duration)
+                    if window_duration > 0 and mole_stats.get("span_seconds") is not None
+                    else None
+                ),
+                "ftir_first_iso": _normalize_iso(ftir_stats.get("first_dt")),
+                "ftir_last_iso": _normalize_iso(ftir_stats.get("last_dt")),
+                "ftir_midpoint_iso": _normalize_iso(ftir_stats.get("midpoint_dt")),
+                "ftir_span_seconds": ftir_stats.get("span_seconds"),
+                "ftir_coverage_ratio": (
+                    min(1.0, float(ftir_stats.get("span_seconds") or 0.0) / window_duration)
+                    if window_duration > 0 and ftir_stats.get("span_seconds") is not None
+                    else None
+                ),
+                "ftir_source_first_iso": _normalize_iso(ftir_source_first),
+                "ftir_source_last_iso": _normalize_iso(ftir_source_last),
+                "ftir_source_midpoint_iso": _normalize_iso(ftir_source_mid),
+                "offset_seconds_raw": _time_delta_seconds(ftir_source_mid, mole_stats.get("midpoint_dt")),
+                "offset_seconds_adjusted": _time_delta_seconds(ftir_stats.get("midpoint_dt"), mole_stats.get("midpoint_dt")),
+                "drift_seconds_raw": (
+                    (_time_delta_seconds(ftir_source_last, mole_stats.get("last_dt")) or 0.0)
+                    - (_time_delta_seconds(ftir_source_first, mole_stats.get("first_dt")) or 0.0)
+                    if ftir_source_first and ftir_source_last and mole_stats.get("first_dt") and mole_stats.get("last_dt")
+                    else None
+                ),
+                "drift_seconds_adjusted": (
+                    (_time_delta_seconds(ftir_stats.get("last_dt"), mole_stats.get("last_dt")) or 0.0)
+                    - (_time_delta_seconds(ftir_stats.get("first_dt"), mole_stats.get("first_dt")) or 0.0)
+                    if ftir_stats.get("first_dt") and ftir_stats.get("last_dt") and mole_stats.get("first_dt") and mole_stats.get("last_dt")
+                    else None
+                ),
                 "status": (
                     "PAIRED"
                     if (mole_avg is not None and ftir_avg is not None)
                     else ("MISSING_MOLE" if ftir_avg is not None else ("MISSING_FTIR" if mole_avg is not None else "NO_DATA"))
                 ),
-            })
+            }
+            qa_status, qa_flags = _row_qa_eval(row)
+            row["qa_status"] = qa_status
+            row["qa_flags"] = qa_flags
+            out.append(row)
     return out
 
 
@@ -638,6 +1013,7 @@ def build_validation_package(
             row["reviewer"] = ""
             row["updated_iso"] = ""
     method301 = compute_method301_stats(normalized, aligned_rows)
+    qa = _build_validation_qa(normalized, ftir.get("summary") or {}, mole.get("summary") or {}, windows, aligned_rows, method301)
 
     statuses = [str(row.get("overall_status") or "") for row in method301]
     overall = "Gap"
@@ -672,6 +1048,8 @@ def build_validation_package(
         "overall_status": overall,
         "paired_window_count": len([row for row in aligned_rows if bool(row.get("paired"))]),
         "excluded_count": len(excluded_rows),
+        "source": "LIVE_COMPUTE",
+        "qa": qa,
         "review_notes": str(normalized.get("review_notes") or "").strip(),
         "reviewer": str(normalized.get("reviewer") or "").strip(),
         "review_locked": bool(normalized.get("review_locked")),
@@ -715,6 +1093,12 @@ def write_validation_exports(
             "difference",
             "paired",
             "status",
+            "qa_status",
+            "qa_flags",
+            "offset_seconds_adjusted",
+            "drift_seconds_adjusted",
+            "mole_coverage_ratio",
+            "ftir_coverage_ratio",
             "excluded",
             "exclusion_reason",
             "reviewer",
@@ -737,6 +1121,12 @@ def write_validation_exports(
                 _fmt_num(row.get("difference"), 6),
                 row.get("paired"),
                 row.get("status"),
+                row.get("qa_status"),
+                ";".join([str(v) for v in list(row.get("qa_flags") or []) if str(v or "").strip()]),
+                _fmt_num(row.get("offset_seconds_adjusted"), 3),
+                _fmt_num(row.get("drift_seconds_adjusted"), 3),
+                _fmt_num(row.get("mole_coverage_ratio"), 3),
+                _fmt_num(row.get("ftir_coverage_ratio"), 3),
                 row.get("excluded"),
                 row.get("exclusion_reason"),
                 row.get("reviewer"),

@@ -258,6 +258,59 @@ class FtirValidationTests(unittest.TestCase):
             method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
             self.assertIn("excluded_window_count", method_csv)
 
+    def test_qa_preview_autodetects_columns_and_flags_large_time_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_lines = ["sample_time,NO_ppm"]
+            raw_lines = []
+            actual_runs = [{
+                "run_no": 1,
+                "start_ts_iso": base.isoformat().replace("+00:00", "Z"),
+                "end_ts_iso": (base + timedelta(minutes=20)).isoformat().replace("+00:00", "Z"),
+            }]
+
+            for step in range(4):
+                mole_ts = base + timedelta(minutes=(step * 5) + 1)
+                ftir_ts = mole_ts + timedelta(seconds=90)
+                value = 25.0 + step
+                ftir_lines.append(f"{ftir_ts.isoformat().replace('+00:00', 'Z')},{value}")
+                raw_lines.append(json.dumps({
+                    "ts_utc": mole_ts.isoformat().replace("+00:00", "Z"),
+                    "channel_id": "NO",
+                    "value_eng": value,
+                    "quality_flags": {"comm_ok": True, "decode_ok": True},
+                }))
+
+            ftir_csv.write_text("\n".join(ftir_lines) + "\n", encoding="utf-8")
+            raw_samples.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "analytes": ["NO"],
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples,
+            )
+
+            ftir_summary = payload.get("ftir_source") or {}
+            qa = payload.get("qa") or {}
+            self.assertEqual(ftir_summary.get("timestamp_column"), "sample_time")
+            self.assertEqual((ftir_summary.get("autodetected_columns_used") or {}).get("NO"), "NO_ppm")
+            self.assertFalse(bool(qa.get("lock_ready")))
+            self.assertFalse(bool(qa.get("signoff_ready")))
+            self.assertTrue(any("failed alignment QA" in str(item) for item in list(qa.get("blocking_issues") or [])))
+            row = (payload.get("aligned_rows") or [])[0]
+            self.assertEqual(row.get("qa_status"), "ERROR")
+            self.assertTrue("HIGH_TIME_OFFSET" in list(row.get("qa_flags") or []))
+
 
 if __name__ == "__main__":
     unittest.main()

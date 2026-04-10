@@ -3417,6 +3417,7 @@ def _build_report_context(
                     "review_unlock_iso": ftir_validation.get("review_unlock_iso"),
                     "review_snapshot": ftir_validation.get("review_snapshot"),
                     "signoff": ftir_validation.get("signoff"),
+                    "qa": ftir_validation.get("qa"),
                     "excluded_rows": ftir_validation.get("excluded_rows"),
                     "method301": ftir_validation.get("method301"),
                 } if ftir_validation else None,
@@ -3890,6 +3891,12 @@ def _write_final_report_markdown(
     lines.append(f"- Lock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_lock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_lock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
     lines.append(f"- Last unlock by / at: {_md_scalar({'by': (ftir_validation_summary.get('review_unlock_by') if isinstance(ftir_validation_summary, dict) else None), 'at': (ftir_validation_summary.get('review_unlock_iso') if isinstance(ftir_validation_summary, dict) else None)})}")
     lines.append(f"- Locked snapshot: {_md_scalar((ftir_validation_summary.get('review_snapshot') if isinstance(ftir_validation_summary, dict) else None))}")
+    qa = (ftir_validation_summary.get("qa") if isinstance(ftir_validation_summary, dict) else {}) or {}
+    lines.append(f"- QA summary: {_md_scalar((qa.get('summary') if isinstance(qa, dict) else None))}")
+    lines.append(f"- QA lock ready: {_md_scalar((qa.get('lock_ready') if isinstance(qa, dict) else None))}")
+    lines.append(f"- QA signoff ready: {_md_scalar((qa.get('signoff_ready') if isinstance(qa, dict) else None))}")
+    lines.append(f"- QA blocking issue count: {_md_scalar((len(list(qa.get('blocking_issues') or [])) if isinstance(qa, dict) else None))}")
+    lines.append(f"- QA warning count: {_md_scalar((len(list(qa.get('warnings') or [])) if isinstance(qa, dict) else None))}")
     signoff = (ftir_validation_summary.get("signoff") if isinstance(ftir_validation_summary, dict) else {}) or {}
     lines.append(f"- Signoff decision: {_md_scalar((signoff.get('decision') if isinstance(signoff, dict) else None))}")
     lines.append(f"- Signoff basis: {_md_scalar((signoff.get('basis') if isinstance(signoff, dict) else None))}")
