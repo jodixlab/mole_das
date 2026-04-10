@@ -620,6 +620,33 @@ def _mole_slug(s: str, default: str = "X") -> str:
         return default
 
 
+def _project_session_folder_slug(project: Dict[str, Any], default_job: str = "job") -> str:
+    try:
+        proj = dict(project or {})
+    except Exception:
+        proj = {}
+    job_id = _mole_slug(str(proj.get("job_id") or "").strip(), default_job)
+    ordered_parts = [
+        job_id,
+        _mole_slug(str(proj.get("project_name") or "").strip(), ""),
+        _mole_slug(str(proj.get("site_facility") or "").strip(), ""),
+        _mole_slug(str(proj.get("operator") or "").strip(), ""),
+        _mole_slug(str(proj.get("asset_unit_id") or "").strip(), ""),
+    ]
+    slug = "_".join([part.lower() for part in ordered_parts if str(part or "").strip()])
+    return slug or str(job_id).lower()
+
+
+def _unique_child_name(parent_dir: Path, base_name: str) -> str:
+    seed = str(base_name or "").strip() or "session"
+    candidate = seed
+    idx = 2
+    while (parent_dir / candidate).exists():
+        candidate = f"{seed}__{idx}"
+        idx += 1
+    return candidate
+
+
 def _artifact_sha256(path: Path) -> str:
     import hashlib
 
@@ -16922,20 +16949,15 @@ def _build_intake(self) -> None:
           session directory (older runner builds used a separate daq_runs tree).
         * The DAQ Runner is responsible for writing RAW evidence into raw/*.jsonl.
         """
-        try:
-            job = str((self.session.get("project") or {}).get("job_id") or "job")
-        except Exception:
-            job = "job"
-        try:
-            site = str((self.session.get("project") or {}).get("site_facility") or "site")
-        except Exception:
-            site = "site"
-
-        stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-        session_id = f"{_mole_slug(job,'JOB')}__{_mole_slug(site,'SITE')}__{stamp}"
-
         day = datetime.now().astimezone().strftime("%Y-%m-%d")
-        sess_dir = Path(self.sessions_root) / day / session_id
+        day_dir = Path(self.sessions_root) / day
+        safe_mkdir(day_dir)
+        try:
+            base_session_id = _project_session_folder_slug(self.session.get("project") or {}, "job")
+        except Exception:
+            base_session_id = "job"
+        session_id = _unique_child_name(day_dir, base_session_id)
+        sess_dir = day_dir / session_id
         safe_mkdir(sess_dir)
         for sub in ("meta", "raw", "processed", "exports"):
             safe_mkdir(sess_dir / sub)
