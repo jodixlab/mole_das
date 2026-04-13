@@ -7,3 +7,4 @@ MOLE-DAS Data Acquisition System
 - GitHub Actions workflow: [.github/workflows/clean-release-validation.yml](.github/workflows/clean-release-validation.yml)
 - Acceptance matrix source: [config/mole_release_acceptance_matrix_v1.json](config/mole_release_acceptance_matrix_v1.json)
 - Generated release checklist artifacts appear under `RELEASES/clean_release_workflow/`
+- Generated clean-workspace ZIP, release cert, and package hygiene reports also appear under `RELEASES/clean_release_workflow/`

@@ -103,6 +103,9 @@ Release metadata standard:
     before a certified runtime ZIP is cut.
   - The release gate writes certified ZIP artifacts and certificates under
     RELEASES\.
+  - The release gate also writes package-hygiene reports and rejects runtime
+    ZIPs that contain banned paths or absolute local path drift in packaged
+    config/runtime text files.
 
 Operational troubleshooting notes:
   - Use console launchers first when debugging startup or UI issues.

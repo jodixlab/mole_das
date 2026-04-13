@@ -1368,7 +1368,7 @@
       "state_pack_paths": [],
       "state_packs_loaded": [],
       "last_sync_iso": "2026-03-02T23:26:08+00:00",
-      "cache_path": "C:\\Users\\User\\Desktop\\mole_development\\mole_das_data\\configs\\mole_federal_reg_library_cache.json",
+      "cache_path": "mole_das_data\\configs\\mole_federal_reg_library_cache.json",
       "deltas": {},
       "federal_rule_latest": {
         "EPA_NSPS_IIII": {
@@ -1484,14 +1484,14 @@
     "instruments": {}
   },
   "paths": {
-    "config_dir": "C:\\Users\\User\\Desktop\\mole_development\\mole_das_data\\configs",
-    "session_config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\configs\\mole_session_2026_03_02_2316.json",
-    "runner_config_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413\\runner_config.json",
-    "session_profile_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413\\session_profile.json",
-    "session_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413",
-    "daq_run_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413",
-    "db_path": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\db\\mole_master.sqlite",
-    "logs_dir": "C:\\Users\\Joe Etheridge\\OneDrive - Encino Environmental Services, LLC\\Archive\\Documents\\New project\\2026_04_07_001\\mole_das_data\\logs"
+    "config_dir": "mole_das_data\\configs",
+    "session_config_path": "mole_das_data\\configs\\mole_session_2026_03_02_2316.json",
+    "runner_config_path": "mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413\\runner_config.json",
+    "session_profile_path": "mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413\\session_profile.json",
+    "session_dir": "mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413",
+    "daq_run_dir": "mole_das_data\\sessions\\2026-04-07\\2026_03_02_2316__katy_texas__20260407_162413",
+    "db_path": "mole_das_data\\db\\mole_master.sqlite",
+    "logs_dir": "mole_das_data\\logs"
   },
   "soundtrack": {
     "enabled": true,

@@ -39,12 +39,16 @@ from mole_preflight import run_preflight, format_preflight_report
 SKIP_DIR_NAMES = {
     "RELEASES",
     ".git",
+    ".github",
     ".vs",
+    "scripts",
     "__pycache__",
 }
 SKIP_FILE_NAMES = {
     ".gitattributes",
     ".gitignore",
+    "BUILD_WHEELHOUSE.bat",
+    "RUN_CLEAN_RELEASE_WORKFLOW.bat",
     "desktop.ini",
     "Thumbs.db",
 }

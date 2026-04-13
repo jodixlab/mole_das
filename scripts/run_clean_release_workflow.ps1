@@ -132,7 +132,9 @@ try {
         }
         Get-ChildItem -LiteralPath $artifactDir -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $sourceArtifacts "*") -Destination $artifactDir -Recurse -Force
+        Get-ChildItem -LiteralPath $sourceArtifacts -Force | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $artifactDir -Recurse -Force
+        }
         Add-StepResult -Name "collect_artifacts" -Status "PASS" -Detail "Release artifacts copied back from clean workspace."
     }
 

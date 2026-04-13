@@ -31,6 +31,7 @@ from typing import Dict, List, Optional, Tuple
 
 from mole_preflight import run_preflight
 from mole_postcal_policy_regression import run_regression as run_postcal_policy_regression
+from mole_release_package_hygiene import audit_release_zip, format_hygiene_report
 
 
 def _sha256_file(path: Path, chunk: int = 1024 * 1024) -> str:
@@ -197,6 +198,15 @@ def main() -> int:
     zip_path: Optional[Path] = None
     zip_sha: Optional[str] = None
     zip_bytes: Optional[int] = None
+    hygiene_report: Dict[str, object] = {
+        "schema": "mole_release_package_hygiene_v1",
+        "status": "NOT_RUN",
+        "entry_count": 0,
+        "banned_entry_count": 0,
+        "absolute_path_hit_count": 0,
+        "banned_entries": [],
+        "absolute_path_hits": [],
+    }
     if status != "FAIL":
         label = str(args.label).strip().replace(" ", "_")
         zip_path = outdir / f"{label}_{build_id}_RUNTIME_READY_FULL_DATA.zip"
@@ -222,6 +232,11 @@ def main() -> int:
             else:
                 zip_bytes = zip_path.stat().st_size
                 zip_sha = _sha256_file(zip_path)
+                hygiene_report = audit_release_zip(zip_path)
+                if hygiene_report.get("status") != "PASS":
+                    status = "FAIL"
+                    exit_code = 3
+                    notes.append("Release package hygiene audit failed.")
         finally:
             sys.argv = argv_bak
 
@@ -247,22 +262,32 @@ def main() -> int:
             "policy_regression_case_count": int(regression_report.get("case_count") or 0),
             "policy_regression_failure_count": int(regression_report.get("failure_count") or 0),
             "policy_regression_failures": regression_failures[:50],
+            "package_hygiene_status": hygiene_report.get("status"),
+            "package_hygiene_banned_entry_count": int(hygiene_report.get("banned_entry_count") or 0),
+            "package_hygiene_absolute_path_hit_count": int(hygiene_report.get("absolute_path_hit_count") or 0),
         },
         "output": {
             "zip_path": str(zip_path) if zip_path else None,
             "zip_bytes": zip_bytes,
             "zip_sha256": zip_sha,
         },
+        "package_hygiene": hygiene_report,
         "notes": notes,
     }
 
     cert_txt = _format_cert_txt(cert)
     cert_txt_path = outdir / f"RELEASE_CERT_{build_id}.txt"
     cert_json_path = outdir / f"RELEASE_CERT_{build_id}.json"
+    hygiene_txt_path = outdir / f"RELEASE_HYGIENE_{build_id}.txt"
+    hygiene_json_path = outdir / f"RELEASE_HYGIENE_{build_id}.json"
     _write_text(cert_txt_path, cert_txt)
     cert_json_path.write_text(json.dumps(cert, indent=2), encoding="utf-8")
+    _write_text(hygiene_txt_path, format_hygiene_report(hygiene_report))
+    hygiene_json_path.write_text(json.dumps(hygiene_report, indent=2), encoding="utf-8")
 
     print(cert_txt)
+    print("")
+    print(format_hygiene_report(hygiene_report))
     if zip_path:
         print(f"\nOK: certified artifact at {zip_path}")
     print(f"OK: certificate at {cert_txt_path}")

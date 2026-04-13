@@ -31,3 +31,6 @@ Notes
   - The clean workflow also emits a production acceptance matrix and
     operator go / no-go checklist into:
       <root>\RELEASES\clean_release_workflow\
+  - The release gate now also emits a package hygiene report and fails
+    if the runtime ZIP contains banned paths or absolute local path
+    drift in packaged config/runtime text files.
