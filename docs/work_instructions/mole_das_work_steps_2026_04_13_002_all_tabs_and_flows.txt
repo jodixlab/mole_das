@@ -1,0 +1,916 @@
+MOLE-DAS WORKSTEPS - ALL TABS AND TESTING FLOW PATHS
+
+Purpose
+
+- This document completes the workstep format started in `worksteps_2026_04_13_001.txt`.
+- The format is intentionally kept as a plain operational outline with major sections, bullets, and nested entries.
+- This document covers:
+	- every current Wizard navigation tab
+	- the major DAQ Runner operating environments
+	- the main operator and support workflows
+	- testing flow paths from Diagnostics-only through formal FTIR Method 301 comparison
+
+New Project
+
+- From the Welcome Screen, navigate to "Project Configs (Hub)"
+	- Welcome
+		- The Welcome tab is the routing tab
+		- It is used to:
+			- start a new project
+			- load an existing configuration
+			- review the recommended setup order
+		- The normal setup order is:
+			- Project Configs (Hub)
+			- Job Intake (QA Routing)
+			- Source Details
+			- Pollutants
+			- QA/QC
+			- Test Matrix
+			- Site Conditions
+			- Reference / Audit FTIR (if used)
+			- Sample System
+			- Fuel Analysis
+			- Regulatory
+			- Save + Apply Config
+			- DAQ Runner (Test) or DAQ Runner (SIM)
+
+	- Project Configs (Hub)
+		- The Job ID is a unique MOLE-DAS generated project number
+		- The Job ID format remains:
+			- YYYY_MM_DD_HHMM
+		- The primary project/session folder now uses:
+			- JobID_ProjectName_Site-Facility_Operator_Asset-Unit-ID
+		- Enter the following core project identifiers:
+			- Job ID
+			- Project Name
+			- Site / Facility
+			- Operator
+			- Asset / Unit ID
+		- Session Intent
+			- Record Data is selected if the session should persist DAQ evidence
+			- Tokenize is selected if full provenance / traceability is desired
+			- Diagnostics-only is selected for tuning, troubleshooting, or non-compliance verification use
+			- May Support Compliance is selected when the project may support compliance or formal reporting
+			- Diagnostics-only and May Support Compliance are mutually exclusive
+		- Fuel Category
+			- Primary selections include:
+				- NG Natural Gas
+				- DSL Diesel Fuel
+				- DG Dual-Fuel Blend
+				- BG Biogas
+				- RFG Refinery Fuel Gas
+				- OT Other
+			- If "Capture Fuel Analysis" is selected, the User is expected to complete the Fuel Analysis tab
+		- Arcade Soundtrack
+			- Toggle soundtrack ON/OFF
+			- Select Auto mode behavior
+			- Adjust volume
+			- Review active track
+		- Validation Test Plan
+			- This section is used when the project is a validation or FTIR comparison project
+			- Session Type options include:
+				- STANDARD_TEST
+				- FTIR_VALIDATION
+			- Validation Mode options include:
+				- NONE
+				- METHOD_301_INFORMED_COMPARISON
+				- METHOD_301_FORMAL
+			- Comparator Method is used to describe the external comparator method or protocol
+			- FTIR Vendor Profile is used to pre-seed the downstream FTIR validation workflow
+			- Comparator Label allows a project-specific comparator name
+			- Timestamp Master Clock identifies the authoritative clock for alignment
+			- Planned Set Count is used for FTIR side-by-side planning
+			- Planned Run Minutes and Purge Minutes establish cadence defaults
+			- Purge Required and Bias Required define cadence checkpoints expected in the live runner
+			- Lead Scientist, Peer Reviewer, and Final Approver identify validation assignments
+			- Plan Notes allow project-specific validation planning notes
+
+- Job Intake Checklist (QA Routing)
+	- Policy: if "May Support Compliance" is enabled, this checklist must be completed before Save + Apply and before the full DAQ Runner will start
+	- Regulatory Purpose defines the compliance scope:
+		- State
+		- Federal
+		- Other
+	- If "Other" is selected, the User must enter a short explanation
+	- Project Checklist
+		- Each checklist item must be set to:
+			- Provided
+			- Not Provided
+			- Reason (required when Not Provided is selected)
+		- Checklist items include:
+			- Site-specific fuel-gas analysis
+			- Permit information with emission limits
+			- Manufacturer technical information / data sheets
+			- Site/facility contact information
+			- Regulatory region (county/parish)
+			- Agency identification number
+			- Physical location / coordinates
+			- Site elevation
+			- Regulatory-purpose support detail
+
+- Empirical Conditions
+	- This tab is used for controlled editing of the empirical formula registry
+	- The tab includes:
+		- Registry path display
+		- Category selector
+		- JSON editor
+		- Save action
+	- This is an engineering/administrative tab, not a routine operator tab
+
+- DB Paths
+	- This tab is used to map MOLE-DAS to the correct folders, databases, and asset libraries
+	- The tab includes:
+		- Global Config
+		- Core Folders
+		- Databases
+		- Asset DBs (JSON)
+	- Actions include:
+		- Browse
+		- Open
+		- Validate
+		- Reset Defaults
+		- Apply Paths
+
+- Catalog Governance
+	- This tab is used for catalog review, merges, and stewardship
+	- The tab includes:
+		- Reviewer identity
+		- Pending queue
+		- Synonyms tools
+		- Manufacturer merge tools
+		- Model merge tools
+		- Audit views
+	- Pending queue actions include:
+		- Filter
+		- Search
+		- Refresh
+		- Approve as canonical
+		- Merge to canonical
+		- Reject with reason
+
+- Source Details
+	- Source Schema
+		- Select or enter:
+			- Source Category
+			- Application
+			- Service Class
+			- Output Type
+			- Engine Cycle (when applicable)
+			- Cyl Count (when applicable)
+			- Notes
+		- Source Category may include:
+			- Engine
+			- Turbine
+			- Heater
+			- Boiler
+			- Flare
+			- Tank Vent
+			- Process Vent
+			- Fugitive / Component
+			- Other
+	- Equipment Identification
+		- Manufacturer
+		- Model Number
+		- Serial Number
+		- Asset Tag
+	- Rating / Capacity (for normalization outputs)
+		- Units
+		- Nameplate / Max
+		- Site Rate
+		- Estimated Operating
+		- Load Basis
+	- Fuel Flow (Qf)
+		- Fuel Flow Basis
+			- UNSET
+			- METERED
+			- MANUAL
+			- ESTIMATED
+		- Units
+		- Typical Variation
+		- Acknowledge run-to-run fuel flow variation
+	- Exhaust Flow Determination (Qd)
+		- The User selects how Qd will be derived:
+			- Stoichiometric via Fuel Input
+			- Measured at Stack
+			- Manufacturer Inputs
+			- Rated power / heat rate crosswalk
+			- Rated power / BSFC crosswalk
+		- Inputs may include:
+			- Fuel flow
+			- Units
+			- O2 dry % (optional)
+			- Heat input
+			- Rated power
+			- Load fraction
+			- Heat rate
+			- BSFC
+			- Fuel LHV
+	- Stack / Duct Geometry (EPA Method 1/2)
+		- Shape
+		- Upstream straight run
+		- Downstream straight run
+		- Diameter
+		- Width
+		- Height
+		- Pitot type
+		- Cp
+		- Traverse points / line
+		- Unstratified site
+	- (EPA) Method 1 Port Layout + Diagram (Printable)
+		- Wall thickness
+		- Port Dia
+		- Ports (#)
+		- Port height AGL
+		- Stack height AGL
+		- Preview
+			- ARCADE
+			- PRINT
+		- Export actions include:
+			- Export Diagram (PNG - Print)
+			- Export Diagram (PNG - Arcade)
+			- Export Side View (PNG - Print)
+			- Export Side View (PNG - Arcade)
+
+- Pollutants
+	- Pollutant Selection
+		- Select the pollutants and diluents to be measured
+		- Common selections include:
+			- O2
+			- CO2
+			- CO
+			- NO
+			- NO2
+			- NOx
+			- VOC
+			- CH4
+		- Selection drives:
+			- QA/QC profile resolution
+			- method binding
+			- cylinder guidance
+			- test matrix generation
+	- Active Pollutant Prescription
+		- Review or set:
+			- Active pollutant
+			- Expected Max
+			- Units
+			- Method
+			- CAL Points
+			- LIN Points
+			- NOx Converter Efficiency workflow
+			- Instrument
+			- Instrument Channel
+	- Hardware Mapping / Connection / Certificates
+		- Apply Active HW Channel
+		- Modbus Poll
+		- COM Protocol
+		- Connect to Instrument
+		- Zero Cylinder
+		- Mid Cylinder
+		- Span Cylinder
+		- Zero Certificates
+		- Mid Certificates
+		- Span Certificates
+
+- QA/QC
+	- Policy indicates whether QA/QC is required for the session
+	- QA/QC Profile
+		- Resolved Profile
+		- Significant digits
+		- Portable Track
+		- Persist calibration events to Master DB
+	- Spike Recovery
+		- Enable optional spike recovery
+		- Recovery min
+		- Recovery max
+	- Actions include:
+		- Save QA/QC + Generate Test Matrix
+		- QA/QC Trending Viewer
+		- Go to Test Matrix
+
+- Test Matrix
+	- Matrix Header
+		- Profile
+		- Portable state
+		- Required/policy state
+		- Weather auto-compile state
+		- Lat/Lon
+		- Station
+	- Acquisition Plan
+		- Sample runs
+		- Minutes per run
+		- Default log interval
+		- Per-run minute overrides
+		- Channel log intervals
+	- Proposed Work Steps
+		- Sequence
+		- Step label
+		- Analyte
+		- Method
+		- Default tolerance
+		- Override tolerance
+		- Acknowledgement state
+	- Step Edit Dialog
+		- Label
+		- Analyte
+		- Method
+		- Default tolerance
+		- Override tolerance
+		- Deviation acknowledgement
+		- Deviation note
+	- Actions
+		- Save Test Matrix
+		- Regenerate from Profile
+
+- Site Conditions
+	- Coordinates (WGS84)
+		- Latitude
+		- Longitude
+		- Station ID
+		- Elevation
+		- Fetch Weather
+		- Fetch Coordinates
+		- Fetch Elevation
+		- Open Map
+	- Weather Mode + Failover
+		- Mode
+		- On Fetch Fail
+		- Auto-compile weather data
+	- Manual Site Conditions
+		- T_amb
+		- P_bar
+		- RH
+	- Z Model + Standard Conditions
+		- Z Model
+		- Fixed Z
+		- T_std
+		- P_std
+		- Std Name
+	- Map Preview
+		- Static site preview and browser fallback
+
+- Reference / Audit FTIR
+	- This tab is used for optional FTIR ingest and audit/reference support
+	- FTIR Config
+		- Enable MG2000 FTIR ingest
+		- Provider
+		- Role
+		- Method
+		- PRN path or folder
+		- Pattern
+		- Recursive folder scan
+		- Freshness
+	- Column Mapping
+		- Column overrides
+		- Units overrides
+	- Spike Recovery
+		- ASTM D6348 project accuracy DQO
+		- method-specific spike settings
+	- Channel Offset Carry-Forward
+		- Use approved carried-forward FTIR offsets
+		- Promote latest project offsets as default
+	- FTIR Method Worksteps
+		- Step
+		- Status
+		- Updated
+		- Acceptance / Criterion
+		- Mark Step Done
+		- Mark Step Skipped
+		- Reset FTIR Steps
+	- Preview / Save actions
+		- Preview PRN
+		- Save Into Session
+		- Back
+		- Next
+
+- Connectivity / Commissioning
+	- This tab is conditional
+	- If the commissioning helper is not included in the runtime, this tab may be hidden or inactive
+	- If present, it is used for hardware/communications probe workflows
+
+- Sample System
+	- Active Session / Connectivity
+		- Active session selector
+		- Pick
+		- Use latest
+		- Session Browser
+		- Open Folder
+		- Connectivity Map
+	- Mappings
+		- Flow channel
+		- Units
+		- Warn min/max
+		- Alarm min/max
+		- Apply
+	- Sensors / Sampling Train / Gas Cells
+		- Sensors
+		- Sampling Train
+		- Gas Cells
+		- Animate
+	- Gas Cell Mapping
+		- Channel assignment
+		- Gas
+		- Range
+		- Sensitivity
+		- Apply Gas Cell Mapping
+	- Sample System Print / Export
+		- Refresh Preview
+		- Export Diagram (PNG)
+		- Open Export Folder
+		- Open Last Export
+
+- Hardware Profiles
+	- Profile Controls
+		- Set Default
+		- Save Config
+		- New
+		- Duplicate
+		- Delete
+		- Build / Update from cfg.hardware
+		- Validate
+		- Export channels.json
+		- Probe (Commissioning)
+	- Profile Meta
+		- profile_key
+		- protocol
+		- timeout_s
+		- endpoint_role
+		- host
+		- port
+		- description
+		- serial_port
+		- baud
+		- parity
+		- stopbits
+	- Channels
+		- channel_id
+		- unit_id
+		- register
+		- function code
+		- dtype
+		- qty
+		- units
+		- scale
+		- offset
+		- host override
+		- port
+		- description
+	- Channel actions
+		- Apply Channel
+		- Add Channel
+		- Delete Channel
+		- Poll Selected Channel
+		- List COM Ports
+		- Probe Matrix
+	- Additional utilities
+		- Raw RTU Diagnostics
+
+- Inventory Registry
+	- Session Binding
+		- Current bound instance
+		- Go to Source Details
+	- Instance Builder
+		- instance_id
+		- Site ID
+		- Location ID
+		- Category
+		- Manufacturer
+		- Model
+		- Variant
+		- Serial Number
+		- Asset Tag
+		- Manufacture Date
+		- Install Date
+		- Engine Cycle
+		- Cylinders
+		- Duty
+		- Notes
+	- Registry Search
+		- Category
+		- Serial
+		- Asset Tag
+		- Manufacturer
+		- Model
+		- Site ID
+		- Location ID
+	- Actions
+		- Save Instance
+		- Save + Bind Session
+		- Bind Loaded -> Session
+		- Clear
+		- Refresh Search
+
+- Session Browser
+	- Sessions root
+	- Open
+	- Filter
+	- Helper availability
+	- Sessions list
+	- Selected Session details
+		- path
+		- approval state
+		- deliverable readiness
+	- Actions may include:
+		- Open Folder
+		- Go to Event Console
+		- Run RAW->Processed
+		- Export Session ZIP
+		- Sync to
+		- Import Session ZIP
+	- Helper-backed actions may show N/A when the runtime package does not include the helper
+
+- Packages Inbox
+	- Inbox folder
+	- Open
+	- Filter
+	- Status
+	- Indexed Packages list
+	- Selected Package detail
+	- Inbox Actions Output
+	- Available actions:
+		- Scan / Rescan
+		- Refresh
+		- Export CSV
+		- Open ZIP
+		- Open Folder
+		- Ingest to Sessions
+		- Open Ingested Session
+		- Go to Session Browser
+
+- Event Console
+	- Active Session
+		- Open Folder
+		- Pick from Session Browser
+	- Send Event
+		- Event type
+		- Scope
+		- Channels
+		- Note
+	- Actions
+		- Send Event
+		- Refresh Tail
+		- Run Layout Audit
+		- Run Text Audit
+
+- Documents Library
+	- Category
+	- Document
+	- Current File
+	- Updated
+	- Selected Document detail
+	- Actions
+		- Open Selected Document
+		- Open Selected Folder
+		- Open Docs Folder
+		- Refresh Library
+
+- Fuel Analysis
+	- Fuel Analysis Profile
+		- Fuel
+		- Capture Fuel Analysis
+		- Profile
+		- Methodology
+		- Mode / Source
+	- Fuel Analysis Entry
+		- gas composition or liquid properties
+		- entered / verified flag
+		- notes
+	- Computed Panels
+		- combustion attributes
+		- selected F-factor
+		- HHV / LHV values
+		- ultimate analysis / products information
+		- traceability/source notes
+	- Actions
+		- Save Fuel Analysis
+
+- Regulatory
+	- Context
+		- State
+		- Detect from Lat/Lon
+		- Heater class
+		- Boiler type
+		- Source class
+		- Ignition
+		- Service
+		- Cycle
+		- Cylinders
+		- Construction date
+		- Manufacture date
+		- Heat input
+		- Rated duty
+	- Actions
+		- Check Federal Feeds
+		- Load State Pack
+		- Export State Template
+	- Suggested Regulations
+		- Applicability
+		- Jurisdiction
+		- Rule
+		- Citation
+		- Score
+	- Selected Regulations / Custom Regulation
+		- Jurisdiction
+		- Name
+		- Citation
+		- Notes
+	- Limits (basis-aware)
+		- Pollutant
+		- Type
+		- Units
+		- Value
+		- Averaging basis
+		- Basis
+		- O2 reference
+		- Notes
+	- Actions
+		- Add Limit
+		- Remove Selected Limit(s)
+
+- Save + Apply Config
+	- This action:
+		- saves the session configuration
+		- normalizes the session schema
+		- refreshes downstream runner configuration
+		- seeds validation / FTIR planning into the runner when applicable
+		- enables DAQ Runner launch tabs
+	- Left footer actions also include:
+		- Load Existing Config
+		- Export Tab CSV
+		- Export Full CSV Pack
+
+- DAQ Runner (Test)
+	- If Diagnostics-only is not selected:
+		- launches the full formal runner
+	- If Diagnostics-only is selected:
+		- launches the diagnostics-only runner
+	- The full runner includes the following primary sections:
+		- Reference / Audit FTIR (Optional)
+		- Side-by-Side Alignment
+		- FTIR Method Worksteps
+		- Spike Recovery
+		- Static Artifacts
+		- Worksteps (QA/QC + Run Workflow)
+		- Instrument Channels (Raw Frame)
+		- Site Conditions
+		- Fuel Basis / Method 19 Reference
+		- Live Graphs (Optional)
+		- Regulatory Limits
+		- Source Details
+		- Test Matrix (Tracking)
+		- Method 19 Operator Inputs / Derived Outputs
+		- Diagnostics Verification (diagnostics shell only)
+		- Calculation Audit / Provenance
+		- Report Builder (Formal Deliverables)
+		- Runner Log
+	- Package approval and deliverable readiness are shown in the left rail
+
+- DAQ Runner (SIM)
+	- If Diagnostics-only is not selected:
+		- launches the formal training/simulation runner
+	- If Diagnostics-only is selected:
+		- launches the diagnostics-only training shell
+	- SIM is sandboxed and is not institutional evidence unless separately governed by project policy
+
+Testing Flow Paths
+
+- Diagnostics-only - Test Environment
+	- Use this when the goal is troubleshooting, tuning, or non-compliance verification
+	- Recommended flow:
+		- Welcome
+		- Project Configs (Hub)
+			- set Diagnostics-only
+			- leave May Support Compliance off
+		- Source Details
+		- Pollutants
+		- Site Conditions
+		- Sample System
+		- Fuel Analysis
+		- Regulatory only if comparison limits are desired
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- In the diagnostics runner:
+			- complete Diagnostics Verification when applicable
+			- review Method 19 inputs / outputs
+			- review Calculation Audit / Provenance
+			- use Diagnostics Print Panel for non-compliance artifact export
+	- Expected outputs:
+		- diagnostics snapshots
+		- calculation audit JSON/CSV
+		- no formal report-pack deliverable
+
+- Diagnostics-only - SIM Environment
+	- Use this when the goal is operator training or sandboxed diagnostics rehearsal
+	- Recommended flow:
+		- Project Configs (Hub)
+			- set Diagnostics-only
+		- complete only the tabs needed for the simulated source behavior
+		- Save + Apply Config
+		- DAQ Runner (SIM)
+		- use the diagnostics-only training shell
+	- Expected outputs:
+		- sandboxed diagnostics behavior
+		- no compliance support
+		- no formal report-pack path
+
+- Standard Recorded Test - No FTIR
+	- Use this when the project is a normal recorded MOLE test without FTIR reference or validation
+	- Recommended flow:
+		- Welcome
+		- Project Configs (Hub)
+			- set Record Data
+			- set Tokenize if full provenance is desired
+		- Job Intake (if the project may support compliance)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Sample System
+		- Fuel Analysis
+		- Regulatory (if limits/rules are needed)
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- execute runs and worksteps
+		- use Report Builder for formal package/report generation when needed
+	- Expected outputs:
+		- report_pack_v1
+		- final_report_v1
+		- package approval/signoff path if formal deliverables are used
+
+- Standard SIM / Training Test - No FTIR
+	- Use this when training or rehearsing the standard recorded workflow without live acquisition
+	- Recommended flow:
+		- configure the session as a standard non-diagnostics session
+		- Save + Apply Config
+		- DAQ Runner (SIM)
+		- review simulated pollutant behavior, worksteps, and Method 19 sections
+		- optionally practice Report Builder metadata entry and package review
+
+- Compliance-support Recorded Test
+	- Use this when the project may support a compliance-style deliverable
+	- Required flow additions:
+		- Project Configs (Hub)
+			- set May Support Compliance
+		- Job Intake (QA Routing)
+			- complete checklist
+		- Pollutants / QA/QC / Test Matrix
+			- confirm method/profile/tolerance logic
+		- Fuel Analysis
+			- complete and verify
+		- Regulatory
+			- enter selected rules
+			- enter basis-aware limits
+		- Save + Apply Config
+		- DAQ Runner (Test)
+			- complete QA/QC, run workflow, and post-cal workflow as required
+		- Report Builder
+			- enter report metadata
+			- lock session review
+			- sign off package review
+			- build report pack and final report
+	- Expected outputs:
+		- report pack
+		- final report
+		- package approval and deliverable readiness states
+
+- FTIR Reference / Audit Companion Workflow
+	- Use this when FTIR is a reference or audit data source, but not a formal side-by-side validation package
+	- Recommended flow:
+		- configure the standard recorded or compliance-support workflow
+		- complete Reference / Audit FTIR
+			- enable FTIR ingest
+			- select role
+			- select method
+			- set parser/file inputs
+			- set offsets if applicable
+		- Save FTIR Into Session
+		- Save + Apply Config
+		- DAQ Runner (Test)
+			- use Reference / Audit FTIR section
+			- review side-by-side alignment if relevant
+			- review FTIR method worksteps
+		- Build the formal report if the project requires it
+	- Expected outputs:
+		- FTIR reference/audit evidence in the session package
+		- optional offset trace
+		- FTIR context in the final report
+
+- FTIR Side-by-Side Informed Comparison
+	- Use this when the project compares MOLE and FTIR side-by-side, but the project does not satisfy the full formal Method 301 structure
+	- Recommended setup flow:
+		- Project Configs (Hub)
+			- Session Type = FTIR_VALIDATION
+			- Validation Mode = METHOD_301_INFORMED_COMPARISON
+			- complete Validation Test Plan
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+			- define planned runs and cadence
+		- Site Conditions
+		- Sample System
+		- Fuel Analysis
+		- Regulatory as needed
+		- Save + Apply Config
+	- Recommended runner flow:
+		- DAQ Runner (Test)
+		- Report Builder
+			- FTIR Side-by-Side Validation
+				- select vendor profile
+				- load FTIR file
+				- set timestamp column / delimiter / analytes
+				- use template folder / import template / alignment worksheet as needed
+				- refresh FTIR validation preview
+				- review alignment QA
+				- apply offset sweep if needed
+				- accept/reject comparison sets
+				- review exclusions
+				- lock FTIR review
+				- sign off FTIR validation
+		- Build report
+	- Expected outputs:
+		- informed comparison package
+		- reviewer workbook
+		- locked snapshot
+		- signed FTIR appendix package
+		- final report with informed-comparison basis
+
+- FTIR Formal Method 301 Comparison
+	- Use this when the project is intended to follow the formal FTIR side-by-side Method 301 comparison structure
+	- Required setup flow:
+		- Project Configs (Hub)
+			- Session Type = FTIR_VALIDATION
+			- Validation Mode = METHOD_301_FORMAL
+			- complete Validation Test Plan
+				- comparator metadata
+				- vendor profile
+				- timestamp master clock
+				- planned set count
+				- run cadence
+				- purge requirement
+				- bias requirement
+				- lead scientist
+				- peer reviewer
+				- final approver
+		- Job Intake if the project may support compliance
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+			- establish the actual acquisition plan used to create the comparison-set cadence
+		- Site Conditions
+		- Reference / Audit FTIR if companion ingest is also desired
+		- Sample System
+		- Fuel Analysis
+		- Regulatory as needed
+		- Save + Apply Config
+	- Required runner flow:
+		- DAQ Runner (Test)
+		- execute planned runs with purge/bias cadence
+		- Report Builder
+			- FTIR Side-by-Side Validation
+				- confirm execution planner status
+				- import FTIR data using the correct vendor adapter
+				- review auto-detected column map
+				- confirm timestamp alignment
+				- use offset sweep preview if needed
+				- review comparison sets
+				- apply explicit reviewer decisions to every comparison set
+				- resolve any QA hard blocks
+				- lock FTIR review
+				- sign off FTIR validation
+			- Session Review / Approval
+				- lock package review
+				- sign off package review
+			- Build report
+	- Expected outputs:
+		- formal FTIR validation package
+		- comparison-set model
+		- signed Method 301 statistics
+		- signed exclusion register
+		- reviewer workbook
+		- delta trace
+		- frozen snapshot
+		- final report with formal acceptance basis
+
+- General Report / Approval Flow
+	- For any non-diagnostics formal deliverable, the common closeout path is:
+		- finish acquisition/worksteps
+		- complete post-cal or required QA/QC closeout
+		- open Report Builder
+		- complete report metadata
+		- review package approval state
+		- review deliverable readiness state
+		- lock session review
+		- sign off session review
+		- build report pack and final report
+		- confirm output artifacts exist
+
+Operator Notes
+
+- Some tabs are operator-facing and some are engineering/admin oriented
+- The runner launch tabs depend on a valid Save + Apply operation
+- Diagnostics-only is not a compliance path
+- Fuel Analysis and Site Conditions directly affect combustion and Method 19 outputs
+- The report builder, approval model, and deliverable readiness flow apply only to non-diagnostics formal deliverables
+- FTIR validation projects should use the Validation Test Plan at the start of the workflow rather than trying to build the comparison package only after data collection

@@ -24,6 +24,10 @@ This folder contains the current task-oriented work-instruction set for MOLE-DAS
 - `mole_das_work_steps_2026_04_06_002_expanded.txt`
   - Expanded all-tabs baseline draft derived from the original work steps.
 
+- `mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt`
+  - Completed all-tabs workstep revision using the original bullet/outline format.
+  - Includes testing flow paths from diagnostics-only through formal FTIR Method 301 comparison.
+
 ## Usage Notes
 
 - Prefer the split audience files above for day-to-day use.
