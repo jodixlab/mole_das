@@ -10039,7 +10039,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_purge_min = tk.StringVar(value="5")
     var_ftir_validation_require_purge = tk.BooleanVar(value=True)
     var_ftir_validation_require_bias = tk.BooleanVar(value=True)
+    var_ftir_validation_sweep_min_s = tk.StringVar(value="-120")
+    var_ftir_validation_sweep_max_s = tk.StringVar(value="120")
+    var_ftir_validation_sweep_step_s = tk.StringVar(value="15")
     var_ftir_validation_exclusion_reason = tk.StringVar(value="")
+    var_ftir_validation_set_review_reason = tk.StringVar(value="")
     var_ftir_validation_lock_status = tk.StringVar(value="FTIR validation review state: UNLOCKED")
     var_ftir_validation_signoff_by = tk.StringVar(value="")
     var_ftir_validation_signoff_role = tk.StringVar(value="")
@@ -10160,6 +10164,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     chk_ftir_validation_require_bias.grid(row=6, column=3, sticky="w", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="Sweep min (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_sweep_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_min_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_sweep_min.grid(row=7, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Sweep max (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_sweep_max = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_max_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_sweep_max.grid(row=7, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Sweep step (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=8, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_sweep_step = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_step_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_sweep_step.grid(row=8, column=1, sticky="ew", pady=(0, 6))
 
     report_builder_ftir_btns = tk.Frame(report_builder_ftir_wrap, bg=BG)
     report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
@@ -10306,6 +10320,71 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     ]:
         ftir_stats_tree.heading(col, text=txt)
         ftir_stats_tree.column(col, width=width, stretch=(col in ("bias_status", "precision_status", "overall_status")))
+
+    ftir_alignment_wrap = tk.Frame(report_builder_validation_wrap, bg=BG)
+    ftir_alignment_wrap.pack(fill="x", pady=(0, 8))
+    tk.Label(ftir_alignment_wrap, text="Alignment Sweep / Offset Review", fg=FG, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w")
+    ftir_alignment_body = tk.Frame(ftir_alignment_wrap, bg=BG)
+    ftir_alignment_body.pack(fill="x")
+    ftir_alignment_scroll = tk.Scrollbar(ftir_alignment_body, orient="vertical")
+    ftir_alignment_scroll.pack(side="right", fill="y")
+    ftir_alignment_cols = ("offset_s", "paired_rows", "set_count", "avg_abs_offset_s", "avg_abs_drift_s", "recommended")
+    ftir_alignment_tree = ttk.Treeview(ftir_alignment_body, columns=ftir_alignment_cols, show="headings", height=5)
+    ftir_alignment_tree.pack(side="left", fill="x", expand=True)
+    ftir_alignment_scroll.configure(command=ftir_alignment_tree.yview)
+    ftir_alignment_tree.configure(yscrollcommand=ftir_alignment_scroll.set)
+    for col, txt, width in [
+        ("offset_s", "Offset (s)", 90),
+        ("paired_rows", "Paired Rows", 90),
+        ("set_count", "Sets", 70),
+        ("avg_abs_offset_s", "Avg |Offset| (s)", 120),
+        ("avg_abs_drift_s", "Avg |Drift| (s)", 120),
+        ("recommended", "Recommended", 100),
+    ]:
+        ftir_alignment_tree.heading(col, text=txt)
+        ftir_alignment_tree.column(col, width=width, stretch=(col == "recommended"))
+    ftir_alignment_ctrls = tk.Frame(ftir_alignment_wrap, bg=BG)
+    ftir_alignment_ctrls.pack(fill="x", pady=(6, 0))
+    btn_ftir_validation_apply_sweep = tk.Button(ftir_alignment_ctrls, text="Apply Selected Sweep Offset", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_apply_sweep.pack(side="left")
+
+    ftir_sets_wrap = tk.Frame(report_builder_validation_wrap, bg=BG)
+    ftir_sets_wrap.pack(fill="x", pady=(0, 8))
+    tk.Label(ftir_sets_wrap, text="Comparison Sets / Review Decisions", fg=FG, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w")
+    ftir_sets_body = tk.Frame(ftir_sets_wrap, bg=BG)
+    ftir_sets_body.pack(fill="x")
+    ftir_sets_scroll = tk.Scrollbar(ftir_sets_body, orient="vertical")
+    ftir_sets_scroll.pack(side="right", fill="y")
+    ftir_sets_cols = ("set_no", "label", "inclusion", "basis", "review", "reason", "before_pairs", "after_pairs", "before_offset_s", "after_offset_s")
+    ftir_sets_tree = ttk.Treeview(ftir_sets_body, columns=ftir_sets_cols, show="headings", height=6)
+    ftir_sets_tree.pack(side="left", fill="x", expand=True)
+    ftir_sets_scroll.configure(command=ftir_sets_tree.yview)
+    ftir_sets_tree.configure(yscrollcommand=ftir_sets_scroll.set)
+    for col, txt, width in [
+        ("set_no", "Set", 60),
+        ("label", "Label", 160),
+        ("inclusion", "Inclusion", 110),
+        ("basis", "Basis", 140),
+        ("review", "Review", 110),
+        ("reason", "Reason", 220),
+        ("before_pairs", "Pairs Before", 95),
+        ("after_pairs", "Pairs After", 95),
+        ("before_offset_s", "Before |Offset|", 110),
+        ("after_offset_s", "After |Offset|", 110),
+    ]:
+        ftir_sets_tree.heading(col, text=txt)
+        ftir_sets_tree.column(col, width=width, stretch=(col in ("label", "reason")))
+    ftir_set_ctrls = tk.Frame(ftir_sets_wrap, bg=BG)
+    ftir_set_ctrls.pack(fill="x", pady=(6, 0))
+    tk.Label(ftir_set_ctrls, text="Selected-set review reason:", fg=FG, bg=BG, font=("Consolas", 9)).pack(side="left")
+    ent_ftir_validation_set_review_reason = tk.Entry(ftir_set_ctrls, textvariable=var_ftir_validation_set_review_reason, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9), width=42)
+    ent_ftir_validation_set_review_reason.pack(side="left", padx=(8, 8))
+    btn_ftir_validation_accept_set = tk.Button(ftir_set_ctrls, text="Accept Selected Set", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_accept_set.pack(side="left")
+    btn_ftir_validation_reject_set = tk.Button(ftir_set_ctrls, text="Reject Selected Set", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_reject_set.pack(side="left", padx=(8, 0))
+    btn_ftir_validation_clear_set_reviews = tk.Button(ftir_set_ctrls, text="Clear All Set Decisions", bg=BTN_BG, fg=FG, relief="flat")
+    btn_ftir_validation_clear_set_reviews.pack(side="left", padx=(8, 0))
 
     ftir_windows_wrap = tk.Frame(report_builder_validation_wrap, bg=BG)
     ftir_windows_wrap.pack(fill="both", expand=True)
@@ -15091,6 +15170,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             pass
 
     ftir_validation_preview_rows: Dict[str, Dict[str, Any]] = {}
+    ftir_validation_sweep_rows: Dict[str, Dict[str, Any]] = {}
+    ftir_validation_set_rows: Dict[str, Dict[str, Any]] = {}
 
     def _load_json_file(path: Any) -> Dict[str, Any]:
         try:
@@ -15232,16 +15313,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ent_ftir_validation_timestamp_col,
                 cbo_ftir_validation_delimiter,
                 ent_ftir_validation_offset_s,
+                ent_ftir_validation_sweep_min,
+                ent_ftir_validation_sweep_max,
+                ent_ftir_validation_sweep_step,
                 ent_ftir_validation_analytes,
                 cbo_ftir_validation_master_clock,
                 ent_ftir_validation_purge_min,
                 chk_ftir_validation_require_purge,
                 chk_ftir_validation_require_bias,
                 btn_ftir_validation_browse,
+                btn_ftir_validation_apply_sweep,
                 btn_ftir_validation_exclude,
                 btn_ftir_validation_include,
                 btn_ftir_validation_clear_exclusions,
+                btn_ftir_validation_accept_set,
+                btn_ftir_validation_reject_set,
+                btn_ftir_validation_clear_set_reviews,
                 ent_ftir_validation_exclusion_reason,
+                ent_ftir_validation_set_review_reason,
             ]:
                 if locked:
                     _set_widget_state(widget, "disabled")
@@ -15332,6 +15421,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             pass
 
+    def _selected_ftir_validation_sweep_row() -> Optional[Dict[str, Any]]:
+        try:
+            sel = list(ftir_alignment_tree.selection() or [])
+            if not sel:
+                return None
+            return ftir_validation_sweep_rows.get(str(sel[0]))
+        except Exception:
+            return None
+
+    def _selected_ftir_validation_set_row() -> Optional[Dict[str, Any]]:
+        try:
+            sel = list(ftir_sets_tree.selection() or [])
+            if not sel:
+                return None
+            return ftir_validation_set_rows.get(str(sel[0]))
+        except Exception:
+            return None
+
+    def _on_ftir_validation_set_select(_evt: Any = None) -> None:
+        row = _selected_ftir_validation_set_row()
+        try:
+            var_ftir_validation_set_review_reason.set(str((row or {}).get("review_reason") or ""))
+        except Exception:
+            pass
+
     def _set_ftir_validation_exclusion(selected_row: Dict[str, Any], exclude: bool) -> None:
         nonlocal sess
         sess = _report_builder_save_to_session(show_message=False)
@@ -15402,9 +15516,105 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception as e:
             messagebox.showerror("FTIR Validation Review", str(e))
 
+    def _apply_selected_ftir_validation_sweep_offset() -> None:
+        row = _selected_ftir_validation_sweep_row()
+        if not isinstance(row, dict):
+            messagebox.showinfo("FTIR Validation Review", "Select an alignment sweep row first.")
+            return
+        try:
+            var_ftir_validation_offset_s.set(_fmt_num(row.get("offset_seconds"), 3, "0"))
+            updated = _report_builder_save_to_session(show_message=False)
+            _refresh_ftir_validation_preview(updated)
+            _refresh_report_builder_status(updated)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
+    def _set_ftir_validation_set_review(selected_set: Dict[str, Any], decision: str) -> None:
+        nonlocal sess
+        sess = _report_builder_save_to_session(show_message=False)
+        _ensure_daq_schema(sess)
+        blk = _ftir_validation_block(sess)
+        if _ftir_validation_is_locked(blk):
+            raise ValueError("FTIR validation review is locked. Unlock review before changing comparison-set decisions.")
+        set_reviews = dict(blk.get("set_reviews") or {}) if isinstance(blk.get("set_reviews"), dict) else {}
+        set_key = str(selected_set.get("set_key") or "").strip()
+        if not set_key:
+            raise ValueError("Selected comparison set does not have a stable set key.")
+        decision_norm = str(decision or "").strip().upper()
+        if decision_norm == "REJECTED":
+            reason = str(var_ftir_validation_set_review_reason.get() or "").strip()
+            if not reason:
+                raise ValueError("A rejection reason is required for a rejected comparison set.")
+            set_reviews[set_key] = {
+                "decision": "REJECTED",
+                "reason": reason,
+                "reviewer": _report_builder_actor(sess),
+                "updated_iso": now_iso(),
+            }
+        elif decision_norm == "ACCEPTED":
+            set_reviews[set_key] = {
+                "decision": "ACCEPTED",
+                "reason": str(var_ftir_validation_set_review_reason.get() or "").strip(),
+                "reviewer": _report_builder_actor(sess),
+                "updated_iso": now_iso(),
+            }
+        else:
+            set_reviews.pop(set_key, None)
+        blk["set_reviews"] = set_reviews
+        blk["review_notes"] = _report_builder_text_get(txt_ftir_validation_review_notes)
+        blk["reviewer"] = _report_builder_actor(sess)
+        sess["ftir_validation"] = blk
+        _save_session(sess)
+        _refresh_ftir_validation_preview(sess)
+        _refresh_report_builder_status(sess)
+
+    def _accept_selected_ftir_validation_set() -> None:
+        row = _selected_ftir_validation_set_row()
+        if not isinstance(row, dict):
+            messagebox.showinfo("FTIR Validation Review", "Select a comparison set first.")
+            return
+        try:
+            _set_ftir_validation_set_review(row, "ACCEPTED")
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
+    def _reject_selected_ftir_validation_set() -> None:
+        row = _selected_ftir_validation_set_row()
+        if not isinstance(row, dict):
+            messagebox.showinfo("FTIR Validation Review", "Select a comparison set first.")
+            return
+        try:
+            _set_ftir_validation_set_review(row, "REJECTED")
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
+    def _clear_all_ftir_validation_set_reviews() -> None:
+        nonlocal sess
+        if not messagebox.askyesno("FTIR Validation Review", "Clear all FTIR validation comparison-set review decisions for this session?"):
+            return
+        try:
+            sess = _report_builder_save_to_session(show_message=False)
+            _ensure_daq_schema(sess)
+            blk = _ftir_validation_block(sess)
+            if _ftir_validation_is_locked(blk):
+                raise ValueError("FTIR validation review is locked. Unlock review before clearing comparison-set decisions.")
+            blk["set_reviews"] = {}
+            blk["review_notes"] = _report_builder_text_get(txt_ftir_validation_review_notes)
+            blk["reviewer"] = _report_builder_actor(sess)
+            sess["ftir_validation"] = blk
+            _save_session(sess)
+            _refresh_ftir_validation_preview(sess)
+            _refresh_report_builder_status(sess)
+        except Exception as e:
+            messagebox.showerror("FTIR Validation Review", str(e))
+
     def _refresh_ftir_validation_preview(sess_local: Optional[Dict[str, Any]] = None) -> None:
         ftir_validation_preview_rows.clear()
+        ftir_validation_sweep_rows.clear()
+        ftir_validation_set_rows.clear()
         _report_builder_tree_clear(ftir_stats_tree)
+        _report_builder_tree_clear(ftir_alignment_tree)
+        _report_builder_tree_clear(ftir_sets_tree)
         _report_builder_tree_clear(ftir_windows_tree)
         try:
             sess_use = dict(sess_local) if isinstance(sess_local, dict) else _report_builder_save_to_session(show_message=False)
@@ -15427,8 +15637,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             mole_src = preview.get("mole_source") if isinstance(preview.get("mole_source"), dict) else {}
             qa = preview.get("qa") if isinstance(preview.get("qa"), dict) else {}
             execution = preview.get("execution") if isinstance(preview.get("execution"), dict) else {}
+            alignment_review = preview.get("alignment_review") if isinstance(preview.get("alignment_review"), dict) else {}
             import_preview = qa.get("import_preview") if isinstance(qa.get("import_preview"), dict) else {}
             aligned_rows = list(preview.get("aligned_rows") or [])
+            comparison_sets = [row for row in list(preview.get("comparison_sets") or []) if isinstance(row, dict)]
             unpaired_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
             snap = preview.get("review_snapshot") if isinstance(preview.get("review_snapshot"), dict) else {}
             sign = preview.get("signoff") if isinstance(preview.get("signoff"), dict) else {}
@@ -15439,6 +15651,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
             acceptance_basis = str(preview.get("acceptance_basis") or "").strip() or "(n/a)"
             acceptance_note = str(preview.get("acceptance_basis_note") or "").strip()
+            recommended_offset = alignment_review.get("recommended_offset") if isinstance(alignment_review.get("recommended_offset"), dict) else {}
+            before_summary = alignment_review.get("before_summary") if isinstance(alignment_review.get("before_summary"), dict) else {}
+            after_summary = alignment_review.get("after_summary") if isinstance(alignment_review.get("after_summary"), dict) else {}
+            set_review_counts = {"ACCEPTED": 0, "REJECTED": 0}
+            for block in comparison_sets:
+                decision = str(block.get("review_decision") or "").strip().upper()
+                if decision in set_review_counts:
+                    set_review_counts[decision] += 1
             status_lines = [
                 " | ".join([
                     f"Source: {source_label}",
@@ -15490,6 +15710,29 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 )
                 if str(execution.get("note") or "").strip():
                     status_lines.append("Execution note: " + str(execution.get("note") or "").strip())
+            if alignment_review:
+                status_lines.append(
+                    "Alignment review: "
+                    + " | ".join([
+                        f"current offset={_fmt_num(alignment_review.get('current_offset_seconds'), 2, '')} s",
+                        f"before paired={int(before_summary.get('paired_row_count') or 0)}",
+                        f"after paired={int(after_summary.get('paired_row_count') or 0)}",
+                        (
+                            f"recommended offset={_fmt_num(recommended_offset.get('offset_seconds'), 2, '')} s"
+                            if recommended_offset
+                            else "recommended offset=(n/a)"
+                        ),
+                    ])
+                )
+            if comparison_sets:
+                status_lines.append(
+                    "Comparison-set review: "
+                    + " | ".join([
+                        f"sets={len(comparison_sets)}",
+                        f"accepted={set_review_counts['ACCEPTED']}",
+                        f"rejected={set_review_counts['REJECTED']}",
+                    ])
+                )
             if acceptance_note:
                 status_lines.append("Acceptance basis note: " + acceptance_note)
             if str(snap.get("delta_trace_json_path") or "").strip():
@@ -15515,9 +15758,66 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         str(row.get("overall_status") or ""),
                     ),
                 )
+            sweep_rows = [row for row in list(alignment_review.get("sweep_rows") or []) if isinstance(row, dict)]
+            recommended_offset_value = None
+            try:
+                recommended_offset_value = float(recommended_offset.get("offset_seconds")) if recommended_offset else None
+            except Exception:
+                recommended_offset_value = None
+            for row in sweep_rows:
+                offset_value = _parse_float(row.get("offset_seconds"), default=None)
+                iid = ftir_alignment_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        _fmt_num(offset_value, 3, ""),
+                        int(row.get("paired_row_count") or 0),
+                        int(row.get("comparison_set_count") or 0),
+                        _fmt_num(row.get("avg_abs_offset_seconds"), 3, ""),
+                        _fmt_num(row.get("avg_abs_drift_seconds"), 3, ""),
+                        "YES" if (recommended_offset_value is not None and offset_value is not None and abs(recommended_offset_value - offset_value) < 1e-6) else "",
+                    ),
+                )
+                ftir_validation_sweep_rows[str(iid)] = dict(row)
+            if not sweep_rows:
+                ftir_alignment_tree.insert("", "end", values=("", 0, 0, "", "", "NO SWEEP DATA"))
+            before_after_by_set = {
+                str(row.get("set_key") or "").strip(): row
+                for row in list(alignment_review.get("before_after_by_set") or [])
+                if isinstance(row, dict) and str(row.get("set_key") or "").strip()
+            }
+            for block in comparison_sets:
+                set_key = str(block.get("set_key") or "").strip()
+                review_row = before_after_by_set.get(set_key, {})
+                iid = ftir_sets_tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        str(block.get("set_no") or ""),
+                        str(block.get("label") or ""),
+                        str(block.get("inclusion_status") or ""),
+                        str(block.get("formal_basis") or ""),
+                        str(block.get("review_decision") or ""),
+                        str(block.get("review_reason") or ""),
+                        int(review_row.get("before_paired_row_count") or 0),
+                        int(review_row.get("after_paired_row_count") or 0),
+                        _fmt_num(review_row.get("before_avg_abs_offset_seconds"), 3, ""),
+                        _fmt_num(review_row.get("after_avg_abs_offset_seconds"), 3, ""),
+                    ),
+                )
+                ftir_validation_set_rows[str(iid)] = dict(block)
+            if not comparison_sets:
+                ftir_sets_tree.insert("", "end", values=("", "NO COMPARISON SETS", "", "", "", "", 0, 0, "", ""))
             for row in aligned_rows:
                 if not isinstance(row, dict):
                     continue
+                set_review_decision = str(row.get("set_review_decision") or "").strip().upper()
+                review_label = (
+                    "SET_REJECTED"
+                    if set_review_decision == "REJECTED"
+                    else ("SET_ACCEPTED" if set_review_decision == "ACCEPTED" else ("EXCLUDED" if bool(row.get("excluded")) else "INCLUDED"))
+                )
+                review_reason = str(row.get("set_review_reason") or row.get("exclusion_reason") or "").strip()
                 iid = ftir_windows_tree.insert(
                     "",
                     "end",
@@ -15527,8 +15827,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         str(row.get("analyte") or ""),
                         str(row.get("status") or ""),
                         str(row.get("qa_status") or ""),
-                        "EXCLUDED" if bool(row.get("excluded")) else "INCLUDED",
-                        str(row.get("exclusion_reason") or ""),
+                        review_label,
+                        review_reason,
                         _fmt_num(row.get("offset_seconds_adjusted"), 2, ""),
                         _fmt_num(row.get("drift_seconds_adjusted"), 2, ""),
                         (
@@ -15626,11 +15926,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             var_ftir_validation_analytes.set("; ".join([str(item) for item in list(ftir_validation.get("analytes") or []) if str(item or "").strip()]))
             var_ftir_validation_master_clock.set(str(ftir_validation.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK"))
             execution = ftir_validation.get("execution") if isinstance(ftir_validation.get("execution"), dict) else {}
+            alignment_review = ftir_validation.get("alignment_review") if isinstance(ftir_validation.get("alignment_review"), dict) else {}
             var_ftir_validation_execution_enabled.set(bool(execution.get("enabled")))
             var_ftir_validation_execution_profile.set(str(execution.get("profile") or "SESSION_RUNS"))
             var_ftir_validation_purge_min.set(_fmt_num(execution.get("purge_minutes_required"), 2, "5"))
             var_ftir_validation_require_purge.set(bool(execution.get("require_purge_event", True)))
             var_ftir_validation_require_bias.set(bool(execution.get("require_bias_event", True)))
+            var_ftir_validation_sweep_min_s.set(_fmt_num(alignment_review.get("sweep_min_seconds"), 2, "-120"))
+            var_ftir_validation_sweep_max_s.set(_fmt_num(alignment_review.get("sweep_max_seconds"), 2, "120"))
+            var_ftir_validation_sweep_step_s.set(_fmt_num(alignment_review.get("sweep_step_seconds"), 2, "15"))
             _report_builder_text_set(
                 txt_ftir_validation_column_map,
                 "\n".join([f"{k}={v}" for k, v in sorted((ftir_validation.get("column_map") or {}).items())]),
@@ -15657,6 +15961,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             var_ftir_validation_signoff_basis.set(str(signoff.get("basis") or ""))
             _report_builder_text_set(txt_ftir_validation_signoff_note, signoff.get("note"))
             var_ftir_validation_exclusion_reason.set("")
+            var_ftir_validation_set_review_reason.set("")
             _apply_ftir_validation_lock_state(sess_use)
         except Exception:
             pass
@@ -15868,6 +16173,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "last_bias_run_no": ((ftir_validation.get("execution") or {}).get("last_bias_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
                     "last_bias_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("last_bias_iso") or "")).strip(),
                     "live_review_status": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("live_review_status") or "")).strip(),
+                },
+                "alignment_review": {
+                    **(dict(ftir_validation.get("alignment_review") or {}) if isinstance(ftir_validation.get("alignment_review"), dict) else {}),
+                    "sweep_min_seconds": _parse_float(var_ftir_validation_sweep_min_s.get(), default=-120.0),
+                    "sweep_max_seconds": _parse_float(var_ftir_validation_sweep_max_s.get(), default=120.0),
+                    "sweep_step_seconds": _parse_float(var_ftir_validation_sweep_step_s.get(), default=15.0),
                 },
                 "notes": _report_builder_text_get(txt_ftir_validation_notes),
                 "review_notes": _report_builder_text_get(txt_ftir_validation_review_notes),
@@ -16382,7 +16693,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         btn_ftir_validation_open_templates.configure(command=_open_ftir_validation_template_folder)
         btn_ftir_validation_open_import_template.configure(command=_open_ftir_validation_import_template)
         btn_ftir_validation_open_alignment.configure(command=_open_ftir_validation_alignment)
+        ftir_alignment_tree.bind("<<TreeviewSelect>>", lambda _evt: None)
+        ftir_sets_tree.bind("<<TreeviewSelect>>", _on_ftir_validation_set_select)
         ftir_windows_tree.bind("<<TreeviewSelect>>", _on_ftir_validation_row_select)
+        btn_ftir_validation_apply_sweep.configure(command=_apply_selected_ftir_validation_sweep_offset)
+        btn_ftir_validation_accept_set.configure(command=_accept_selected_ftir_validation_set)
+        btn_ftir_validation_reject_set.configure(command=_reject_selected_ftir_validation_set)
+        btn_ftir_validation_clear_set_reviews.configure(command=_clear_all_ftir_validation_set_reviews)
         btn_ftir_validation_exclude.configure(command=_exclude_selected_ftir_validation_row)
         btn_ftir_validation_include.configure(command=_include_selected_ftir_validation_row)
         btn_ftir_validation_clear_exclusions.configure(command=_clear_all_ftir_validation_exclusions)
@@ -16403,6 +16720,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_report_builder_save.configure(state="disabled")
             btn_report_builder_build.configure(state="disabled")
             btn_ftir_validation_preview.configure(state="disabled")
+            btn_ftir_validation_apply_sweep.configure(state="disabled")
+            btn_ftir_validation_accept_set.configure(state="disabled")
+            btn_ftir_validation_reject_set.configure(state="disabled")
+            btn_ftir_validation_clear_set_reviews.configure(state="disabled")
             btn_ftir_validation_exclude.configure(state="disabled")
             btn_ftir_validation_include.configure(state="disabled")
             btn_ftir_validation_clear_exclusions.configure(state="disabled")

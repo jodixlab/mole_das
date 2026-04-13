@@ -21,6 +21,7 @@ SIGNOFF_ACCEPTANCE_BASES = ("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON
 FTIR_VENDOR_PROFILES = ("AUTO", "GENERIC", "GASMET_CSV", "MKS_MULTIGAS_CSV", "OPSIS_CSV", "THERMOFISHER_MAX_CSV")
 FTIR_EXECUTION_PROFILES = ("SESSION_RUNS", "MANUAL_WINDOWS_ONLY")
 FTIR_COMPARISON_SET_POLICIES = ("RUN_EQUALS_SET",)
+FTIR_SET_REVIEW_DECISIONS = ("ACCEPTED", "REJECTED")
 LEGACY_SIGNOFF_BASIS_MAP = {
     "FORMAL_METHOD_301_PASS": "FORMAL_METHOD_301",
     "INFORMED_COMPARISON_ONLY": "METHOD_301_INFORMED_COMPARISON",
@@ -630,6 +631,35 @@ def _normalize_exclusions(value: Any) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def _normalize_set_reviews(value: Any) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(value, dict):
+        return out
+    for raw_key, raw_val in value.items():
+        key = str(raw_key or "").strip()
+        if not key or not isinstance(raw_val, dict):
+            continue
+        decision = str(raw_val.get("decision") or "").strip().upper()
+        if decision not in FTIR_SET_REVIEW_DECISIONS:
+            continue
+        out[key] = {
+            "decision": decision,
+            "reason": str(raw_val.get("reason") or "").strip(),
+            "reviewer": str(raw_val.get("reviewer") or "").strip(),
+            "updated_iso": str(raw_val.get("updated_iso") or "").strip(),
+        }
+    return out
+
+
+def _normalize_alignment_review(value: Any) -> Dict[str, Any]:
+    block = dict(value or {}) if isinstance(value, dict) else {}
+    return {
+        "sweep_min_seconds": float(_safe_float(block.get("sweep_min_seconds")) or -120.0),
+        "sweep_max_seconds": float(_safe_float(block.get("sweep_max_seconds")) or 120.0),
+        "sweep_step_seconds": float(_safe_float(block.get("sweep_step_seconds")) or 15.0),
+    }
+
+
 def _normalize_execution(value: Any) -> Dict[str, Any]:
     block = dict(value or {}) if isinstance(value, dict) else {}
     profile = str(block.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS"
@@ -791,6 +821,8 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "review_snapshot": _normalize_review_snapshot(block.get("review_snapshot")),
         "signoff": _normalize_signoff(block.get("signoff")),
         "exclusions": _normalize_exclusions(block.get("exclusions")),
+        "set_reviews": _normalize_set_reviews(block.get("set_reviews")),
+        "alignment_review": _normalize_alignment_review(block.get("alignment_review")),
         "execution": _normalize_execution(block.get("execution")),
     }
 
@@ -1407,6 +1439,190 @@ def build_comparison_sets(
     return out
 
 
+def _apply_set_reviews(
+    aligned_rows: Iterable[Dict[str, Any]],
+    comparison_sets: Iterable[Dict[str, Any]],
+    set_reviews: Dict[str, Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    rows = [row for row in list(aligned_rows or []) if isinstance(row, dict)]
+    sets = [row for row in list(comparison_sets or []) if isinstance(row, dict)]
+    reviews = dict(set_reviews or {}) if isinstance(set_reviews, dict) else {}
+    for row in rows:
+        review = reviews.get(str(row.get("comparison_set_key") or "").strip()) if reviews else None
+        if not isinstance(review, dict):
+            row["set_review_decision"] = ""
+            row["set_review_reason"] = ""
+            row["set_review_reviewer"] = ""
+            row["set_review_updated_iso"] = ""
+            continue
+        row["set_review_decision"] = str(review.get("decision") or "").strip().upper()
+        row["set_review_reason"] = str(review.get("reason") or "").strip()
+        row["set_review_reviewer"] = str(review.get("reviewer") or "").strip()
+        row["set_review_updated_iso"] = str(review.get("updated_iso") or "").strip()
+        if row["set_review_decision"] == "REJECTED":
+            row["excluded"] = True
+            if not str(row.get("exclusion_reason") or "").strip():
+                row["exclusion_reason"] = row["set_review_reason"] or "Comparison set rejected by reviewer."
+            if not str(row.get("reviewer") or "").strip():
+                row["reviewer"] = row["set_review_reviewer"]
+            if not str(row.get("updated_iso") or "").strip():
+                row["updated_iso"] = row["set_review_updated_iso"]
+    for block in sets:
+        review = reviews.get(str(block.get("set_key") or "").strip()) if reviews else None
+        if isinstance(review, dict):
+            block["review_decision"] = str(review.get("decision") or "").strip().upper()
+            block["review_reason"] = str(review.get("reason") or "").strip()
+            block["review_reviewer"] = str(review.get("reviewer") or "").strip()
+            block["review_updated_iso"] = str(review.get("updated_iso") or "").strip()
+        else:
+            block["review_decision"] = ""
+            block["review_reason"] = ""
+            block["review_reviewer"] = ""
+            block["review_updated_iso"] = ""
+    return rows, sets
+
+
+def _alignment_summary(aligned_rows: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    rows = [row for row in list(aligned_rows or []) if isinstance(row, dict)]
+    paired_rows = [row for row in rows if bool(row.get("paired"))]
+    set_keys = sorted({
+        str(row.get("comparison_set_key") or "").strip()
+        for row in rows
+        if str(row.get("comparison_set_key") or "").strip()
+    })
+    abs_offsets = [
+        abs(float(row.get("offset_seconds_adjusted")))
+        for row in paired_rows
+        if row.get("offset_seconds_adjusted") is not None
+    ]
+    abs_drifts = [
+        abs(float(row.get("drift_seconds_adjusted")))
+        for row in paired_rows
+        if row.get("drift_seconds_adjusted") is not None
+    ]
+    return {
+        "aligned_row_count": len(rows),
+        "paired_row_count": len(paired_rows),
+        "comparison_set_count": len(set_keys),
+        "avg_abs_offset_seconds": _mean(abs_offsets),
+        "avg_abs_drift_seconds": _mean(abs_drifts),
+    }
+
+
+def _build_alignment_variant(
+    cfg: Dict[str, Any],
+    windows_rows: Iterable[Dict[str, Any]],
+    mole_rows: Iterable[Dict[str, Any]],
+    ftir_rows: Iterable[Dict[str, Any]],
+    *,
+    offset_seconds: float,
+) -> Dict[str, Any]:
+    cfg_local = dict(cfg or {})
+    cfg_local["time_offset_seconds"] = float(offset_seconds)
+    ftir_rows_use = [row for row in list(ftir_rows or []) if isinstance(row, dict)]
+    try:
+        if str(cfg_local.get("ftir_file_path") or "").strip():
+            ftir_loaded = load_ftir_records(cfg_local)
+            ftir_rows_use = [row for row in list((ftir_loaded.get("rows") or [])) if isinstance(row, dict)]
+    except Exception:
+        pass
+    aligned_rows = align_windows(cfg_local, windows_rows, mole_rows, ftir_rows_use)
+    comparison_sets = build_comparison_sets(cfg_local, windows_rows, aligned_rows)
+    return {
+        "offset_seconds": float(offset_seconds),
+        "aligned_rows": aligned_rows,
+        "comparison_sets": comparison_sets,
+        "summary": _alignment_summary(aligned_rows),
+    }
+
+
+def _build_alignment_review(
+    cfg: Dict[str, Any],
+    windows: Dict[str, Any],
+    mole_rows: Iterable[Dict[str, Any]],
+    ftir_rows: Iterable[Dict[str, Any]],
+    aligned_rows: Iterable[Dict[str, Any]],
+    comparison_sets: Iterable[Dict[str, Any]],
+) -> Dict[str, Any]:
+    review_cfg = dict(cfg.get("alignment_review") or {}) if isinstance(cfg.get("alignment_review"), dict) else {}
+    current_offset = float(_safe_float(cfg.get("time_offset_seconds")) or 0.0)
+    sweep_min = float(_safe_float(review_cfg.get("sweep_min_seconds")) or -120.0)
+    sweep_max = float(_safe_float(review_cfg.get("sweep_max_seconds")) or 120.0)
+    sweep_step = float(_safe_float(review_cfg.get("sweep_step_seconds")) or 15.0)
+    if sweep_step <= 0:
+        sweep_step = 15.0
+    current_summary = _alignment_summary(aligned_rows)
+    before_variant = _build_alignment_variant(cfg, windows.get("rows") or [], mole_rows, ftir_rows, offset_seconds=0.0)
+    sweep_rows: List[Dict[str, Any]] = []
+    offset = sweep_min
+    max_iters = 200
+    iters = 0
+    while offset <= sweep_max + 1e-9 and iters < max_iters:
+        variant = _build_alignment_variant(cfg, windows.get("rows") or [], mole_rows, ftir_rows, offset_seconds=float(round(offset, 6)))
+        summary = dict(variant.get("summary") or {})
+        sweep_rows.append({
+            "offset_seconds": float(round(offset, 6)),
+            "paired_row_count": summary.get("paired_row_count"),
+            "comparison_set_count": summary.get("comparison_set_count"),
+            "avg_abs_offset_seconds": summary.get("avg_abs_offset_seconds"),
+            "avg_abs_drift_seconds": summary.get("avg_abs_drift_seconds"),
+        })
+        offset += sweep_step
+        iters += 1
+    recommended = None
+    if sweep_rows:
+        ranked = sorted(
+            sweep_rows,
+            key=lambda row: (
+                -(int(row.get("paired_row_count") or 0)),
+                float(row.get("avg_abs_offset_seconds")) if row.get("avg_abs_offset_seconds") is not None else 10**9,
+                float(row.get("avg_abs_drift_seconds")) if row.get("avg_abs_drift_seconds") is not None else 10**9,
+                abs(float(row.get("offset_seconds") or 0.0)),
+            ),
+        )
+        recommended = dict(ranked[0])
+    before_after_by_set: List[Dict[str, Any]] = []
+    before_sets = {
+        str(row.get("set_key") or "").strip(): row
+        for row in list(before_variant.get("comparison_sets") or [])
+        if isinstance(row, dict) and str(row.get("set_key") or "").strip()
+    }
+    for block in list(comparison_sets or []):
+        if not isinstance(block, dict):
+            continue
+        key = str(block.get("set_key") or "").strip()
+        before_block = before_sets.get(key) if key else None
+        after_rows = [row for row in list(block.get("analyte_rows") or []) if isinstance(row, dict)]
+        before_rows = [row for row in list((before_block or {}).get("analyte_rows") or []) if isinstance(row, dict)]
+        after_offsets = [abs(float(row.get("offset_seconds_adjusted"))) for row in after_rows if row.get("offset_seconds_adjusted") is not None and bool(row.get("paired"))]
+        before_offsets = [abs(float(row.get("offset_seconds_adjusted"))) for row in before_rows if row.get("offset_seconds_adjusted") is not None and bool(row.get("paired"))]
+        before_after_by_set.append({
+            "set_no": block.get("set_no"),
+            "set_key": key,
+            "label": block.get("label"),
+            "before_paired_row_count": len([row for row in before_rows if bool(row.get("paired"))]),
+            "after_paired_row_count": len([row for row in after_rows if bool(row.get("paired"))]),
+            "before_avg_abs_offset_seconds": _mean(before_offsets),
+            "after_avg_abs_offset_seconds": _mean(after_offsets),
+            "review_decision": block.get("review_decision"),
+            "review_reason": block.get("review_reason"),
+        })
+    return {
+        "current_offset_seconds": current_offset,
+        "before_offset_seconds": 0.0,
+        "before_summary": before_variant.get("summary") or {},
+        "after_summary": current_summary,
+        "sweep_range": {
+            "min_seconds": sweep_min,
+            "max_seconds": sweep_max,
+            "step_seconds": sweep_step,
+        },
+        "sweep_rows": sweep_rows,
+        "recommended_offset": recommended,
+        "before_after_by_set": before_after_by_set,
+    }
+
+
 def compute_method301_stats(cfg: Dict[str, Any], comparison_sets: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     mode = str(cfg.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
     set_list = [dict(row) for row in list(comparison_sets or []) if isinstance(row, dict)]
@@ -1714,7 +1930,6 @@ def build_validation_package(
     windows = build_windows(normalized, actual_runs)
     aligned_rows = align_windows(normalized, windows.get("rows") or [], mole.get("rows") or [], ftir.get("rows") or [])
     exclusions = normalized.get("exclusions") if isinstance(normalized.get("exclusions"), dict) else {}
-    excluded_rows: List[Dict[str, Any]] = []
     for row in aligned_rows:
         if not isinstance(row, dict):
             continue
@@ -1725,24 +1940,53 @@ def build_validation_package(
             row["exclusion_reason"] = str(exc.get("reason") or "").strip()
             row["reviewer"] = str(exc.get("reviewer") or "").strip()
             row["updated_iso"] = str(exc.get("updated_iso") or "").strip()
-            excluded_rows.append({
-                "row_key": row_key,
-                "run_no": row.get("run_no"),
-                "label": row.get("label"),
-                "analyte": row.get("analyte"),
-                "reason": row.get("exclusion_reason"),
-                "reviewer": row.get("reviewer"),
-                "updated_iso": row.get("updated_iso"),
-            })
         else:
             row["excluded"] = False
             row["exclusion_reason"] = ""
             row["reviewer"] = ""
             row["updated_iso"] = ""
     comparison_sets = build_comparison_sets(normalized, windows.get("rows") or [], aligned_rows)
+    aligned_rows, comparison_sets = _apply_set_reviews(
+        aligned_rows,
+        comparison_sets,
+        normalized.get("set_reviews") if isinstance(normalized.get("set_reviews"), dict) else {},
+    )
+    comparison_sets = build_comparison_sets(normalized, windows.get("rows") or [], aligned_rows)
+    aligned_rows, comparison_sets = _apply_set_reviews(
+        aligned_rows,
+        comparison_sets,
+        normalized.get("set_reviews") if isinstance(normalized.get("set_reviews"), dict) else {},
+    )
+    excluded_rows: List[Dict[str, Any]] = []
+    for row in aligned_rows:
+        if not isinstance(row, dict) or not bool(row.get("excluded")):
+            continue
+        excluded_rows.append({
+            "row_key": str(row.get("row_key") or "").strip(),
+            "run_no": row.get("run_no"),
+            "label": row.get("label"),
+            "comparison_set_no": row.get("comparison_set_no"),
+            "comparison_set_key": row.get("comparison_set_key"),
+            "analyte": row.get("analyte"),
+            "reason": row.get("exclusion_reason"),
+            "reviewer": row.get("reviewer"),
+            "updated_iso": row.get("updated_iso"),
+            "set_review_decision": str(row.get("set_review_decision") or "").strip().upper(),
+            "set_review_reason": str(row.get("set_review_reason") or "").strip(),
+            "set_review_reviewer": str(row.get("set_review_reviewer") or "").strip(),
+            "set_review_updated_iso": str(row.get("set_review_updated_iso") or "").strip(),
+        })
     method301 = compute_method301_stats(normalized, comparison_sets)
     qa = _build_validation_qa(normalized, ftir.get("summary") or {}, mole.get("summary") or {}, windows, aligned_rows, method301)
     execution = _build_execution_summary(normalized, windows, comparison_sets, actual_runs)
+    alignment_review = _build_alignment_review(
+        normalized,
+        windows,
+        mole.get("rows") or [],
+        ftir.get("rows") or [],
+        aligned_rows,
+        comparison_sets,
+    )
 
     statuses = [str(row.get("overall_status") or "") for row in method301]
     overall = "Gap"
@@ -1786,6 +2030,7 @@ def build_validation_package(
         "excluded_rows": excluded_rows,
         "method301": method301,
         "execution": execution,
+        "alignment_review": alignment_review,
         "coverage_note": coverage_note,
         "overall_status": overall,
         "acceptance_basis": acceptance.get("basis"),
@@ -1797,6 +2042,7 @@ def build_validation_package(
         "qa": qa,
         "review_notes": str(normalized.get("review_notes") or "").strip(),
         "reviewer": str(normalized.get("reviewer") or "").strip(),
+        "set_reviews": dict(normalized.get("set_reviews") or {}) if isinstance(normalized.get("set_reviews"), dict) else {},
         "review_locked": bool(normalized.get("review_locked")),
         "review_lock_by": str(normalized.get("review_lock_by") or "").strip(),
         "review_lock_iso": str(normalized.get("review_lock_iso") or "").strip(),
@@ -1848,6 +2094,10 @@ def write_validation_exports(
             "bias_required",
             "cadence_status",
             "review_live_status",
+            "set_review_decision",
+            "set_review_reason",
+            "set_review_reviewer",
+            "set_review_updated_iso",
             "run_no",
             "label",
             "window_start_iso",
@@ -1888,6 +2138,10 @@ def write_validation_exports(
                 row.get("bias_required"),
                 row.get("cadence_status"),
                 row.get("review_live_status"),
+                row.get("set_review_decision"),
+                row.get("set_review_reason"),
+                row.get("set_review_reviewer"),
+                row.get("set_review_updated_iso"),
                 row.get("run_no"),
                 row.get("label"),
                 row.get("window_start_iso"),

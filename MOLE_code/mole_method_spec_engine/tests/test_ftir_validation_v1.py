@@ -544,6 +544,160 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(len(rows), 2)
             self.assertEqual((rows[1].get("values") or {}).get("O2"), 5.0)
 
+    def test_alignment_review_recommends_offset_from_sweep(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_csv.write_text(
+                "\n".join([
+                    "timestamp,NO",
+                    "2026-04-10T12:01:30Z,10.0",
+                    "2026-04-10T12:06:30Z,10.5",
+                    "2026-04-10T12:11:30Z,10.8",
+                    "2026-04-10T12:16:30Z,11.0",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            raw_samples.write_text(
+                "\n".join([
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:01:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 10.0,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:06:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 10.5,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:11:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 10.8,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:16:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 11.0,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "analytes": ["NO"],
+                "time_offset_seconds": 0.0,
+                "alignment_review": {
+                    "sweep_min_seconds": -60.0,
+                    "sweep_max_seconds": 60.0,
+                    "sweep_step_seconds": 30.0,
+                },
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": [{
+                    "run_no": 1,
+                    "start_ts_iso": "2026-04-10T12:00:00Z",
+                    "end_ts_iso": "2026-04-10T12:20:00Z",
+                    "label": "Run 1",
+                }]},
+                raw_samples_path=raw_samples,
+            )
+            alignment_review = payload.get("alignment_review") or {}
+            recommended = alignment_review.get("recommended_offset") or {}
+            self.assertEqual(alignment_review.get("current_offset_seconds"), 0.0)
+            self.assertEqual((alignment_review.get("sweep_range") or {}).get("step_seconds"), 30.0)
+            self.assertEqual(abs(float(recommended.get("offset_seconds") or 0.0)), 30.0)
+            self.assertGreaterEqual(int((recommended or {}).get("paired_row_count") or 0), 1)
+            self.assertLess(
+                float(recommended.get("avg_abs_offset_seconds") or 0.0),
+                float((alignment_review.get("after_summary") or {}).get("avg_abs_offset_seconds") or 0.0),
+            )
+
+    def test_set_review_rejection_excludes_comparison_set_and_is_exported(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_lines = ["timestamp,NO"]
+            raw_lines = []
+            actual_runs = []
+
+            for idx in range(2):
+                start = base + timedelta(minutes=idx * 25)
+                end = start + timedelta(minutes=20)
+                actual_runs.append({
+                    "run_no": idx + 1,
+                    "start_ts_iso": start.isoformat().replace("+00:00", "Z"),
+                    "end_ts_iso": end.isoformat().replace("+00:00", "Z"),
+                    "comparison_set_no": idx + 1,
+                    "comparison_set_key": f"RUN_SET_{idx+1:02d}",
+                    "label": f"Run {idx+1}",
+                })
+                for step in range(2):
+                    ts = start + timedelta(minutes=(step * 8) + 2)
+                    value = 30.0 + idx + step
+                    ts_iso = ts.isoformat().replace("+00:00", "Z")
+                    ftir_lines.append(f"{ts_iso},{value}")
+                    raw_lines.append(json.dumps({
+                        "ts_utc": ts_iso,
+                        "channel_id": "NO",
+                        "value_eng": value,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }))
+
+            ftir_csv.write_text("\n".join(ftir_lines) + "\n", encoding="utf-8")
+            raw_samples.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "analytes": ["NO"],
+                "set_reviews": {
+                    "RUN_SET_01": {
+                        "decision": "REJECTED",
+                        "reason": "timestamp spread out of tolerance",
+                        "reviewer": "peer_scientist",
+                        "updated_iso": "2026-04-10T18:10:00Z",
+                    }
+                },
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples,
+            )
+
+            comparison_sets = payload.get("comparison_sets") or []
+            self.assertEqual(len(comparison_sets), 2)
+            self.assertEqual(comparison_sets[0].get("review_decision"), "REJECTED")
+            self.assertEqual(comparison_sets[0].get("review_reason"), "timestamp spread out of tolerance")
+            self.assertEqual(comparison_sets[0].get("inclusion_status"), "EXCLUDED")
+            self.assertEqual(payload.get("excluded_comparison_set_count"), 1)
+            self.assertTrue(any(str(row.get("set_review_decision") or "").strip().upper() == "REJECTED" for row in (payload.get("aligned_rows") or [])))
+
+            out = write_validation_exports(
+                payload,
+                json_path=root / "payload.json",
+                windows_csv_path=root / "windows.csv",
+                method301_csv_path=root / "method301.csv",
+            )
+            windows_csv = Path(out["windows_csv_path"]).read_text(encoding="utf-8")
+            self.assertIn("set_review_decision", windows_csv)
+            self.assertIn("timestamp spread out of tolerance", windows_csv)
+
 
 if __name__ == "__main__":
     unittest.main()
