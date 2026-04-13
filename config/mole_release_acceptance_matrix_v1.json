@@ -1,0 +1,130 @@
+{
+  "schema": "mole_release_acceptance_matrix_v1",
+  "version": "2026-04-13",
+  "items": [
+    {
+      "id": "clean_install_runtime",
+      "category": "Automated release gate",
+      "scenario": "Clean workspace runtime bootstrap",
+      "entrypoint": "INSTALL_MOLE_DAS.bat",
+      "acceptance_type": "AUTOMATED",
+      "gate": "BLOCKING",
+      "expected_outcome": "Fresh workspace creates a runnable Python 3.12 runtime with all required core dependencies.",
+      "evidence_required": "clean_release_summary.json step install_runtime = PASS",
+      "workflow_step": "install_runtime"
+    },
+    {
+      "id": "clean_unit_suite",
+      "category": "Automated release gate",
+      "scenario": "Calculation and schema unit regression",
+      "entrypoint": "python -m unittest discover",
+      "acceptance_type": "AUTOMATED",
+      "gate": "BLOCKING",
+      "expected_outcome": "Tracked unit suite passes in a clean workspace.",
+      "evidence_required": "clean_release_summary.json step unit_tests = PASS",
+      "workflow_step": "unit_tests"
+    },
+    {
+      "id": "clean_smoketest_integration",
+      "category": "Automated release gate",
+      "scenario": "Launcher and report-pack integration",
+      "entrypoint": "mole_smoketest.py --integration-launcher-report-pack",
+      "acceptance_type": "AUTOMATED",
+      "gate": "BLOCKING",
+      "expected_outcome": "Launcher bootstrap, report pack, final report, and FTIR appendix path complete successfully in a fresh workspace.",
+      "evidence_required": "clean_release_summary.json step smoketest = PASS",
+      "workflow_step": "smoketest"
+    },
+    {
+      "id": "clean_release_gate",
+      "category": "Automated release gate",
+      "scenario": "Certified runtime packaging",
+      "entrypoint": "mole_release_gate.py --strict-hash",
+      "acceptance_type": "AUTOMATED",
+      "gate": "BLOCKING",
+      "expected_outcome": "Release gate passes and produces a runtime ZIP plus release certificate.",
+      "evidence_required": "clean_release_summary.json step release_gate = PASS and release cert present",
+      "workflow_step": "release_gate"
+    },
+    {
+      "id": "wizard_launch",
+      "category": "Operator acceptance",
+      "scenario": "Wizard launch",
+      "entrypoint": "run_wizard.bat",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Wizard opens without crash, preflight runs, and the main navigation renders correctly.",
+      "evidence_required": "Operator initials, date, and any crash log path if failed."
+    },
+    {
+      "id": "runner_launch_test",
+      "category": "Operator acceptance",
+      "scenario": "DAQ Runner (Test) launch",
+      "entrypoint": "run_daq_runner.bat",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Full runner opens without UI crash and displays package approval / deliverable readiness banners.",
+      "evidence_required": "Operator initials, date, and screenshot or log path."
+    },
+    {
+      "id": "diagnostics_only_flow",
+      "category": "Operator acceptance",
+      "scenario": "Diagnostics-only execution",
+      "entrypoint": "Diagnostics-only Test or SIM",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Diagnostics session opens, captures data, and produces the diagnostics print artifact without claiming compliance support.",
+      "evidence_required": "Session ID and exported diagnostics artifact path."
+    },
+    {
+      "id": "standard_recorded_test_flow",
+      "category": "Operator acceptance",
+      "scenario": "Standard recorded test without FTIR",
+      "entrypoint": "DAQ Runner (Test)",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Recorded run completes, side-by-side/purge logic behaves, and formal report artifacts build successfully.",
+      "evidence_required": "Session ID, run count, and final report path."
+    },
+    {
+      "id": "compliance_support_flow",
+      "category": "Operator acceptance",
+      "scenario": "Compliance-support recorded session",
+      "entrypoint": "DAQ Runner (Test) with compliance-capable session",
+      "acceptance_type": "MANUAL",
+      "gate": "CONDITIONAL",
+      "expected_outcome": "Session review and approval basis reflect compliance-ready status and report export completes with the correct approval state.",
+      "evidence_required": "Session ID and summary.json path."
+    },
+    {
+      "id": "ftir_validation_flow",
+      "category": "Operator acceptance",
+      "scenario": "FTIR validation execution and review",
+      "entrypoint": "Report Builder -> FTIR Side-by-Side Validation",
+      "acceptance_type": "MANUAL",
+      "gate": "CONDITIONAL",
+      "expected_outcome": "FTIR import, alignment review, exclusions, lock, signoff, and signed appendix package complete successfully.",
+      "evidence_required": "Session ID and FTIR appendix index path."
+    },
+    {
+      "id": "final_report_export",
+      "category": "Operator acceptance",
+      "scenario": "Formal report deliverable build",
+      "entrypoint": "Report Builder -> Build Report",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Markdown, PDF, and DOCX final reports build and open from the runtime package.",
+      "evidence_required": "Paths to final_test_report_v1.md/pdf/docx."
+    },
+    {
+      "id": "package_review_signoff",
+      "category": "Operator acceptance",
+      "scenario": "Package approval and deliverable readiness",
+      "entrypoint": "Wizard summary / Runner banner / Report Builder",
+      "acceptance_type": "MANUAL",
+      "gate": "BLOCKING",
+      "expected_outcome": "Shared package approval state matches the intended release basis and deliverable readiness is visible before export.",
+      "evidence_required": "Operator initials and final approval basis."
+    }
+  ]
+}

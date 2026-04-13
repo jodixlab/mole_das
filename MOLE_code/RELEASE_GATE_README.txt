@@ -28,3 +28,6 @@ Notes
       <root>\RUN_CLEAN_RELEASE_WORKFLOW.bat
     This copies tracked files into a fresh workspace, installs the runtime,
     runs unit tests + smoketest integration, then runs the release gate.
+  - The clean workflow also emits a production acceptance matrix and
+    operator go / no-go checklist into:
+      <root>\RELEASES\clean_release_workflow\

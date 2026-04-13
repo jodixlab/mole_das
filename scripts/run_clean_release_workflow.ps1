@@ -161,6 +161,26 @@ finally {
     }
     Set-Content -LiteralPath $summaryTxtPath -Value ($summaryText -join [Environment]::NewLine) -Encoding UTF8
 
+    try {
+        $acceptanceScript = Join-Path $repo "scripts\build_release_acceptance_pack.py"
+        if ((Test-Path $acceptanceScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $acceptanceScript,
+                "--repo-root", $repo,
+                "--output-dir", $artifactDir,
+                "--summary-json", $summaryPath
+            ) -WorkingDirectory $repo
+        }
+    }
+    catch {
+        Add-StepResult -Name "acceptance_pack" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        $summaryJson = $summary | ConvertTo-Json -Depth 6
+        Set-Content -LiteralPath $summaryPath -Value $summaryJson -Encoding UTF8
+        $summaryText += "- acceptance_pack: FAIL :: $($_.Exception.Message)"
+        Set-Content -LiteralPath $summaryTxtPath -Value ($summaryText -join [Environment]::NewLine) -Encoding UTF8
+    }
+
     if ((-not $KeepScratch) -and (Test-Path $scratch)) {
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
     }
