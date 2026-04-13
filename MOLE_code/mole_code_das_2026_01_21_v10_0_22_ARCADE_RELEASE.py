@@ -592,6 +592,18 @@ def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, A
     }
 
 
+def _default_session_review_basis(scope: Any, decision: Any = "UNSIGNED") -> str:
+    decision_u = str(decision or "UNSIGNED").strip().upper() or "UNSIGNED"
+    scope_u = str(scope or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW"
+    if decision_u == "REJECTED":
+        return "NOT_APPROVED"
+    if scope_u == "VALIDATION_REPORT":
+        return "VALIDATION_PACKAGE_READY"
+    if scope_u == "COMPLIANCE_REPORT":
+        return "COMPLIANCE_REPORT_READY"
+    return "INTERNAL_REVIEW_READY"
+
+
 def _normalize_session_review_cfg(
     value: Any,
     *,
@@ -627,6 +639,8 @@ def _normalize_session_review_cfg(
     signoff_basis = str(signoff_in.get("basis") or "").strip().upper()
     if signoff_basis and signoff_basis not in SESSION_REVIEW_BASES:
         signoff_basis = ""
+    if enabled and not signoff_basis:
+        signoff_basis = _default_session_review_basis(scope, signoff_decision)
 
     reviewer_name = str(review.get("reviewer_name") or plan.get("peer_reviewer") or ftir.get("reviewer") or "").strip()
     reviewer_role = str(review.get("reviewer_role") or ("Peer Reviewer" if reviewer_name else "")).strip()

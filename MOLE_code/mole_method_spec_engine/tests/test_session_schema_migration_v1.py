@@ -132,6 +132,47 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertIn("Validation test plan", notes)
         self.assertIn("backfilled from FTIR validation settings", notes)
 
+    def _assert_standard_compliance_review(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
+        sess = ensure_fn({
+            "session_mode": {
+                "record_data": True,
+                "tokenize": True,
+                "diagnostic_only": False,
+                "may_support_compliance": True,
+            },
+            "session_review": {
+                "enabled": True,
+                "scope": "COMPLIANCE_REPORT",
+                "reviewer_name": "Peer Scientist",
+                "reviewer_role": "Peer Reviewer",
+                "review_notes": "Package reviewed for non-FTIR compliance deliverable.",
+                "review_locked": True,
+                "review_lock_by": "Peer Scientist",
+                "review_lock_iso": "2026-04-13T10:15:00-05:00",
+                "default_approver": "Lead Scientist",
+                "default_approver_role": "Principal Scientist",
+                "signoff": {
+                    "decision": "APPROVED",
+                    "basis": "COMPLIANCE_REPORT_READY",
+                    "by": "Lead Scientist",
+                    "role": "Principal Scientist",
+                    "iso": "2026-04-13T10:20:00-05:00",
+                    "note": "Approved for compliance report generation.",
+                },
+            },
+        }, actor="unit_test")
+        review = sess["session_review"]
+        self.assertTrue(review["enabled"])
+        self.assertEqual(review["scope"], "COMPLIANCE_REPORT")
+        self.assertEqual(review["reviewer_name"], "Peer Scientist")
+        self.assertTrue(review["review_locked"])
+        self.assertEqual(review["review_lock_by"], "Peer Scientist")
+        self.assertEqual(review["default_approver"], "Lead Scientist")
+        self.assertEqual(review["signoff"]["decision"], "APPROVED")
+        self.assertEqual(review["signoff"]["basis"], "COMPLIANCE_REPORT_READY")
+        self.assertEqual(review["signoff"]["by"], "Lead Scientist")
+        self.assertEqual(review["signoff"]["role"], "Principal Scientist")
+
     def test_wizard_migrates_legacy_diagnostic_session(self) -> None:
         self._assert_diag_fixture(self.wizard_mod.ensure_session_schema)
 
@@ -149,6 +190,12 @@ class SessionSchemaMigrationTests(unittest.TestCase):
 
     def test_runner_backfills_validation_plan_from_ftir_validation(self) -> None:
         self._assert_ftir_validation_backfill(self.runner_mod.ensure_session_schema)
+
+    def test_wizard_preserves_standard_compliance_review(self) -> None:
+        self._assert_standard_compliance_review(self.wizard_mod.ensure_session_schema)
+
+    def test_runner_preserves_standard_compliance_review(self) -> None:
+        self._assert_standard_compliance_review(self.runner_mod.ensure_session_schema)
 
 
 if __name__ == "__main__":

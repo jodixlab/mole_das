@@ -378,6 +378,18 @@ def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, A
     }
 
 
+def _default_session_review_basis(scope: Any, decision: Any = "UNSIGNED") -> str:
+    decision_u = str(decision or "UNSIGNED").strip().upper() or "UNSIGNED"
+    scope_u = str(scope or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW"
+    if decision_u == "REJECTED":
+        return "NOT_APPROVED"
+    if scope_u == "VALIDATION_REPORT":
+        return "VALIDATION_PACKAGE_READY"
+    if scope_u == "COMPLIANCE_REPORT":
+        return "COMPLIANCE_REPORT_READY"
+    return "INTERNAL_REVIEW_READY"
+
+
 def _normalize_session_review_cfg(
     value: Any,
     *,
@@ -410,6 +422,8 @@ def _normalize_session_review_cfg(
     signoff_basis = str(signoff_in.get("basis") or "").strip().upper()
     if signoff_basis and signoff_basis not in SESSION_REVIEW_BASES:
         signoff_basis = ""
+    if enabled and not signoff_basis:
+        signoff_basis = _default_session_review_basis(scope, signoff_decision)
 
     return {
         "enabled": enabled,
@@ -17085,7 +17099,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if not _session_review_is_locked(review):
                 raise ValueError("Lock the session review before signing off.")
             decision = str(var_session_review_decision.get() or "UNSIGNED").strip().upper() or "UNSIGNED"
-            basis = str(var_session_review_basis.get() or "").strip().upper()
+            basis = str(var_session_review_basis.get() or "").strip().upper() or _default_session_review_basis(review.get("scope"), decision)
             approver = str(var_session_review_signoff_by.get() or review.get("default_approver") or "").strip()
             role = str(var_session_review_signoff_role.get() or review.get("default_approver_role") or "").strip()
             note = _report_builder_text_get(txt_session_review_signoff_note)
@@ -17093,8 +17107,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 raise ValueError("Select a session-review signoff decision before signing off.")
             if not approver:
                 raise ValueError("Approver name is required.")
+            expected_basis = _default_session_review_basis(review.get("scope"), decision)
             if decision in ("APPROVED", "CONDITIONAL") and basis == "NOT_APPROVED":
                 raise ValueError("Approved or conditional signoff cannot use NOT_APPROVED as the basis.")
+            if decision in ("APPROVED", "CONDITIONAL") and basis != expected_basis:
+                raise ValueError(f"{decision.title()} signoff for scope {review.get('scope') or 'PROJECT_REVIEW'} requires basis {expected_basis}.")
             if decision == "REJECTED" and basis != "NOT_APPROVED":
                 raise ValueError("Rejected signoff requires basis NOT_APPROVED.")
             review["signoff"] = {
