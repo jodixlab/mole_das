@@ -7960,6 +7960,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     package_review_lbl = tk.Label(left_inner, textvariable=package_review_var, fg=ACC2, bg=BG, font=("Consolas", 9, "bold"), anchor="w", justify="left")
     package_review_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     _bind_safe_wrap(package_review_lbl, left, pad_px=32, min_wrap=180)
+    deliverable_status_var = tk.StringVar(value="Deliverable readiness: (not evaluated)")
+    deliverable_status_lbl = tk.Label(left_inner, textvariable=deliverable_status_var, fg=FG_DIM, bg=BG, font=("Consolas", 9, "bold"), anchor="w", justify="left")
+    deliverable_status_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
+    _bind_safe_wrap(deliverable_status_lbl, left, pad_px=32, min_wrap=180)
 
     btns = tk.Frame(left_inner, bg=BG)
     btns.pack(fill="x", padx=12, pady=(8, 10))
@@ -14799,6 +14803,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         mode_summary_var.set(_format_mode_summary(sess))
         status_var.set("Status: READY")
         _refresh_session_review_banner(sess)
+        _refresh_deliverable_status_banner(sess)
         _populate_pollutants(sess)
         _load_reference_config(sess)
         _populate_reference_table(sess)
@@ -15250,6 +15255,48 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             try:
                 package_review_var.set("Package approval: (unavailable)")
+            except Exception:
+                pass
+
+    def _session_deliverable_status_text(sess_local: Dict[str, Any], review_local: Optional[Dict[str, Any]] = None) -> str:
+        review_use = dict(review_local or _session_review_block(sess_local))
+        if not bool(review_use.get("enabled")):
+            return "Deliverable readiness: review inactive"
+        sign = _session_review_signoff_block(review_use)
+        decision = str(sign.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+        basis = str(sign.get("basis") or "").strip().upper()
+        try:
+            pths = _report_builder_paths(sess_local)
+            pack_exists = bool(pths.get("summary_json") and Path(str(pths["summary_json"])).exists())
+            final_exists = any(
+                bool(pths.get(key)) and Path(str(pths[key])).exists()
+                for key in ("final_report_md", "final_report_docx", "final_report_pdf")
+            )
+        except Exception:
+            pack_exists = False
+            final_exists = False
+        if decision == "APPROVED":
+            text = "Deliverable readiness: READY TO BUILD" if not (pack_exists or final_exists) else "Deliverable readiness: APPROVED"
+        elif decision == "CONDITIONAL":
+            text = "Deliverable readiness: READY WITH CONDITIONS"
+        elif decision == "REJECTED":
+            text = "Deliverable readiness: NOT APPROVED"
+        elif _session_review_is_locked(review_use):
+            text = "Deliverable readiness: REVIEW LOCKED | awaiting signoff"
+        else:
+            text = "Deliverable readiness: DRAFT | lock and sign before export"
+        if basis and decision != "UNSIGNED":
+            text += f" | basis={basis}"
+        if pack_exists or final_exists:
+            text += f" | report_pack={'YES' if pack_exists else 'NO'} | final_report={'YES' if final_exists else 'NO'}"
+        return text
+
+    def _refresh_deliverable_status_banner(sess_local: Dict[str, Any], review_local: Optional[Dict[str, Any]] = None) -> None:
+        try:
+            deliverable_status_var.set(_session_deliverable_status_text(sess_local, review_local=review_local))
+        except Exception:
+            try:
+                deliverable_status_var.set("Deliverable readiness: (unavailable)")
             except Exception:
                 pass
 
@@ -16902,6 +16949,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 ftir_blk = dict(ftir_cfg)
             try:
                 _refresh_session_review_banner({**sess_use, "session_review": session_review_blk})
+            except Exception:
+                pass
+            try:
+                _refresh_deliverable_status_banner({**sess_use, "session_review": session_review_blk}, review_local=session_review_blk)
             except Exception:
                 pass
             ftir_exec_state = _ftir_validation_execution_status(sess_use)

@@ -3252,6 +3252,7 @@ class MoleDASWizard(tk.Tk):
 f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((proj.get('intake') or {}).get('missing') or [])} missing)",
             f"Validation: {self._validation_plan_summary(self.session.get('validation_plan') or {})}",
             f"Review: {self._session_review_summary(self.session.get('session_review') or {})}",
+            f"{self._session_deliverable_summary(self.session.get('session_review') or {})}",
             f"Fuel: {(fuel.get('fuel_button_code','') + ' ' + fuel.get('fuel_category','')).strip() or '(unset)'}",
             f"Source: {src.get('source_category') or '(unset)'}",
             f"Pollutants: {', '.join(sel) if sel else '(none)'}",
@@ -6313,6 +6314,27 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             return f"Package approval: REVIEW LOCKED | scope={scope} | reviewer={reviewer} | awaiting signoff"
         reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
         return f"Package approval: DRAFT | scope={scope} | reviewer={reviewer}"
+
+    def _session_deliverable_summary(self, review: Optional[Dict[str, Any]] = None) -> str:
+        review_use = dict(review or self._session_review_section())
+        if not bool(review_use.get("enabled")):
+            return "Deliverable: review inactive"
+        signoff = review_use.get("signoff") if isinstance(review_use.get("signoff"), dict) else {}
+        decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+        basis = str(signoff.get("basis") or "").strip().upper()
+        if decision == "APPROVED":
+            msg = "Deliverable: READY TO BUILD"
+        elif decision == "CONDITIONAL":
+            msg = "Deliverable: READY WITH CONDITIONS"
+        elif decision == "REJECTED":
+            msg = "Deliverable: NOT APPROVED"
+        elif bool(review_use.get("review_locked")):
+            msg = "Deliverable: REVIEW LOCKED - awaiting signoff"
+        else:
+            msg = "Deliverable: DRAFT - lock and sign before export"
+        if basis and decision != "UNSIGNED":
+            msg += f" | basis={basis}"
+        return msg
 
     def _apply_validation_plan_policy(self) -> None:
         session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"
@@ -12569,16 +12591,16 @@ def _build_intake(self) -> None:
             try:
                 sdir = Path(str(session_dir)).resolve()
             except Exception:
-                return "Approval: (invalid session path)"
+                return "Approval: (invalid session path)\nDeliverable: (unavailable)"
             summary_path = sdir / "exports" / "report_pack_v1" / "summary.json"
             if not summary_path.exists():
-                return "Approval: no report-pack review summary found for this session."
+                return "Approval: no report-pack review summary found for this session.\nDeliverable: review/export state unavailable."
             try:
                 summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
             except Exception as e:
-                return f"Approval: report-pack summary unreadable ({type(e).__name__})."
+                return f"Approval: report-pack summary unreadable ({type(e).__name__}).\nDeliverable: review/export state unavailable."
             if not isinstance(summary, dict):
-                return "Approval: report-pack summary invalid."
+                return "Approval: report-pack summary invalid.\nDeliverable: review/export state unavailable."
             review = summary.get("session_review") if isinstance(summary.get("session_review"), dict) else {}
             signoff = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
             decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
@@ -12597,13 +12619,29 @@ def _build_intake(self) -> None:
             if basis:
                 parts.append(f"basis={basis}")
             final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
+            pack_exists = bool(summary_path.exists())
+            final_exists = False
             if final_blk:
-                final_ready = "YES" if any(
-                    str(final_blk.get(key) or "").strip()
-                    for key in ("markdown_path", "docx_path", "pdf_path")
-                ) else "NO"
-                parts.append(f"final_report={final_ready}")
-            return " | ".join(parts)
+                for key in ("markdown_path", "docx_path", "pdf_path"):
+                    val = str(final_blk.get(key) or "").strip()
+                    if val and Path(val).exists():
+                        final_exists = True
+                        break
+            if decision == "APPROVED":
+                deliverable = "Deliverable: READY TO BUILD" if not (pack_exists or final_exists) else "Deliverable: APPROVED"
+            elif decision == "CONDITIONAL":
+                deliverable = "Deliverable: READY WITH CONDITIONS"
+            elif decision == "REJECTED":
+                deliverable = "Deliverable: NOT APPROVED"
+            elif bool(review.get("review_locked")):
+                deliverable = "Deliverable: REVIEW LOCKED - awaiting signoff"
+            else:
+                deliverable = "Deliverable: DRAFT - lock and sign before export"
+            if basis and decision != "UNSIGNED":
+                deliverable += f" | basis={basis}"
+            if pack_exists or final_exists:
+                deliverable += f" | report_pack={'YES' if pack_exists else 'NO'} | final_report={'YES' if final_exists else 'NO'}"
+            return " | ".join(parts) + "\n" + deliverable
 
         def _scan_sessions() -> list[dict[str, Any]]:
             out: list[dict[str, Any]] = []
