@@ -498,6 +498,8 @@ VALIDATION_VENDOR_OPTIONS = tuple(
     getattr(mole_ftir_validation, "FTIR_VENDOR_PROFILES", ("AUTO", "THERMOFISHER_MAX_CSV"))
 )
 VALIDATION_MASTER_CLOCK_OPTIONS = ("SESSION_MASTER_CLOCK", "SITE_NTP", "EXTERNAL_REFERENCE")
+SESSION_REVIEW_DECISIONS = ("UNSIGNED", "APPROVED", "CONDITIONAL", "REJECTED")
+SESSION_REVIEW_BASES = ("INTERNAL_REVIEW_READY", "COMPLIANCE_REPORT_READY", "VALIDATION_PACKAGE_READY", "NOT_APPROVED")
 
 
 def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -587,6 +589,73 @@ def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, A
         "notes": str(plan.get("notes") or "").strip(),
         "updated_by": str(plan.get("updated_by") or "").strip(),
         "updated_iso": str(plan.get("updated_iso") or "").strip(),
+    }
+
+
+def _normalize_session_review_cfg(
+    value: Any,
+    *,
+    session_mode: Optional[Dict[str, Any]] = None,
+    validation_plan: Optional[Dict[str, Any]] = None,
+    ftir_cfg: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    review = dict(value or {}) if isinstance(value, dict) else {}
+    sm = dict(session_mode or {}) if isinstance(session_mode, dict) else {}
+    plan = _normalize_validation_plan_cfg(validation_plan or {}, ftir_cfg=ftir_cfg)
+    ftir = dict(ftir_cfg or {}) if isinstance(ftir_cfg, dict) else {}
+    ftir_signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
+
+    enabled = bool(review.get("enabled"))
+    if not review:
+        enabled = bool(sm.get("may_support_compliance")) or bool(plan.get("enabled"))
+    scope = str(review.get("scope") or "").strip().upper()
+    if not scope:
+        if bool(plan.get("enabled")):
+            scope = "VALIDATION_REPORT"
+        elif bool(sm.get("may_support_compliance")):
+            scope = "COMPLIANCE_REPORT"
+        else:
+            scope = "PROJECT_REVIEW"
+    if scope not in ("PROJECT_REVIEW", "COMPLIANCE_REPORT", "VALIDATION_REPORT"):
+        scope = "PROJECT_REVIEW"
+
+    review_locked = bool(review.get("review_locked"))
+    signoff_in = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
+    signoff_decision = str(signoff_in.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+    if signoff_decision not in SESSION_REVIEW_DECISIONS:
+        signoff_decision = "UNSIGNED"
+    signoff_basis = str(signoff_in.get("basis") or "").strip().upper()
+    if signoff_basis and signoff_basis not in SESSION_REVIEW_BASES:
+        signoff_basis = ""
+
+    reviewer_name = str(review.get("reviewer_name") or plan.get("peer_reviewer") or ftir.get("reviewer") or "").strip()
+    reviewer_role = str(review.get("reviewer_role") or ("Peer Reviewer" if reviewer_name else "")).strip()
+    approver_name = str((signoff_in.get("by") or review.get("default_approver") or plan.get("final_approver") or ftir_signoff.get("by") or "")).strip()
+    approver_role = str((signoff_in.get("role") or review.get("default_approver_role") or plan.get("final_approver_role") or ftir_signoff.get("role") or "")).strip()
+
+    return {
+        "enabled": bool(enabled),
+        "scope": scope,
+        "reviewer_name": reviewer_name,
+        "reviewer_role": reviewer_role,
+        "review_notes": str(review.get("review_notes") or "").strip(),
+        "review_locked": review_locked,
+        "review_lock_by": str(review.get("review_lock_by") or "").strip(),
+        "review_lock_iso": str(review.get("review_lock_iso") or "").strip(),
+        "review_unlock_by": str(review.get("review_unlock_by") or "").strip(),
+        "review_unlock_iso": str(review.get("review_unlock_iso") or "").strip(),
+        "default_approver": str(review.get("default_approver") or plan.get("final_approver") or "").strip(),
+        "default_approver_role": str(review.get("default_approver_role") or plan.get("final_approver_role") or "").strip(),
+        "signoff": {
+            "decision": signoff_decision,
+            "basis": signoff_basis,
+            "by": approver_name,
+            "role": approver_role,
+            "iso": str(signoff_in.get("iso") or "").strip(),
+            "note": str(signoff_in.get("note") or "").strip(),
+        },
+        "updated_by": str(review.get("updated_by") or "").strip(),
+        "updated_iso": str(review.get("updated_iso") or "").strip(),
     }
 
 
@@ -698,6 +767,21 @@ def ensure_session_schema(session: Dict[str, Any], *, actor: str = "wizard", too
         migrated = True
         notes.append("Validation test plan was backfilled from FTIR validation settings.")
     session["validation_plan"] = validation_plan
+
+    session_review_in = session.get("session_review")
+    session_review = _normalize_session_review_cfg(
+        session_review_in,
+        session_mode=sm,
+        validation_plan=validation_plan,
+        ftir_cfg=(session.get("ftir_validation") if isinstance(session.get("ftir_validation"), dict) else {}),
+    )
+    if not isinstance(session_review_in, dict):
+        migrated = True
+        notes.append("Session review / approval block was initialized.")
+    elif session_review_in != session_review:
+        migrated = True
+        notes.append("Session review / approval block was normalized.")
+    session["session_review"] = session_review
 
     session["schema_version"] = SESSION_SCHEMA_VERSION
     meta["session_schema_version"] = SESSION_SCHEMA_VERSION
@@ -3138,9 +3222,10 @@ class MoleDASWizard(tk.Tk):
         lines = [
             f"Mode: {sm.get('mode')} | Install: {sm.get('install')}",
             f"Record: {sm.get('record_data')} | Token: {sm.get('tokenize')} | Diag: {sm.get('diagnostic_only')}",
-f"Job: {proj.get('job_id')}",
+            f"Job: {proj.get('job_id')}",
 f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((proj.get('intake') or {}).get('missing') or [])} missing)",
             f"Validation: {self._validation_plan_summary(self.session.get('validation_plan') or {})}",
+            f"Review: {self._session_review_summary(self.session.get('session_review') or {})}",
             f"Fuel: {(fuel.get('fuel_button_code','') + ' ' + fuel.get('fuel_category','')).strip() or '(unset)'}",
             f"Source: {src.get('source_category') or '(unset)'}",
             f"Pollutants: {', '.join(sel) if sel else '(none)'}",
@@ -6149,6 +6234,33 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             f"peer reviewer={reviewer}",
         ])
 
+    def _session_review_section(self) -> Dict[str, Any]:
+        review = _normalize_session_review_cfg(
+            self.session.get("session_review"),
+            session_mode=(self.session.get("session_mode") if isinstance(self.session.get("session_mode"), dict) else {}),
+            validation_plan=(self.session.get("validation_plan") if isinstance(self.session.get("validation_plan"), dict) else {}),
+            ftir_cfg=(self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}),
+        )
+        self.session["session_review"] = review
+        return review
+
+    def _session_review_summary(self, review: Optional[Dict[str, Any]] = None) -> str:
+        review_use = dict(review or self._session_review_section())
+        if not bool(review_use.get("enabled")):
+            return "Session review inactive."
+        signoff = review_use.get("signoff") if isinstance(review_use.get("signoff"), dict) else {}
+        decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+        lock_state = "LOCKED" if bool(review_use.get("review_locked")) else "DRAFT"
+        reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
+        approver = str(signoff.get("by") or review_use.get("default_approver") or "").strip() or "(unassigned)"
+        return " | ".join([
+            f"scope={review_use.get('scope') or 'PROJECT_REVIEW'}",
+            f"state={lock_state}",
+            f"decision={decision}",
+            f"reviewer={reviewer}",
+            f"approver={approver}",
+        ])
+
     def _apply_validation_plan_policy(self) -> None:
         session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"
         if session_type not in VALIDATION_SESSION_TYPES:
@@ -6243,6 +6355,12 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         self.session["validation_plan"] = plan
         self.var_validation_status.set(self._validation_plan_summary(plan))
         self._seed_ftir_validation_from_plan(plan)
+        self.session["session_review"] = _normalize_session_review_cfg(
+            self.session.get("session_review"),
+            session_mode=(self.session.get("session_mode") if isinstance(self.session.get("session_mode"), dict) else {}),
+            validation_plan=plan,
+            ftir_cfg=(self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}),
+        )
 
     def _validation_plan_load_vars_from_session(self) -> None:
         plan = self._validation_plan_section()

@@ -57,12 +57,16 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertNotIn("STATE_PERMIT_GENERAL", sess["regulatory"]["selected_rule_meta"])
         self.assertEqual(sess["validation_plan"]["session_type"], "STANDARD_TEST")
         self.assertEqual(sess["validation_plan"]["validation_mode"], "NONE")
+        self.assertFalse(sess["session_review"]["enabled"])
+        self.assertEqual(sess["session_review"]["scope"], "PROJECT_REVIEW")
+        self.assertEqual(sess["session_review"]["signoff"]["decision"], "UNSIGNED")
 
         note_blob = " | ".join(meta["session_schema_last_notes"])
         self.assertIn("may_support_compliance=true", note_blob)
         self.assertIn("Unsupported compressibility mode", note_blob)
         self.assertIn("Dual-fuel liquid share semantics", note_blob)
         self.assertIn("STATE_PERMIT_GENERAL", note_blob)
+        self.assertIn("Session review / approval block", note_blob)
 
     def _assert_prod_fixture(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
         sess = ensure_fn(self._fixture("legacy_prod_session.json"), actor="unit_test")
@@ -76,10 +80,13 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertNotIn("z_basis", sess["site_conditions"])
         self.assertEqual(sess["validation_plan"]["session_type"], "STANDARD_TEST")
         self.assertEqual(sess["validation_plan"]["validation_mode"], "NONE")
+        self.assertFalse(sess["session_review"]["enabled"])
+        self.assertEqual(sess["session_review"]["signoff"]["decision"], "UNSIGNED")
 
         note_blob = " | ".join(meta["session_schema_last_notes"])
         self.assertIn("Stale diagnostics UI mode was cleared", note_blob)
         self.assertIn("Legacy site_conditions.z_basis key was retired", note_blob)
+        self.assertIn("Session review / approval block", note_blob)
 
     def _assert_ftir_validation_backfill(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
         sess = ensure_fn({
@@ -115,6 +122,13 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertEqual(plan["peer_reviewer"], "Peer Scientist")
         self.assertEqual(plan["final_approver"], "Lead Scientist")
         self.assertEqual(plan["final_approver_role"], "Principal Scientist")
+        review = sess["session_review"]
+        self.assertTrue(review["enabled"])
+        self.assertEqual(review["scope"], "VALIDATION_REPORT")
+        self.assertEqual(review["reviewer_name"], "Peer Scientist")
+        self.assertEqual(review["default_approver"], "Lead Scientist")
+        self.assertEqual(review["default_approver_role"], "Principal Scientist")
+        self.assertEqual(review["signoff"]["decision"], "UNSIGNED")
         self.assertIn("Validation test plan", notes)
         self.assertIn("backfilled from FTIR validation settings", notes)
 

@@ -284,6 +284,8 @@ VALIDATION_VENDOR_OPTIONS = tuple(
     getattr(mole_ftir_validation, "FTIR_VENDOR_PROFILES", ("AUTO", "THERMOFISHER_MAX_CSV"))
 )
 VALIDATION_MASTER_CLOCK_OPTIONS = ("SESSION_MASTER_CLOCK", "SITE_NTP", "EXTERNAL_REFERENCE")
+SESSION_REVIEW_DECISIONS = ("UNSIGNED", "APPROVED", "CONDITIONAL", "REJECTED")
+SESSION_REVIEW_BASES = ("INTERNAL_REVIEW_READY", "COMPLIANCE_REPORT_READY", "VALIDATION_PACKAGE_READY", "NOT_APPROVED")
 
 
 def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -373,6 +375,65 @@ def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, A
         "notes": str(plan.get("notes") or "").strip(),
         "updated_by": str(plan.get("updated_by") or "").strip(),
         "updated_iso": str(plan.get("updated_iso") or "").strip(),
+    }
+
+
+def _normalize_session_review_cfg(
+    value: Any,
+    *,
+    session_mode: Optional[Dict[str, Any]] = None,
+    validation_plan: Optional[Dict[str, Any]] = None,
+    ftir_cfg: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    review = dict(value or {}) if isinstance(value, dict) else {}
+    sm = dict(session_mode or {}) if isinstance(session_mode, dict) else {}
+    plan = _normalize_validation_plan_cfg(validation_plan or {}, ftir_cfg=ftir_cfg)
+    ftir = dict(ftir_cfg or {}) if isinstance(ftir_cfg, dict) else {}
+    ftir_signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
+
+    enabled = bool(review.get("enabled"))
+    if not review:
+        enabled = bool(plan.get("enabled")) or bool(sm.get("may_support_compliance"))
+    scope = str(review.get("scope") or "").strip().upper()
+    if not scope:
+        if bool(plan.get("enabled")):
+            scope = "VALIDATION_REPORT"
+        elif bool(sm.get("may_support_compliance")):
+            scope = "COMPLIANCE_REPORT"
+        else:
+            scope = "PROJECT_REVIEW"
+
+    signoff_in = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
+    signoff_decision = str(signoff_in.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+    if signoff_decision not in SESSION_REVIEW_DECISIONS:
+        signoff_decision = "UNSIGNED"
+    signoff_basis = str(signoff_in.get("basis") or "").strip().upper()
+    if signoff_basis and signoff_basis not in SESSION_REVIEW_BASES:
+        signoff_basis = ""
+
+    return {
+        "enabled": enabled,
+        "scope": scope,
+        "reviewer_name": str(review.get("reviewer_name") or plan.get("peer_reviewer") or ftir.get("reviewer") or "").strip(),
+        "reviewer_role": str(review.get("reviewer_role") or "Peer Reviewer").strip(),
+        "review_notes": str(review.get("review_notes") or "").strip(),
+        "review_locked": bool(review.get("review_locked")),
+        "review_lock_by": str(review.get("review_lock_by") or "").strip(),
+        "review_lock_iso": str(review.get("review_lock_iso") or "").strip(),
+        "review_unlock_by": str(review.get("review_unlock_by") or "").strip(),
+        "review_unlock_iso": str(review.get("review_unlock_iso") or "").strip(),
+        "default_approver": str(review.get("default_approver") or plan.get("final_approver") or ftir_signoff.get("by") or "").strip(),
+        "default_approver_role": str(review.get("default_approver_role") or plan.get("final_approver_role") or ftir_signoff.get("role") or "").strip(),
+        "signoff": {
+            "decision": signoff_decision,
+            "basis": signoff_basis,
+            "by": str(signoff_in.get("by") or "").strip(),
+            "role": str(signoff_in.get("role") or "").strip(),
+            "iso": str(signoff_in.get("iso") or "").strip(),
+            "note": str(signoff_in.get("note") or "").strip(),
+        },
+        "updated_by": str(review.get("updated_by") or "").strip(),
+        "updated_iso": str(review.get("updated_iso") or "").strip(),
     }
 
 
@@ -486,6 +547,21 @@ def ensure_session_schema(session: Dict[str, Any], *, actor: str = "runner", too
         migrated = True
         notes.append("Validation test plan was backfilled from FTIR validation settings.")
     session["validation_plan"] = validation_plan
+
+    session_review_in = session.get("session_review")
+    session_review = _normalize_session_review_cfg(
+        session_review_in,
+        session_mode=sm,
+        validation_plan=validation_plan,
+        ftir_cfg=(session.get("ftir_validation") if isinstance(session.get("ftir_validation"), dict) else {}),
+    )
+    if not isinstance(session_review_in, dict):
+        migrated = True
+        notes.append("Session review / approval block was initialized.")
+    elif session_review_in != session_review:
+        migrated = True
+        notes.append("Session review / approval block was normalized.")
+    session["session_review"] = session_review
 
     session["schema_version"] = SESSION_SCHEMA_VERSION
     meta["session_schema_version"] = SESSION_SCHEMA_VERSION
@@ -10037,6 +10113,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_report_submission_status = tk.StringVar(value="")
     var_report_observer_contacts = tk.StringVar(value="")
     var_report_approval_dates = tk.StringVar(value="")
+    var_session_review_scope = tk.StringVar(value="PROJECT_REVIEW")
+    var_session_review_reviewer = tk.StringVar(value="")
+    var_session_review_reviewer_role = tk.StringVar(value="Peer Reviewer")
+    var_session_review_default_approver = tk.StringVar(value="")
+    var_session_review_default_approver_role = tk.StringVar(value="")
+    var_session_review_decision = tk.StringVar(value="UNSIGNED")
+    var_session_review_basis = tk.StringVar(value="")
+    var_session_review_signoff_by = tk.StringVar(value="")
+    var_session_review_signoff_role = tk.StringVar(value="")
+    var_session_review_lock_status = tk.StringVar(value="Session review state: UNLOCKED")
+    var_session_review_signoff_status = tk.StringVar(value="Session review signoff: UNSIGNED")
 
     tk.Label(report_builder_form, text="Client name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     tk.Entry(report_builder_form, textvariable=var_report_client_name, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=1, sticky="ew", pady=(0, 6))
@@ -10067,6 +10154,109 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     tk.Entry(report_builder_form, textvariable=var_report_observer_contacts, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=1, sticky="ew", pady=(0, 6))
     tk.Label(report_builder_form, text="Approval dates:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     tk.Entry(report_builder_form, textvariable=var_report_approval_dates, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=3, sticky="ew", pady=(0, 6))
+
+    report_builder_session_review_wrap = tk.Frame(report_builder_wrap, bg=BG)
+    report_builder_session_review_wrap.pack(fill="x", pady=(0, 8))
+    tk.Label(
+        report_builder_session_review_wrap,
+        text="Session Review / Approval",
+        fg=ACC,
+        bg=BG,
+        font=("Consolas", 10, "bold"),
+    ).pack(anchor="w")
+    tk.Label(
+        report_builder_session_review_wrap,
+        text="Shared review state for validation and compliance-ready deliverables.",
+        fg=FG_DIM,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(2, 6))
+
+    report_builder_session_review_form = tk.Frame(report_builder_session_review_wrap, bg=BG)
+    report_builder_session_review_form.pack(fill="x", pady=(0, 6))
+    _configure_runner_form_grid(report_builder_session_review_form, minspec="runner_two_pair")
+    tk.Label(report_builder_session_review_form, text="Review scope:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    cbo_session_review_scope = ttk.Combobox(
+        report_builder_session_review_form,
+        textvariable=var_session_review_scope,
+        values=["PROJECT_REVIEW", "COMPLIANCE_REPORT", "VALIDATION_REPORT"],
+        state="readonly",
+        width=28,
+    )
+    cbo_session_review_scope.grid(row=0, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Reviewer name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_session_review_reviewer = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_reviewer, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_reviewer.grid(row=0, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Reviewer role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_session_review_reviewer_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_reviewer_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_reviewer_role.grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Default approver:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_session_review_default_approver = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_default_approver, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_default_approver.grid(row=1, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Approver role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_session_review_default_approver_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_default_approver_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_default_approver_role.grid(row=2, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Decision:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    cbo_session_review_decision = ttk.Combobox(
+        report_builder_session_review_form,
+        textvariable=var_session_review_decision,
+        values=list(SESSION_REVIEW_DECISIONS),
+        state="readonly",
+        width=22,
+    )
+    cbo_session_review_decision.grid(row=2, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Acceptance basis:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    cbo_session_review_basis = ttk.Combobox(
+        report_builder_session_review_form,
+        textvariable=var_session_review_basis,
+        values=list(SESSION_REVIEW_BASES),
+        state="readonly",
+        width=28,
+    )
+    cbo_session_review_basis.grid(row=3, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Signoff by:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_session_review_signoff_by = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_signoff_by, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_signoff_by.grid(row=3, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_session_review_form, text="Signoff role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_session_review_signoff_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_signoff_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_session_review_signoff_role.grid(row=4, column=1, sticky="ew", pady=(0, 6))
+
+    txt_session_review_notes = _report_builder_labeled_text(
+        report_builder_session_review_wrap,
+        "Session Review Notes",
+        height=3,
+        note="Use for package-level reviewer observations, restrictions, or release notes.",
+    )
+    txt_session_review_signoff_note = _report_builder_labeled_text(
+        report_builder_session_review_wrap,
+        "Session Review Signoff Note",
+        height=3,
+        note="Use for approval conditions, exceptions, or explicit rejection basis.",
+    )
+    tk.Label(
+        report_builder_session_review_wrap,
+        textvariable=var_session_review_lock_status,
+        fg=ACC,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(0, 2))
+    tk.Label(
+        report_builder_session_review_wrap,
+        textvariable=var_session_review_signoff_status,
+        fg=FG,
+        bg=BG,
+        font=("Consolas", 9),
+    ).pack(anchor="w", pady=(0, 6))
+    report_builder_session_review_ctrls = tk.Frame(report_builder_session_review_wrap, bg=BG)
+    report_builder_session_review_ctrls.pack(fill="x", pady=(0, 4))
+    btn_session_review_lock = tk.Button(report_builder_session_review_ctrls, text="Lock Review", bg=BTN_BG, fg=FG, relief="flat")
+    btn_session_review_lock.pack(side="left")
+    btn_session_review_unlock = tk.Button(report_builder_session_review_ctrls, text="Unlock Review", bg=BTN_BG, fg=FG, relief="flat")
+    btn_session_review_unlock.pack(side="left", padx=(8, 0))
+    btn_session_review_sign = tk.Button(report_builder_session_review_ctrls, text="Sign Off", bg=BTN_BG, fg=FG, relief="flat")
+    btn_session_review_sign.pack(side="left", padx=(8, 0))
+    btn_session_review_clear_signoff = tk.Button(report_builder_session_review_ctrls, text="Clear Signoff", bg=BTN_BG, fg=FG, relief="flat")
+    btn_session_review_clear_signoff.pack(side="left", padx=(8, 0))
 
     report_builder_longform = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_longform.pack(fill="x", pady=(0, 8))
@@ -14985,6 +15175,36 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 blk[key] = {}
         return blk
 
+    def _session_review_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        review = _normalize_session_review_cfg(
+            sess_local.get("session_review"),
+            session_mode=(sess_local.get("session_mode") if isinstance(sess_local.get("session_mode"), dict) else {}),
+            validation_plan=(sess_local.get("validation_plan") if isinstance(sess_local.get("validation_plan"), dict) else {}),
+            ftir_cfg=(sess_local.get("ftir_validation") if isinstance(sess_local.get("ftir_validation"), dict) else {}),
+        )
+        sess_local["session_review"] = review
+        return review
+
+    def _session_review_signoff_block(review_local: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            sign = review_local.get("signoff") if isinstance(review_local.get("signoff"), dict) else {}
+            return dict(sign or {})
+        except Exception:
+            return {}
+
+    def _session_review_is_locked(review_local: Dict[str, Any]) -> bool:
+        try:
+            return bool((review_local or {}).get("review_locked"))
+        except Exception:
+            return False
+
+    def _session_review_is_signed(review_local: Dict[str, Any]) -> bool:
+        try:
+            sign = _session_review_signoff_block(review_local)
+            return str(sign.get("decision") or "UNSIGNED").strip().upper() != "UNSIGNED"
+        except Exception:
+            return False
+
     def _ftir_validation_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
         blk = sess_local.get("ftir_validation")
         if not isinstance(blk, dict):
@@ -15509,6 +15729,62 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     def _set_widget_state(widget: Any, state: str) -> None:
         try:
             widget.configure(state=state)
+        except Exception:
+            pass
+
+    def _apply_session_review_lock_state(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        try:
+            sess_use = dict(sess_local) if isinstance(sess_local, dict) else _load_session()
+            review_local = _session_review_block(sess_use)
+            enabled = bool(review_local.get("enabled"))
+            if diagnostics_ui:
+                enabled = False
+            locked = _session_review_is_locked(review_local)
+            signed = _session_review_is_signed(review_local)
+            sign = _session_review_signoff_block(review_local)
+            lock_by = str(review_local.get("review_lock_by") or "").strip()
+            lock_iso = str(review_local.get("review_lock_iso") or "").strip()
+            unlock_by = str(review_local.get("review_unlock_by") or "").strip()
+            unlock_iso = str(review_local.get("review_unlock_iso") or "").strip()
+            if not enabled:
+                var_session_review_lock_status.set("Session review state: INACTIVE")
+                var_session_review_signoff_status.set("Session review signoff: INACTIVE")
+            else:
+                msg = f"Session review state: {'LOCKED' if locked else 'UNLOCKED'} | scope {review_local.get('scope') or 'PROJECT_REVIEW'}"
+                if locked and (lock_by or lock_iso):
+                    msg += f" | by {lock_by or '(unknown)'} @ {lock_iso or '(unknown)'}"
+                elif (not locked) and (unlock_by or unlock_iso):
+                    msg += f" | last unlock by {unlock_by or '(unknown)'} @ {unlock_iso or '(unknown)'}"
+                var_session_review_lock_status.set(msg)
+                sign_msg = f"Session review signoff: {str(sign.get('decision') or 'UNSIGNED').strip().upper() or 'UNSIGNED'}"
+                if str(sign.get("basis") or "").strip():
+                    sign_msg += f" | basis {sign.get('basis')}"
+                if str(sign.get("by") or "").strip() or str(sign.get("iso") or "").strip():
+                    sign_msg += f" | by {sign.get('by') or '(unknown)'} @ {sign.get('iso') or '(unknown)'}"
+                var_session_review_signoff_status.set(sign_msg)
+
+            if cbo_session_review_scope is not None:
+                _set_widget_state(cbo_session_review_scope, "readonly" if enabled and not locked else "disabled")
+            for widget in [
+                ent_session_review_reviewer,
+                ent_session_review_reviewer_role,
+                ent_session_review_default_approver,
+                ent_session_review_default_approver_role,
+                txt_session_review_notes,
+            ]:
+                _set_widget_state(widget, "normal" if enabled and not locked else "disabled")
+            for widget in [cbo_session_review_decision, cbo_session_review_basis]:
+                _set_widget_state(widget, "readonly" if enabled and locked and not signed else "disabled")
+            for widget in [
+                ent_session_review_signoff_by,
+                ent_session_review_signoff_role,
+                txt_session_review_signoff_note,
+            ]:
+                _set_widget_state(widget, "normal" if enabled and locked and not signed else "disabled")
+            _set_widget_state(btn_session_review_lock, "normal" if enabled and not locked else "disabled")
+            _set_widget_state(btn_session_review_unlock, "normal" if enabled and locked else "disabled")
+            _set_widget_state(btn_session_review_sign, "normal" if enabled and locked and not signed else "disabled")
+            _set_widget_state(btn_session_review_clear_signoff, "normal" if enabled and signed else "disabled")
         except Exception:
             pass
 
@@ -16121,6 +16397,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
             deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
             correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+            session_review = _session_review_block(sess_use)
             ftir_validation = _ftir_validation_block(sess_use)
             project = sess_use.get("project") if isinstance(sess_use.get("project"), dict) else {}
             source = sess_use.get("source") if isinstance(sess_use.get("source"), dict) else {}
@@ -16137,6 +16414,18 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             var_report_submission_status.set(str(correspondence.get("submission_status") or ""))
             var_report_observer_contacts.set("; ".join([str(item) for item in _report_builder_split_list(parties.get("observer_contacts"))]))
             var_report_approval_dates.set("; ".join([str(item) for item in _report_builder_split_list(correspondence.get("approval_dates"))]))
+            var_session_review_scope.set(str(session_review.get("scope") or "PROJECT_REVIEW"))
+            var_session_review_reviewer.set(str(session_review.get("reviewer_name") or ""))
+            var_session_review_reviewer_role.set(str(session_review.get("reviewer_role") or "Peer Reviewer"))
+            var_session_review_default_approver.set(str(session_review.get("default_approver") or ""))
+            var_session_review_default_approver_role.set(str(session_review.get("default_approver_role") or ""))
+            _report_builder_text_set(txt_session_review_notes, session_review.get("review_notes"))
+            session_review_sign = _session_review_signoff_block(session_review)
+            var_session_review_decision.set(str(session_review_sign.get("decision") or "UNSIGNED"))
+            var_session_review_basis.set(str(session_review_sign.get("basis") or ""))
+            var_session_review_signoff_by.set(str(session_review_sign.get("by") or session_review.get("default_approver") or ""))
+            var_session_review_signoff_role.set(str(session_review_sign.get("role") or session_review.get("default_approver_role") or ""))
+            _report_builder_text_set(txt_session_review_signoff_note, session_review_sign.get("note"))
 
             _report_builder_text_set(
                 txt_report_process_narrative,
@@ -16210,6 +16499,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _report_builder_text_set(txt_ftir_validation_signoff_note, signoff.get("note"))
             var_ftir_validation_exclusion_reason.set("")
             var_ftir_validation_set_review_reason.set("")
+            _apply_session_review_lock_state(sess_use)
             _apply_ftir_validation_lock_state(sess_use)
         except Exception:
             pass
@@ -16220,6 +16510,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         process_control = blk.get("process_control") if isinstance(blk.get("process_control"), dict) else {}
         deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
         correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
+        session_review = _session_review_block(sess_local)
         ftir_validation = _ftir_validation_block(sess_local)
 
         sections: List[Dict[str, Any]] = []
@@ -16308,6 +16599,32 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         ]
         sections.append({"label": "Regulatory correspondence", **corr_eval})
 
+        if bool(session_review.get("enabled")):
+            review_sign = _session_review_signoff_block(session_review)
+            review_eval = _status(
+                [
+                    ("Reviewer name", session_review.get("reviewer_name")),
+                    ("Default approver", session_review.get("default_approver")),
+                ],
+                [
+                    ("Reviewer role", session_review.get("reviewer_role")),
+                    ("Approver role", session_review.get("default_approver_role")),
+                    ("Review notes", session_review.get("review_notes")),
+                    ("Signoff note", review_sign.get("note")),
+                ],
+            )
+            if not _session_review_is_locked(session_review) or not _session_review_is_signed(session_review):
+                review_eval["status"] = "Partial" if review_eval["status"] == "Available" else review_eval["status"]
+                missing_extra: List[str] = []
+                if not _session_review_is_locked(session_review):
+                    missing_extra.append("Review lock")
+                if not _session_review_is_signed(session_review):
+                    missing_extra.append("Signoff decision")
+                review_eval["missing"] = list(dict.fromkeys(list(review_eval.get("missing") or []) + missing_extra))
+            sections.append({"label": "Session review / approval", **review_eval})
+        else:
+            sections.append({"label": "Session review / approval", "status": "Available", "missing": []})
+
         ftir_eval = _status(
             [
                 ("FTIR data file", ftir_validation.get("ftir_file_path") if bool(ftir_validation.get("enabled")) else "disabled"),
@@ -16348,6 +16665,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         deviations = blk.get("deviations_approvals") if isinstance(blk.get("deviations_approvals"), dict) else {}
         correspondence = blk.get("correspondence") if isinstance(blk.get("correspondence"), dict) else {}
         meta = blk.get("meta") if isinstance(blk.get("meta"), dict) else {}
+        session_review = _session_review_block(sess)
+        session_review_locked = _session_review_is_locked(session_review)
+        session_review_signed = _session_review_is_signed(session_review)
         ftir_validation = _ftir_validation_block(sess)
         ftir_locked = _ftir_validation_is_locked(ftir_validation)
         ftir_signed = _ftir_validation_is_signed(ftir_validation)
@@ -16379,6 +16699,26 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "submission_status": str(var_report_submission_status.get() or "").strip(),
             "notes": _report_builder_text_get(txt_report_correspondence_notes),
         })
+        if not session_review_locked:
+            session_review.update({
+                "scope": str(var_session_review_scope.get() or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW",
+                "reviewer_name": str(var_session_review_reviewer.get() or "").strip(),
+                "reviewer_role": str(var_session_review_reviewer_role.get() or "").strip(),
+                "default_approver": str(var_session_review_default_approver.get() or "").strip(),
+                "default_approver_role": str(var_session_review_default_approver_role.get() or "").strip(),
+                "review_notes": _report_builder_text_get(txt_session_review_notes),
+            })
+        if not session_review_signed:
+            session_review["signoff"] = {
+                "decision": str(var_session_review_decision.get() or "UNSIGNED").strip().upper() or "UNSIGNED",
+                "basis": str(var_session_review_basis.get() or "").strip().upper(),
+                "by": str(var_session_review_signoff_by.get() or "").strip(),
+                "role": str(var_session_review_signoff_role.get() or "").strip(),
+                "iso": "",
+                "note": _report_builder_text_get(txt_session_review_signoff_note),
+            }
+        session_review["updated_by"] = _report_builder_actor(sess)
+        session_review["updated_iso"] = now_iso()
         if not ftir_locked:
             ftir_validation.update({
                 "enabled": bool(var_ftir_validation_enabled.get()),
@@ -16466,10 +16806,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         blk["correspondence"] = correspondence
         blk["meta"] = meta
         sess["report_builder"] = blk
+        sess["session_review"] = _normalize_session_review_cfg(
+            session_review,
+            session_mode=(sess.get("session_mode") if isinstance(sess.get("session_mode"), dict) else {}),
+            validation_plan=(sess.get("validation_plan") if isinstance(sess.get("validation_plan"), dict) else {}),
+            ftir_cfg=ftir_validation,
+        )
         sess["ftir_validation"] = ftir_validation
         _ftir_validation_execution_status(sess)
         _save_session(sess)
         _refresh_report_builder_status(sess)
+        _apply_session_review_lock_state(sess)
         _apply_ftir_validation_lock_state(sess)
         if show_message:
             messagebox.showinfo("Report Builder", "Report metadata saved.")
@@ -16484,10 +16831,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             summary = _read_json(pths["summary_json"]) if pths["summary_json"].exists() else {}
             final_blk: Dict[str, Any] = {}
             ftir_blk: Dict[str, Any] = {}
+            session_review_blk = _session_review_block(sess_use)
             ftir_cfg = _ftir_validation_block(sess_use)
             if isinstance(summary, dict):
                 final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
                 ftir_blk = summary.get("ftir_validation") if isinstance(summary.get("ftir_validation"), dict) else {}
+                review_summary = summary.get("session_review") if isinstance(summary.get("session_review"), dict) else {}
+                if isinstance(review_summary, dict) and review_summary:
+                    session_review_blk = {**session_review_blk, **review_summary}
                 rc_blk = summary.get("report_context") if isinstance(summary.get("report_context"), dict) else {}
                 if str(final_blk.get("markdown_path") or "").strip():
                     pths["final_report_md"] = Path(str(final_blk.get("markdown_path")))
@@ -16576,6 +16927,21 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 lines.append(f"- PDF render status: {(pdf_row.get('status') if isinstance(pdf_row, dict) else None) or '(n/a)'}")
                 if isinstance(pdf_row, dict) and str(pdf_row.get("reason") or "").strip():
                     lines.append(f"  reason: {pdf_row.get('reason')}")
+            if isinstance(session_review_blk, dict) and session_review_blk:
+                review_sign = _session_review_signoff_block(session_review_blk)
+                lines.append(f"- Session review enabled: {'YES' if bool(session_review_blk.get('enabled')) else 'NO'}")
+                lines.append(f"- Session review scope: {session_review_blk.get('scope') or '(n/a)'}")
+                lines.append(f"- Session review reviewer: {session_review_blk.get('reviewer_name') or '(n/a)'} | role: {session_review_blk.get('reviewer_role') or '(n/a)'}")
+                lines.append(f"- Session review locked: {'YES' if bool(session_review_blk.get('review_locked')) else 'NO'}")
+                if bool(session_review_blk.get('review_locked')):
+                    lines.append(f"  locked by: {session_review_blk.get('review_lock_by') or '(n/a)'} @ {session_review_blk.get('review_lock_iso') or '(n/a)'}")
+                elif str(session_review_blk.get('review_unlock_by') or '').strip() or str(session_review_blk.get('review_unlock_iso') or '').strip():
+                    lines.append(f"  last unlock: {session_review_blk.get('review_unlock_by') or '(n/a)'} @ {session_review_blk.get('review_unlock_iso') or '(n/a)'}")
+                lines.append(f"- Session review signoff: {str(review_sign.get('decision') or 'UNSIGNED').strip().upper() or 'UNSIGNED'}")
+                if str(review_sign.get("basis") or "").strip():
+                    lines.append(f"  basis: {review_sign.get('basis')}")
+                if str(review_sign.get("by") or "").strip() or str(review_sign.get("iso") or "").strip():
+                    lines.append(f"  by: {review_sign.get('by') or '(n/a)'} | role: {review_sign.get('role') or '(n/a)'} | at: {review_sign.get('iso') or '(n/a)'}")
             if isinstance(ftir_blk, dict) and ftir_blk:
                 sign = ftir_blk.get("signoff") if isinstance(ftir_blk.get("signoff"), dict) else {}
                 qa = ftir_blk.get("qa") if isinstance(ftir_blk.get("qa"), dict) else {}
@@ -16648,6 +17014,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             report_builder_text.delete("1.0", "end")
             report_builder_text.insert("1.0", "\n".join(lines).strip() + "\n")
             report_builder_text.configure(state="disabled")
+            _apply_session_review_lock_state(sess_use)
         except Exception as e:
             try:
                 var_report_builder_status.set("Report builder status refresh failed.")
@@ -16657,6 +17024,118 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 report_builder_text.configure(state="disabled")
             except Exception:
                 pass
+
+    def _lock_session_review() -> None:
+        nonlocal sess
+        try:
+            sess = _report_builder_save_to_session(show_message=False)
+            _ensure_daq_schema(sess)
+            review = _session_review_block(sess)
+            if not bool(review.get("enabled")):
+                raise ValueError("Session review is not active for this session.")
+            if _session_review_is_locked(review):
+                _apply_session_review_lock_state(sess)
+                return
+            review["review_locked"] = True
+            review["review_lock_by"] = _report_builder_actor(sess)
+            review["review_lock_iso"] = now_iso()
+            sess["session_review"] = review
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _apply_session_review_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("Session Review", str(e))
+
+    def _unlock_session_review() -> None:
+        nonlocal sess
+        if not messagebox.askyesno("Session Review", "Unlock session review and allow edits?"):
+            return
+        try:
+            sess = _load_session()
+            _ensure_daq_schema(sess)
+            review = _session_review_block(sess)
+            review["review_locked"] = False
+            review["review_unlock_by"] = _report_builder_actor(sess)
+            review["review_unlock_iso"] = now_iso()
+            review["signoff"] = {
+                "decision": "UNSIGNED",
+                "basis": "",
+                "by": "",
+                "role": "",
+                "iso": "",
+                "note": "",
+            }
+            sess["session_review"] = review
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _apply_session_review_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("Session Review", str(e))
+
+    def _signoff_session_review() -> None:
+        nonlocal sess
+        try:
+            sess = _report_builder_save_to_session(show_message=False)
+            _ensure_daq_schema(sess)
+            review = _session_review_block(sess)
+            if not bool(review.get("enabled")):
+                raise ValueError("Session review is not active for this session.")
+            if not _session_review_is_locked(review):
+                raise ValueError("Lock the session review before signing off.")
+            decision = str(var_session_review_decision.get() or "UNSIGNED").strip().upper() or "UNSIGNED"
+            basis = str(var_session_review_basis.get() or "").strip().upper()
+            approver = str(var_session_review_signoff_by.get() or review.get("default_approver") or "").strip()
+            role = str(var_session_review_signoff_role.get() or review.get("default_approver_role") or "").strip()
+            note = _report_builder_text_get(txt_session_review_signoff_note)
+            if decision == "UNSIGNED":
+                raise ValueError("Select a session-review signoff decision before signing off.")
+            if not approver:
+                raise ValueError("Approver name is required.")
+            if decision in ("APPROVED", "CONDITIONAL") and basis == "NOT_APPROVED":
+                raise ValueError("Approved or conditional signoff cannot use NOT_APPROVED as the basis.")
+            if decision == "REJECTED" and basis != "NOT_APPROVED":
+                raise ValueError("Rejected signoff requires basis NOT_APPROVED.")
+            review["signoff"] = {
+                "decision": decision,
+                "basis": basis,
+                "by": approver,
+                "role": role,
+                "iso": now_iso(),
+                "note": note,
+            }
+            sess["session_review"] = review
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _apply_session_review_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("Session Review", str(e))
+
+    def _clear_session_review_signoff() -> None:
+        nonlocal sess
+        if not messagebox.askyesno("Session Review", "Clear the session review signoff for this locked review?"):
+            return
+        try:
+            sess = _load_session()
+            _ensure_daq_schema(sess)
+            review = _session_review_block(sess)
+            review["signoff"] = {
+                "decision": "UNSIGNED",
+                "basis": "",
+                "by": "",
+                "role": "",
+                "iso": "",
+                "note": "",
+            }
+            sess["session_review"] = review
+            _save_session(sess)
+            _report_builder_load_form(sess)
+            _refresh_report_builder_status(sess)
+            _apply_session_review_lock_state(sess)
+        except Exception as e:
+            messagebox.showerror("Session Review", str(e))
 
     def _lock_ftir_validation_review() -> None:
         nonlocal sess
@@ -16872,6 +17351,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             sess = _report_builder_save_to_session(show_message=False)
             completeness = _report_builder_completeness(sess)
             warn_rows = list(completeness.get("warn_sections") or [])
+            session_review = _session_review_block(sess)
             ftir_blk = _ftir_validation_block(sess)
             ftir_exec = _ftir_validation_execution_status(sess)
             if warn_rows:
@@ -16894,6 +17374,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if not messagebox.askyesno("Report Builder", "\n".join(msg_lines)):
                     _refresh_report_builder_status(sess)
                     return
+            if bool(session_review.get("enabled")) and not _session_review_is_locked(session_review):
+                if not messagebox.askyesno(
+                    "Report Builder",
+                    "Session review is active, but the shared review state is not locked.\n\n"
+                    "Build anyway without freezing the package-level review state?",
+                ):
+                    _refresh_report_builder_status(sess)
+                    return
+            if bool(session_review.get("enabled")) and _session_review_is_locked(session_review):
+                review_sign = _session_review_signoff_block(session_review)
+                if str(review_sign.get("decision") or "UNSIGNED").strip().upper() == "UNSIGNED":
+                    if not messagebox.askyesno(
+                        "Report Builder",
+                        "Session review is locked, but no session-level approval decision has been recorded.\n\n"
+                        "Build anyway without a package-level signoff?",
+                    ):
+                        _refresh_report_builder_status(sess)
+                        return
             if bool(ftir_blk.get("enabled")) and bool(ftir_exec.get("enabled")) and not bool(ftir_exec.get("cadence_ready_for_next_run")):
                 if not messagebox.askyesno(
                     "Report Builder",
@@ -16979,6 +17477,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         _open_fs_target(_report_builder_paths(sess_use).get("report_pack_dir"), title="Open Report Pack Folder Failed")
 
     try:
+        btn_session_review_lock.configure(command=_lock_session_review)
+        btn_session_review_unlock.configure(command=_unlock_session_review)
+        btn_session_review_sign.configure(command=_signoff_session_review)
+        btn_session_review_clear_signoff.configure(command=_clear_session_review_signoff)
         btn_ftir_validation_browse.configure(command=_browse_ftir_validation_file)
         btn_ftir_validation_open_templates.configure(command=_open_ftir_validation_template_folder)
         btn_ftir_validation_open_import_template.configure(command=_open_ftir_validation_import_template)
@@ -17009,6 +17511,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_tm_report_pack.configure(text="Build Report Disabled (Diagnostics)", state="disabled")
             btn_report_builder_save.configure(state="disabled")
             btn_report_builder_build.configure(state="disabled")
+            btn_session_review_lock.configure(state="disabled")
+            btn_session_review_unlock.configure(state="disabled")
+            btn_session_review_sign.configure(state="disabled")
+            btn_session_review_clear_signoff.configure(state="disabled")
             btn_ftir_validation_preview.configure(state="disabled")
             btn_ftir_validation_apply_sweep.configure(state="disabled")
             btn_ftir_validation_accept_set.configure(state="disabled")

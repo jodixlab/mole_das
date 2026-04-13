@@ -2946,6 +2946,61 @@ def _report_correspondence_block(session: Dict[str, Any], evidence_bundle: Dict[
     }
 
 
+def _report_session_review_block(session: Dict[str, Any]) -> Dict[str, Any]:
+    review = session.get("session_review") if isinstance(session.get("session_review"), dict) else {}
+    enabled = bool(review.get("enabled"))
+    signoff = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
+    reviewer_name = str(review.get("reviewer_name") or "").strip() or None
+    reviewer_role = str(review.get("reviewer_role") or "").strip() or None
+    default_approver = str(review.get("default_approver") or "").strip() or None
+    default_approver_role = str(review.get("default_approver_role") or "").strip() or None
+    review_notes = str(review.get("review_notes") or "").strip() or None
+    decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+    signoff_basis = str(signoff.get("basis") or "").strip().upper() or None
+    signoff_by = str(signoff.get("by") or "").strip() or None
+    signoff_role = str(signoff.get("role") or "").strip() or None
+    signoff_iso = str(signoff.get("iso") or "").strip() or None
+    signoff_note = str(signoff.get("note") or "").strip() or None
+    status = _report_block_status(
+        [reviewer_name, default_approver] if enabled else [],
+        [reviewer_role, default_approver_role, review_notes, signoff_basis, signoff_by, signoff_note],
+    )
+    if not enabled:
+        status = "Available"
+    elif not bool(review.get("review_locked")) or decision == "UNSIGNED":
+        status = "Partial" if status == "Available" else status
+    notes: List[str] = []
+    if enabled and not bool(review.get("review_locked")):
+        notes.append("Session review is active but not locked.")
+    if enabled and decision == "UNSIGNED":
+        notes.append("Session review has no approval decision recorded.")
+    return {
+        "status": status,
+        "enabled": enabled,
+        "scope": str(review.get("scope") or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW",
+        "reviewer_name": reviewer_name,
+        "reviewer_role": reviewer_role,
+        "review_notes": review_notes,
+        "review_locked": bool(review.get("review_locked")),
+        "review_lock_by": str(review.get("review_lock_by") or "").strip() or None,
+        "review_lock_iso": str(review.get("review_lock_iso") or "").strip() or None,
+        "review_unlock_by": str(review.get("review_unlock_by") or "").strip() or None,
+        "review_unlock_iso": str(review.get("review_unlock_iso") or "").strip() or None,
+        "default_approver": default_approver,
+        "default_approver_role": default_approver_role,
+        "signoff": {
+            "decision": decision,
+            "basis": signoff_basis,
+            "by": signoff_by,
+            "role": signoff_role,
+            "iso": signoff_iso,
+            "note": signoff_note,
+        },
+        "notes": notes,
+        "source": "session.session_review",
+    }
+
+
 def _report_run_aggregation(
     session: Dict[str, Any],
     evidence_bundle: Dict[str, Any],
@@ -3218,6 +3273,7 @@ def _build_report_context(
     process_control = _report_process_control_block(session)
     deviations = _report_deviation_approval_block(session, evidence_bundle)
     correspondence = _report_correspondence_block(session, evidence_bundle)
+    session_review = _report_session_review_block(session)
     run_aggregation = _report_run_aggregation(session, evidence_bundle, cfg_path=cfg_path, session_dir=session_dir)
     ftir_validation = summary.get("ftir_validation") if isinstance(summary.get("ftir_validation"), dict) else {}
 
@@ -3275,7 +3331,7 @@ def _build_report_context(
         "coverage_note": run_aggregation.get("coverage_note"),
     }
     block_status_counts = {"Available": 0, "Partial": 0, "Gap": 0}
-    for block in (report_parties, process_control, deviations, correspondence, run_aggregation):
+    for block in (report_parties, process_control, deviations, correspondence, session_review, run_aggregation):
         status = str(block.get("status") or "")
         if status in block_status_counts:
             block_status_counts[status] += 1
@@ -3527,6 +3583,12 @@ def _build_report_context(
                 "Partial",
                 "Exception evidence exists, but narrative collation and impact statements are not generated yet.",
             ),
+            "review_approval": _ctx_field(
+                session_review,
+                session_review.get("source") or "session.session_review",
+                session_review.get("status"),
+                "Shared session-level review and approval state for validation/compliance-ready deliverables.",
+            ),
         },
         "appendices": {
             "appendix_manifest": _ctx_field(
@@ -3575,6 +3637,11 @@ def _build_report_context(
                     "note": "Run summaries are now aggregated from worksteps, but per-run averaged operating metrics are still not normalized.",
                 },
                 {
+                    "id": "session_review_and_approval",
+                    "status": session_review.get("status"),
+                    "note": "Shared package-level review and signoff are tracked, but downstream policy use is still evolving beyond FTIR validation.",
+                },
+                {
                     "id": "ftir_side_by_side_validation",
                     "status": ftir_validation.get("status") if isinstance(ftir_validation, dict) else "Gap",
                     "note": "FTIR validation is session-scoped and exportable, but formal Method 301 acceptance still depends on complete time-matched evidence and six valid comparison sets.",
@@ -3591,6 +3658,7 @@ def _build_report_context(
         "process_control": process_control,
         "deviations_approvals": deviations,
         "regulatory_correspondence": correspondence,
+        "session_review": session_review,
         "run_aggregation": run_aggregation,
         "ftir_validation": ftir_validation,
     }
@@ -3692,6 +3760,7 @@ def _write_final_report_markdown(
     correspondence = _ctx_value(appendices, "regulatory_and_correspondence") or {}
     parties = blocks.get("report_parties") if isinstance(blocks.get("report_parties"), dict) else {}
     process_control = blocks.get("process_control") if isinstance(blocks.get("process_control"), dict) else {}
+    session_review = blocks.get("session_review") if isinstance(blocks.get("session_review"), dict) else {}
     run_aggregation = blocks.get("run_aggregation") if isinstance(blocks.get("run_aggregation"), dict) else {}
     ftir_validation = blocks.get("ftir_validation") if isinstance(blocks.get("ftir_validation"), dict) else {}
     template_contract = report_context.get("template_contract") if isinstance(report_context.get("template_contract"), dict) else {}
@@ -4034,6 +4103,23 @@ def _write_final_report_markdown(
     lines.append("### 5.4 QA/QC exceptions")
     lines.append("")
     lines.append(f"- QA/QC exceptions: {_md_scalar(_ctx_value(qaqc, 'qaqc_exceptions'))}")
+    lines.append("")
+    lines.append("### 5.5 Review and approval")
+    lines.append("")
+    session_review_sign = (session_review.get("signoff") if isinstance(session_review.get("signoff"), dict) else {}) or {}
+    lines.append(f"- Session review enabled: {_md_scalar(session_review.get('enabled'))}")
+    lines.append(f"- Session review scope: {_md_scalar(session_review.get('scope'))}")
+    lines.append(f"- Reviewer: {_md_scalar(session_review.get('reviewer_name'))}")
+    lines.append(f"- Reviewer role: {_md_scalar(session_review.get('reviewer_role'))}")
+    lines.append(f"- Review notes: {_md_scalar(session_review.get('review_notes'))}")
+    lines.append(f"- Review locked: {_md_scalar(session_review.get('review_locked'))}")
+    lines.append(f"- Lock by / at: {_md_scalar({'by': session_review.get('review_lock_by'), 'at': session_review.get('review_lock_iso')})}")
+    lines.append(f"- Default approver / role: {_md_scalar({'approver': session_review.get('default_approver'), 'role': session_review.get('default_approver_role')})}")
+    lines.append(f"- Signoff decision: {_md_scalar(session_review_sign.get('decision'))}")
+    lines.append(f"- Signoff basis: {_md_scalar(session_review_sign.get('basis'))}")
+    lines.append(f"- Signoff by / role / at: {_md_scalar({'by': session_review_sign.get('by'), 'role': session_review_sign.get('role'), 'at': session_review_sign.get('iso')})}")
+    lines.append(f"- Signoff note: {_md_scalar(session_review_sign.get('note'))}")
+    lines.append(f"- Session review status: {_md_scalar(_ctx_value(qaqc, 'review_approval'))}")
     lines.append("")
     lines.append("## 6. Appendices")
     lines.append("")
@@ -5317,6 +5403,7 @@ def generate_report_pack_v1(
             "delta_trace_csv": str(paths.ftir_validation_delta_trace_csv),
             "appendix": ftir_validation_appendix,
         },
+        "session_review": _report_session_review_block(session),
         "analyzer_validity": analyzer_validity_summary,
         "fuel_analysis": fuel_analysis_summary,
         "pollutant_adjustments": pollutant_adjustments_summary,
