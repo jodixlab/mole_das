@@ -3039,6 +3039,18 @@ class MoleDASWizard(tk.Tk):
             font=("Consolas", 9, "bold"),
         )
         self.lbl_schema_notice.pack(fill="x", padx=12, pady=(0, 10))
+        self.var_review_notice = tk.StringVar(value="")
+        self.lbl_review_notice = tk.Label(
+            self.left_header,
+            textvariable=self.var_review_notice,
+            fg=self.ACCENT,
+            bg=self.BG,
+            justify="left",
+            anchor="w",
+            wraplength=280,
+            font=("Consolas", 9, "bold"),
+        )
+        self.lbl_review_notice.pack(fill="x", padx=12, pady=(0, 10))
 
         # Footer (always visible)
         self.left_footer = tk.Frame(self.left, bg=self.BG)
@@ -3262,6 +3274,13 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         except Exception:
             try:
                 self.var_schema_notice.set("")
+            except Exception:
+                pass
+        try:
+            self.var_review_notice.set(self._session_review_notice_text(self.session.get("session_review") or {}))
+        except Exception:
+            try:
+                self.var_review_notice.set("")
             except Exception:
                 pass
         self.lbl_status.configure(text="\n".join(lines))
@@ -6274,6 +6293,26 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             f"reviewer={reviewer}",
             f"approver={approver}",
         ])
+
+    def _session_review_notice_text(self, review: Optional[Dict[str, Any]] = None) -> str:
+        review_use = dict(review or self._session_review_section())
+        if not bool(review_use.get("enabled")):
+            return ""
+        signoff = review_use.get("signoff") if isinstance(review_use.get("signoff"), dict) else {}
+        scope = str(review_use.get("scope") or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW"
+        decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+        basis = str(signoff.get("basis") or "").strip().upper()
+        if decision != "UNSIGNED":
+            by = str(signoff.get("by") or review_use.get("default_approver") or "").strip() or "(unassigned)"
+            parts = [f"Package approval: {decision}", f"scope={scope}", f"approver={by}"]
+            if basis:
+                parts.append(f"basis={basis}")
+            return " | ".join(parts)
+        if bool(review_use.get("review_locked")):
+            reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
+            return f"Package approval: REVIEW LOCKED | scope={scope} | reviewer={reviewer} | awaiting signoff"
+        reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
+        return f"Package approval: DRAFT | scope={scope} | reviewer={reviewer}"
 
     def _apply_validation_plan_policy(self) -> None:
         session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"
@@ -12406,6 +12445,8 @@ def _build_intake(self) -> None:
             self.var_sessions_filter = tk.StringVar(value="")
         if not hasattr(self, "var_sessions_status"):
             self.var_sessions_status = tk.StringVar(value="")
+        if not hasattr(self, "var_selected_session_review"):
+            self.var_selected_session_review = tk.StringVar(value="Approval: (no session selected)")
 
         controls = tk.Frame(outer, bg=self.BG)
         controls.pack(fill="x")
@@ -12472,6 +12513,16 @@ def _build_intake(self) -> None:
 
         lbl_path = tk.Label(detail, textvariable=self.var_active_session_dir, bg=self.BG, fg=self.MUTED, justify="left")
         lbl_path.pack(anchor="w", padx=10, pady=(6, 2))
+        tk.Label(
+            detail,
+            textvariable=self.var_selected_session_review,
+            bg=self.BG,
+            fg=self.ACCENT,
+            justify="left",
+            anchor="w",
+            wraplength=980,
+            font=("Consolas", 9, "bold"),
+        ).pack(fill="x", padx=10, pady=(0, 6))
 
         btn_row = tk.Frame(detail, bg=self.BG)
         btn_row.pack(fill="x", padx=10, pady=(4, 8))
@@ -12513,6 +12564,46 @@ def _build_intake(self) -> None:
 
         # Scan sessions
         row_map: dict[str, str] = {}
+
+        def _session_browser_review_text(session_dir: str) -> str:
+            try:
+                sdir = Path(str(session_dir)).resolve()
+            except Exception:
+                return "Approval: (invalid session path)"
+            summary_path = sdir / "exports" / "report_pack_v1" / "summary.json"
+            if not summary_path.exists():
+                return "Approval: no report-pack review summary found for this session."
+            try:
+                summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+            except Exception as e:
+                return f"Approval: report-pack summary unreadable ({type(e).__name__})."
+            if not isinstance(summary, dict):
+                return "Approval: report-pack summary invalid."
+            review = summary.get("session_review") if isinstance(summary.get("session_review"), dict) else {}
+            signoff = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
+            decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+            scope = str(review.get("scope") or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW"
+            locked = "LOCKED" if bool(review.get("review_locked")) else "DRAFT"
+            reviewer = str(review.get("reviewer_name") or "").strip() or "(unassigned)"
+            approver = str(signoff.get("by") or review.get("default_approver") or "").strip() or "(unassigned)"
+            basis = str(signoff.get("basis") or "").strip().upper()
+            parts = [
+                f"Approval: {decision}",
+                f"scope={scope}",
+                f"state={locked}",
+                f"reviewer={reviewer}",
+                f"approver={approver}",
+            ]
+            if basis:
+                parts.append(f"basis={basis}")
+            final_blk = summary.get("final_report") if isinstance(summary.get("final_report"), dict) else {}
+            if final_blk:
+                final_ready = "YES" if any(
+                    str(final_blk.get(key) or "").strip()
+                    for key in ("markdown_path", "docx_path", "pdf_path")
+                ) else "NO"
+                parts.append(f"final_report={final_ready}")
+            return " | ".join(parts)
 
         def _scan_sessions() -> list[dict[str, Any]]:
             out: list[dict[str, Any]] = []
@@ -12571,6 +12662,7 @@ def _build_intake(self) -> None:
                     tree.delete(iid)
             except Exception:
                 pass
+            row_map.clear()
 
             filt = (self.var_sessions_filter.get() or "").strip().lower()
             rows = _scan_sessions()
@@ -12595,6 +12687,7 @@ def _build_intake(self) -> None:
             sdir = row_map.get(sid) or ""
             if sdir:
                 self.var_active_session_dir.set(sdir)
+                self.var_selected_session_review.set(_session_browser_review_text(sdir))
 
         tree.bind("<<TreeviewSelect>>", _on_select)
 

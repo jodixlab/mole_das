@@ -7956,6 +7956,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     tk.Label(left_inner, textvariable=run_counter_var, fg=FG_DIM, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w", padx=12, pady=(0, 2))
     planned_remaining_var = tk.StringVar(value="Remaining planned time: (n/a)")
     tk.Label(left_inner, textvariable=planned_remaining_var, fg=FG_DIM, bg=BG, font=("Consolas", 9, "bold")).pack(anchor="w", padx=12, pady=(0, 8))
+    package_review_var = tk.StringVar(value="Package approval: (not evaluated)")
+    package_review_lbl = tk.Label(left_inner, textvariable=package_review_var, fg=ACC2, bg=BG, font=("Consolas", 9, "bold"), anchor="w", justify="left")
+    package_review_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
+    _bind_safe_wrap(package_review_lbl, left, pad_px=32, min_wrap=180)
 
     btns = tk.Frame(left_inner, bg=BG)
     btns.pack(fill="x", padx=12, pady=(8, 10))
@@ -14794,6 +14798,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
         mode_summary_var.set(_format_mode_summary(sess))
         status_var.set("Status: READY")
+        _refresh_session_review_banner(sess)
         _populate_pollutants(sess)
         _load_reference_config(sess)
         _populate_reference_table(sess)
@@ -15218,6 +15223,35 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return str(sign.get("decision") or "UNSIGNED").strip().upper() != "UNSIGNED"
         except Exception:
             return False
+
+    def _session_review_banner_text(review_local: Optional[Dict[str, Any]] = None) -> str:
+        review_use = dict(review_local or {})
+        if not bool(review_use.get("enabled")):
+            return "Package approval: inactive"
+        sign = _session_review_signoff_block(review_use)
+        scope = str(review_use.get("scope") or "PROJECT_REVIEW").strip().upper() or "PROJECT_REVIEW"
+        decision = str(sign.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+        basis = str(sign.get("basis") or "").strip().upper()
+        if decision != "UNSIGNED":
+            approver = str(sign.get("by") or review_use.get("default_approver") or "").strip() or "(unassigned)"
+            parts = [f"Package approval: {decision}", f"scope={scope}", f"approver={approver}"]
+            if basis:
+                parts.append(f"basis={basis}")
+            return " | ".join(parts)
+        if _session_review_is_locked(review_use):
+            reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
+            return f"Package approval: REVIEW LOCKED | scope={scope} | reviewer={reviewer} | awaiting signoff"
+        reviewer = str(review_use.get("reviewer_name") or "").strip() or "(unassigned)"
+        return f"Package approval: DRAFT | scope={scope} | reviewer={reviewer}"
+
+    def _refresh_session_review_banner(sess_local: Dict[str, Any]) -> None:
+        try:
+            package_review_var.set(_session_review_banner_text(_session_review_block(sess_local)))
+        except Exception:
+            try:
+                package_review_var.set("Package approval: (unavailable)")
+            except Exception:
+                pass
 
     def _ftir_validation_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
         blk = sess_local.get("ftir_validation")
@@ -16866,6 +16900,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     pths["report_context_json"] = Path(str(rc_blk.get("json_path")))
             if not isinstance(ftir_blk, dict) or not ftir_blk:
                 ftir_blk = dict(ftir_cfg)
+            try:
+                _refresh_session_review_banner({**sess_use, "session_review": session_review_blk})
+            except Exception:
+                pass
             ftir_exec_state = _ftir_validation_execution_status(sess_use)
             try:
                 var_ftir_validation_execution_plan_status.set(str(ftir_exec_state.get("planner_note") or "FTIR execution planner not configured."))
