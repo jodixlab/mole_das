@@ -68,6 +68,8 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("comparison_set_count"), 6)
             self.assertEqual(payload.get("included_comparison_set_count"), 6)
             self.assertEqual(payload.get("excluded_comparison_set_count"), 0)
+            self.assertEqual(payload.get("acceptance_basis"), "FORMAL_METHOD_301")
+            self.assertEqual(payload.get("acceptance_recommended_decision"), "ACCEPTED")
             first_set = (payload.get("comparison_sets") or [])[0]
             self.assertEqual(first_set.get("inclusion_status"), "INCLUDED")
             self.assertEqual(first_set.get("formal_basis"), "FORMAL_COMPARISON_SET")
@@ -174,6 +176,8 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("comparison_set_count"), 6)
             self.assertEqual(payload.get("included_comparison_set_count"), 5)
             self.assertEqual(payload.get("excluded_comparison_set_count"), 1)
+            self.assertEqual(payload.get("acceptance_basis"), "METHOD_301_INFORMED_COMPARISON")
+            self.assertEqual(payload.get("acceptance_recommended_decision"), "ACCEPTED")
             self.assertEqual(comparison_sets[0].get("inclusion_status"), "EXCLUDED")
             self.assertEqual(comparison_sets[0].get("excluded_row_count"), 1)
             row = (payload.get("method301") or [])[0]
@@ -204,7 +208,7 @@ class FtirValidationTests(unittest.TestCase):
                 },
                 "signoff": {
                     "decision": "ACCEPTED",
-                    "basis": "FORMAL_METHOD_301_PASS",
+                    "basis": "FORMAL_METHOD_301",
                     "by": "peer_scientist",
                     "role": "Peer Scientist",
                     "iso": "2026-04-10T18:15:00Z",
@@ -305,13 +309,26 @@ class FtirValidationTests(unittest.TestCase):
             self.assertTrue(snapshot.get("review_locked"))
             self.assertEqual((snapshot.get("review_snapshot") or {}).get("snapshot_by"), "peer_scientist")
             self.assertEqual((snapshot.get("signoff") or {}).get("decision"), "ACCEPTED")
-            self.assertEqual((snapshot.get("signoff") or {}).get("basis"), "FORMAL_METHOD_301_PASS")
+            self.assertEqual((snapshot.get("signoff") or {}).get("basis"), "FORMAL_METHOD_301")
             windows_csv = (root / "locked_windows.csv").read_text(encoding="utf-8")
             self.assertIn("comparison_set_status", windows_csv)
             self.assertIn("startup stabilization", windows_csv)
             method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
             self.assertIn("comparison_set_count", method_csv)
             self.assertIn("excluded_window_count", method_csv)
+
+    def test_legacy_signoff_basis_normalizes_to_new_acceptance_basis(self) -> None:
+        cfg = normalize_config({
+            "enabled": True,
+            "signoff": {
+                "decision": "ACCEPTED",
+                "basis": "FORMAL_METHOD_301_PASS",
+                "by": "peer_scientist",
+            },
+        })
+        signoff = cfg.get("signoff") or {}
+        self.assertEqual(signoff.get("decision"), "ACCEPTED")
+        self.assertEqual(signoff.get("basis"), "FORMAL_METHOD_301")
 
     def test_qa_preview_autodetects_columns_and_flags_large_time_offset(self) -> None:
         with tempfile.TemporaryDirectory() as td:

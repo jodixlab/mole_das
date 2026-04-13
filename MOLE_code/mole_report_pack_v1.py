@@ -3893,6 +3893,9 @@ def _write_final_report_markdown(
     lines.append(f"- Paired window count: {_md_scalar((ftir_validation_summary.get('paired_window_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Excluded row count: {_md_scalar((ftir_validation_summary.get('excluded_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Coverage note: {_md_scalar((ftir_validation_summary.get('coverage_note') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Acceptance basis: {_md_scalar((ftir_validation_summary.get('acceptance_basis') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Acceptance recommendation: {_md_scalar((ftir_validation_summary.get('acceptance_recommended_decision') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Acceptance basis note: {_md_scalar((ftir_validation_summary.get('acceptance_basis_note') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Reviewer: {_md_scalar((ftir_validation_summary.get('reviewer') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Reviewer notes: {_md_scalar((ftir_validation_summary.get('review_notes') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Review locked: {_md_scalar((ftir_validation_summary.get('review_locked') if isinstance(ftir_validation_summary, dict) else None))}")
@@ -4347,6 +4350,9 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         f"- Source: {ftir.get('source') or '(n/a)'}",
         f"- Validation mode: {config.get('validation_mode') or '(n/a)'}",
         f"- Comparator method: {config.get('comparator_method') or '(n/a)'}",
+        f"- Acceptance basis: {ftir.get('acceptance_basis') or '(n/a)'}",
+        f"- Acceptance recommendation: {ftir.get('acceptance_recommended_decision') or '(n/a)'}",
+        f"- Acceptance basis note: {ftir.get('acceptance_basis_note') or '(n/a)'}",
         f"- Paired window count: {ftir.get('paired_window_count') or 0}",
         f"- Excluded row count: {ftir.get('excluded_count') or 0}",
         f"- Review locked: {ftir.get('review_locked')}",
@@ -4469,6 +4475,9 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
             ("Source", ftir.get("source")),
             ("Validation mode", config.get("validation_mode")),
             ("Comparator method", config.get("comparator_method")),
+            ("Acceptance basis", ftir.get("acceptance_basis")),
+            ("Acceptance recommendation", ftir.get("acceptance_recommended_decision")),
+            ("Acceptance basis note", ftir.get("acceptance_basis_note")),
             ("Comparison set count", ftir.get("comparison_set_count")),
             ("Included comparison set count", ftir.get("included_comparison_set_count")),
             ("Excluded comparison set count", ftir.get("excluded_comparison_set_count")),
@@ -5081,6 +5090,9 @@ def generate_report_pack_v1(
         "ftir_validation": {
             "status": ftir_validation_summary.get("status"),
             "overall_status": ftir_validation_summary.get("overall_status"),
+            "acceptance_basis": ftir_validation_summary.get("acceptance_basis"),
+            "acceptance_recommended_decision": ftir_validation_summary.get("acceptance_recommended_decision"),
+            "acceptance_basis_note": ftir_validation_summary.get("acceptance_basis_note"),
             "source": ftir_validation_source,
             "coverage_note": ftir_validation_summary.get("coverage_note"),
             "paired_window_count": ftir_validation_summary.get("paired_window_count"),

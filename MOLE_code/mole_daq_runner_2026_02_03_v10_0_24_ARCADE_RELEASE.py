@@ -10153,7 +10153,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     cbo_ftir_validation_signoff_basis = ttk.Combobox(
         report_builder_ftir_signoff_form,
         textvariable=var_ftir_validation_signoff_basis,
-        values=("FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY", "REJECTED_NOT_ACCEPTED"),
+        values=("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON", "NOT_ACCEPTED"),
         state="readonly",
         font=("Consolas", 9),
     )
@@ -15082,11 +15082,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             auto_map = import_preview.get("autodetected_columns_used") if isinstance(import_preview.get("autodetected_columns_used"), dict) else {}
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
             qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
+            acceptance_basis = str(preview.get("acceptance_basis") or "").strip() or "(n/a)"
+            acceptance_note = str(preview.get("acceptance_basis_note") or "").strip()
             status_lines = [
                 " | ".join([
                     f"Source: {source_label}",
                     f"Status: {preview.get('status') or '(n/a)'}",
                     f"Overall: {preview.get('overall_status') or '(n/a)'}",
+                    f"Acceptance basis: {acceptance_basis}",
                     f"Mode: {cfg.get('validation_mode') or '(n/a)'}",
                     f"Paired windows: {int(preview.get('paired_window_count') or 0)}",
                     f"Aligned rows: {len(aligned_rows)}",
@@ -15116,6 +15119,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     status_lines.append("Blocking issues: " + " ; ".join(blocking_issues))
                 if qa_warnings:
                     status_lines.append("Warnings: " + " ; ".join(qa_warnings))
+            if acceptance_note:
+                status_lines.append("Acceptance basis note: " + acceptance_note)
             if str(preview.get("coverage_note") or "").strip():
                 status_lines.append(str(preview.get("coverage_note") or "").strip())
             var_ftir_validation_review_status.set("\n".join([line for line in status_lines if line]))
@@ -15593,6 +15598,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 qa = ftir_blk.get("qa") if isinstance(ftir_blk.get("qa"), dict) else {}
                 lines.append(f"- FTIR validation status: {ftir_blk.get('status') or '(n/a)'}")
                 lines.append(f"- FTIR validation overall: {ftir_blk.get('overall_status') or '(n/a)'}")
+                lines.append(f"- FTIR validation acceptance basis: {ftir_blk.get('acceptance_basis') or '(n/a)'}")
+                lines.append(f"- FTIR validation acceptance note: {ftir_blk.get('acceptance_basis_note') or '(n/a)'}")
                 lines.append(f"- FTIR validation source: {ftir_blk.get('source') or '(n/a)'}")
                 lines.append(f"- FTIR validation paired windows: {ftir_blk.get('paired_window_count') or 0}")
                 lines.append(f"- FTIR validation excluded rows: {ftir_blk.get('excluded_count') or 0}")
@@ -15705,13 +15712,19 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 raise ValueError("Select a signoff decision before signing off.")
             if not approver:
                 raise ValueError("Approver name is required.")
-            if decision == "ACCEPTED" and basis not in ("FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY"):
-                raise ValueError("Accepted FTIR validation signoff requires a formal or informed-comparison basis.")
-            if decision == "REJECTED" and basis != "REJECTED_NOT_ACCEPTED":
-                raise ValueError("Rejected FTIR validation signoff requires basis REJECTED_NOT_ACCEPTED.")
+            if decision == "ACCEPTED" and basis not in ("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON"):
+                raise ValueError("Accepted FTIR validation signoff requires basis FORMAL_METHOD_301 or METHOD_301_INFORMED_COMPARISON.")
+            if decision == "REJECTED" and basis != "NOT_ACCEPTED":
+                raise ValueError("Rejected FTIR validation signoff requires basis NOT_ACCEPTED.")
             snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
             qa = snap_payload.get("qa") if isinstance(snap_payload.get("qa"), dict) else {}
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            derived_basis = str(snap_payload.get("acceptance_basis") or "").strip().upper()
+            if decision == "ACCEPTED":
+                if derived_basis == "NOT_ACCEPTED":
+                    raise ValueError("Current FTIR comparison package does not support accepted signoff. Use NOT_ACCEPTED.")
+                if basis == "FORMAL_METHOD_301" and derived_basis != "FORMAL_METHOD_301":
+                    raise ValueError("Formal Method 301 acceptance is not supported by the current FTIR comparison package.")
             if decision == "ACCEPTED" and blocking_issues:
                 if not messagebox.askyesno(
                     "FTIR Validation Signoff",

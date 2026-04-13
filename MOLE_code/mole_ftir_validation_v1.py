@@ -17,6 +17,12 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 VALIDATION_MODES = ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON")
+SIGNOFF_ACCEPTANCE_BASES = ("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON", "NOT_ACCEPTED")
+LEGACY_SIGNOFF_BASIS_MAP = {
+    "FORMAL_METHOD_301_PASS": "FORMAL_METHOD_301",
+    "INFORMED_COMPARISON_ONLY": "METHOD_301_INFORMED_COMPARISON",
+    "REJECTED_NOT_ACCEPTED": "NOT_ACCEPTED",
+}
 COMMON_TS_COLUMNS = ("ts_iso", "ts_utc", "timestamp", "datetime", "date_time", "time")
 QA_MIN_ROWS_PER_SIDE = 2
 QA_MIN_WINDOW_COVERAGE_RATIO = 0.50
@@ -428,7 +434,8 @@ def _normalize_signoff(value: Any) -> Dict[str, Any]:
     if decision not in ("UNSIGNED", "ACCEPTED", "REJECTED"):
         decision = "UNSIGNED"
     basis = str(block.get("basis") or "").strip().upper()
-    if basis not in ("", "FORMAL_METHOD_301_PASS", "INFORMED_COMPARISON_ONLY", "REJECTED_NOT_ACCEPTED"):
+    basis = LEGACY_SIGNOFF_BASIS_MAP.get(basis, basis)
+    if basis not in ("",) + SIGNOFF_ACCEPTANCE_BASES:
         basis = ""
     return {
         "decision": decision,
@@ -437,6 +444,40 @@ def _normalize_signoff(value: Any) -> Dict[str, Any]:
         "role": str(block.get("role") or "").strip(),
         "iso": str(block.get("iso") or "").strip(),
         "note": str(block.get("note") or "").strip(),
+    }
+
+
+def _derive_acceptance_basis(cfg: Dict[str, Any], method301: Iterable[Dict[str, Any]]) -> Dict[str, str]:
+    mode = str(cfg.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
+    rows = [row for row in list(method301 or []) if isinstance(row, dict)]
+    statuses = [str(row.get("overall_status") or "").strip().upper() for row in rows]
+    has_pairs = any(int(row.get("paired_window_count") or 0) > 0 for row in rows)
+    has_fail = any(status == "FAIL" for status in statuses)
+    formal_ready = (
+        mode == "METHOD_301_FORMAL"
+        and bool(rows)
+        and all(
+            str(row.get("overall_status") or "").strip().upper() in ("PASS", "PASS_WITH_CORRECTION_FACTOR")
+            and int(row.get("paired_window_count") or 0) == 6
+            for row in rows
+        )
+    )
+    if formal_ready:
+        return {
+            "basis": "FORMAL_METHOD_301",
+            "recommended_decision": "ACCEPTED",
+            "note": "The FTIR comparison package supports formal Method 301 acceptance for the evaluated analytes.",
+        }
+    if has_pairs and not has_fail:
+        return {
+            "basis": "METHOD_301_INFORMED_COMPARISON",
+            "recommended_decision": "ACCEPTED",
+            "note": "The FTIR comparison package supports an informed side-by-side comparison basis only; it should not be described as a formal Method 301 acceptance.",
+        }
+    return {
+        "basis": "NOT_ACCEPTED",
+        "recommended_decision": "REJECTED",
+        "note": "The FTIR comparison package does not support an accepted validation basis for this dataset.",
     }
 
 
@@ -1227,6 +1268,8 @@ def build_validation_package(
     if not aligned_rows:
         overall = "Gap"
 
+    acceptance = _derive_acceptance_basis(normalized, method301)
+
     coverage_note = []
     coverage_note.append(str(ftir.get("summary", {}).get("note") or "").strip())
     coverage_note.append(str(mole.get("summary", {}).get("note") or "").strip())
@@ -1254,6 +1297,9 @@ def build_validation_package(
         "method301": method301,
         "coverage_note": coverage_note,
         "overall_status": overall,
+        "acceptance_basis": acceptance.get("basis"),
+        "acceptance_recommended_decision": acceptance.get("recommended_decision"),
+        "acceptance_basis_note": acceptance.get("note"),
         "paired_window_count": len([row for row in aligned_rows if bool(row.get("paired"))]),
         "excluded_count": len(excluded_rows),
         "source": "LIVE_COMPUTE",
