@@ -10036,6 +10036,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_master_clock = tk.StringVar(value="SESSION_MASTER_CLOCK")
     var_ftir_validation_execution_enabled = tk.BooleanVar(value=False)
     var_ftir_validation_execution_profile = tk.StringVar(value="SESSION_RUNS")
+    var_ftir_validation_planned_sets = tk.StringVar(value="")
+    var_ftir_validation_planned_run_min = tk.StringVar(value="")
     var_ftir_validation_purge_min = tk.StringVar(value="5")
     var_ftir_validation_require_purge = tk.BooleanVar(value=True)
     var_ftir_validation_require_bias = tk.BooleanVar(value=True)
@@ -10050,6 +10052,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_signoff_decision = tk.StringVar(value="UNSIGNED")
     var_ftir_validation_signoff_basis = tk.StringVar(value="")
     var_ftir_validation_signoff_status = tk.StringVar(value="FTIR validation signoff: UNSIGNED")
+    var_ftir_validation_execution_plan_status = tk.StringVar(value="FTIR execution planner not configured.")
 
     chk_ftir_validation_enabled = tk.Checkbutton(
         report_builder_ftir_form,
@@ -10165,15 +10168,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     chk_ftir_validation_require_bias.grid(row=6, column=3, sticky="w", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Sweep min (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Planned sets override:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_planned_sets = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_planned_sets, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_planned_sets.grid(row=7, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Planned run min override:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_planned_run_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_planned_run_min, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_planned_run_min.grid(row=7, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, textvariable=var_ftir_validation_execution_plan_status, fg=FG_DIM, bg=BG, font=("Consolas", 9), justify="left", wraplength=900).grid(row=8, column=0, columnspan=4, sticky="w", padx=(0, 8), pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="Sweep min (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=9, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_sweep_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_min_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_sweep_min.grid(row=7, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Sweep max (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_sweep_min.grid(row=9, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Sweep max (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=9, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_sweep_max = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_max_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_sweep_max.grid(row=7, column=3, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Sweep step (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=8, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_sweep_max.grid(row=9, column=3, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Sweep step (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=10, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_sweep_step = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_sweep_step_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_sweep_step.grid(row=8, column=1, sticky="ew", pady=(0, 6))
+    ent_ftir_validation_sweep_step.grid(row=10, column=1, sticky="ew", pady=(0, 6))
 
     report_builder_ftir_btns = tk.Frame(report_builder_ftir_wrap, bg=BG)
     report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
@@ -14931,8 +14943,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 planned_run_count = None
         except Exception:
             planned_run_count = None
+        planned_run_count_override = _parse_float(execution.get("planned_run_count_override"), default=None)
+        if planned_run_count_override is not None and planned_run_count_override > 0:
+            planned_run_count = int(planned_run_count_override)
         if planned_run_count is not None:
-            execution["planned_run_count"] = planned_run_count
+            execution["planned_run_count"] = int(planned_run_count)
+        planned_run_minutes_override = _parse_float(execution.get("planned_run_minutes_override"), default=None)
+        tm_minutes_per_run = _tm_minutes_per_run(sess_local)
+        planned_run_minutes = planned_run_minutes_override if planned_run_minutes_override is not None and planned_run_minutes_override > 0 else tm_minutes_per_run
+        if planned_run_minutes is not None:
+            execution["planned_run_minutes"] = float(planned_run_minutes)
         execution["comparison_sets_completed"] = len(completed_runs)
         execution["next_comparison_set_no"] = len(completed_runs) + 1
         if completed_runs:
@@ -14969,6 +14989,89 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             live_status = "READY"
             note = "Live FTIR comparison execution is ready for the next set."
         execution["live_review_status"] = live_status
+        remaining_run_count = (
+            max(int(planned_run_count or 0) - len(completed_runs), 0)
+            if planned_run_count is not None
+            else None
+        )
+        completion_pct = (
+            round((float(len(completed_runs)) / float(planned_run_count)) * 100.0, 1)
+            if planned_run_count not in (None, 0)
+            else None
+        )
+        next_set_no = int(execution.get("next_comparison_set_no") or (len(completed_runs) + 1))
+        next_run_minutes, next_run_minutes_source = (None, "NONE")
+        if planned_run_minutes_override is not None and planned_run_minutes_override > 0:
+            next_run_minutes = float(planned_run_minutes_override)
+            next_run_minutes_source = "EXECUTION_OVERRIDE"
+        else:
+            next_run_minutes, next_run_minutes_source = _tm_planned_run_minutes(sess_local, next_set_no)
+            if next_run_minutes is None:
+                next_run_minutes = planned_run_minutes
+                next_run_minutes_source = ("TEST_MATRIX" if planned_run_minutes is not None else "NONE")
+        planned_total_minutes = _tm_total_planned_minutes(sess_local)
+        if planned_total_minutes is None and planned_run_count not in (None, 0) and planned_run_minutes is not None:
+            planned_total_minutes = float(planned_run_count) * float(planned_run_minutes)
+        expected_checkpoint_runs = list(range(1, int(planned_run_count or 0) + 1)) if planned_run_count not in (None, 0) else []
+        expected_purge_after_runs = expected_checkpoint_runs if bool(execution.get("require_purge_event")) else []
+        expected_bias_after_runs = expected_checkpoint_runs if bool(execution.get("require_bias_event")) else []
+        remaining_expected_purge_after_runs = [run_no for run_no in expected_purge_after_runs if run_no >= next_set_no]
+        remaining_expected_bias_after_runs = [run_no for run_no in expected_bias_after_runs if run_no >= next_set_no]
+        cadence_plan_label = " | ".join([
+            (
+                f"{_fmt_num(next_run_minutes, 2, '')} min next set"
+                if next_run_minutes is not None
+                else "next-set duration unresolved"
+            ),
+            (
+                f"{_fmt_num(execution.get('purge_minutes_required'), 2, '')} min purge"
+                if bool(execution.get("require_purge_event"))
+                else "no purge event required"
+            ),
+            ("bias after each set" if bool(execution.get("require_bias_event")) else "no bias event required"),
+        ])
+        if not bool(cfg.get("enabled")) or not bool(execution.get("enabled")):
+            planner_status = "DISABLED"
+            planner_note = "FTIR execution planner is disabled."
+        elif planned_run_count in (None, 0):
+            planner_status = "UNPLANNED"
+            planner_note = "Planned FTIR comparison-set count is not defined. Use Test Matrix or execution override."
+        elif len(completed_runs) >= int(planned_run_count):
+            planner_status = "COMPLETE"
+            planner_note = f"Planned FTIR comparison sets complete: {len(completed_runs)}/{int(planned_run_count)}."
+        elif len(completed_runs) > 0:
+            planner_status = "IN_PROGRESS"
+            planner_note = " | ".join([
+                f"planned sets={int(planned_run_count)}",
+                f"completed={len(completed_runs)}",
+                f"remaining={int(remaining_run_count or 0)}",
+                f"next set={next_set_no}",
+                cadence_plan_label,
+            ])
+        else:
+            planner_status = "READY_TO_START"
+            planner_note = " | ".join([
+                f"planned sets={int(planned_run_count)}",
+                f"completed=0",
+                f"remaining={int(remaining_run_count or 0)}",
+                f"next set={next_set_no}",
+                cadence_plan_label,
+            ])
+        execution["planned_run_count_override"] = int(planned_run_count_override) if planned_run_count_override is not None and planned_run_count_override > 0 else None
+        execution["planned_run_minutes_override"] = float(planned_run_minutes_override) if planned_run_minutes_override is not None and planned_run_minutes_override > 0 else None
+        execution["planned_run_minutes"] = planned_run_minutes
+        execution["planned_total_minutes"] = planned_total_minutes
+        execution["remaining_run_count"] = remaining_run_count
+        execution["completion_pct"] = completion_pct
+        execution["next_run_minutes"] = next_run_minutes
+        execution["next_run_minutes_source"] = next_run_minutes_source
+        execution["expected_purge_after_runs"] = expected_purge_after_runs
+        execution["expected_bias_after_runs"] = expected_bias_after_runs
+        execution["remaining_expected_purge_after_runs"] = remaining_expected_purge_after_runs
+        execution["remaining_expected_bias_after_runs"] = remaining_expected_bias_after_runs
+        execution["cadence_plan_label"] = cadence_plan_label
+        execution["planner_status"] = planner_status
+        execution["planner_note"] = planner_note
         cfg["execution"] = execution
         sess_local["ftir_validation"] = cfg
         snap = _load_ftir_validation_locked_snapshot(cfg) if _ftir_validation_is_locked(cfg) else {}
@@ -14978,11 +15081,26 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "profile": str(execution.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
             "comparison_set_policy": str(execution.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET",
             "planned_run_count": execution.get("planned_run_count"),
+            "planned_run_count_override": execution.get("planned_run_count_override"),
+            "planned_run_minutes": execution.get("planned_run_minutes"),
+            "planned_run_minutes_override": execution.get("planned_run_minutes_override"),
+            "planned_total_minutes": execution.get("planned_total_minutes"),
             "comparison_sets_completed": execution.get("comparison_sets_completed"),
+            "remaining_run_count": execution.get("remaining_run_count"),
+            "completion_pct": execution.get("completion_pct"),
             "next_comparison_set_no": execution.get("next_comparison_set_no"),
+            "next_run_minutes": execution.get("next_run_minutes"),
+            "next_run_minutes_source": execution.get("next_run_minutes_source"),
             "purge_minutes_required": execution.get("purge_minutes_required"),
             "require_purge_event": bool(execution.get("require_purge_event")),
             "require_bias_event": bool(execution.get("require_bias_event")),
+            "expected_purge_after_runs": list(execution.get("expected_purge_after_runs") or []),
+            "expected_bias_after_runs": list(execution.get("expected_bias_after_runs") or []),
+            "remaining_expected_purge_after_runs": list(execution.get("remaining_expected_purge_after_runs") or []),
+            "remaining_expected_bias_after_runs": list(execution.get("remaining_expected_bias_after_runs") or []),
+            "cadence_plan_label": str(execution.get("cadence_plan_label") or "").strip(),
+            "planner_status": str(execution.get("planner_status") or "").strip(),
+            "planner_note": str(execution.get("planner_note") or "").strip(),
             "purge_due_after_run_no": execution.get("purge_due_after_run_no"),
             "purge_due_after_iso": execution.get("purge_due_after_iso"),
             "bias_due_after_run_no": execution.get("bias_due_after_run_no"),
@@ -15309,6 +15427,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 chk_ftir_validation_execution_enabled,
                 cbo_ftir_validation_mode,
                 cbo_ftir_validation_execution_profile,
+                ent_ftir_validation_planned_sets,
+                ent_ftir_validation_planned_run_min,
                 ent_ftir_validation_file,
                 ent_ftir_validation_timestamp_col,
                 cbo_ftir_validation_delimiter,
@@ -15701,7 +15821,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "Execution: "
                     + " | ".join([
                         f"profile={execution.get('profile') or '(n/a)'}",
+                        f"planned={execution.get('planned_run_count') or '(n/a)'}",
                         f"sets completed={execution.get('completed_run_count') or 0}",
+                        f"remaining={execution.get('remaining_run_count') if execution.get('remaining_run_count') is not None else '(n/a)'}",
                         f"next set={execution.get('next_comparison_set_no') or '(n/a)'}",
                         f"live status={execution.get('live_review_status') or '(n/a)'}",
                         f"frozen sets={execution.get('frozen_comparison_set_count') or 0}",
@@ -15709,6 +15831,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 )
                 if str(execution.get("note") or "").strip():
                     status_lines.append("Execution note: " + str(execution.get("note") or "").strip())
+                if str(execution.get("planner_note") or "").strip():
+                    status_lines.append("Execution planner: " + str(execution.get("planner_note") or "").strip())
             if alignment_review:
                 status_lines.append(
                     "Alignment review: "
@@ -15929,9 +16053,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             alignment_review = ftir_validation.get("alignment_review") if isinstance(ftir_validation.get("alignment_review"), dict) else {}
             var_ftir_validation_execution_enabled.set(bool(execution.get("enabled")))
             var_ftir_validation_execution_profile.set(str(execution.get("profile") or "SESSION_RUNS"))
+            var_ftir_validation_planned_sets.set(str(execution.get("planned_run_count_override") or ""))
+            var_ftir_validation_planned_run_min.set(_fmt_num(execution.get("planned_run_minutes_override"), 2, ""))
             var_ftir_validation_purge_min.set(_fmt_num(execution.get("purge_minutes_required"), 2, "5"))
             var_ftir_validation_require_purge.set(bool(execution.get("require_purge_event", True)))
             var_ftir_validation_require_bias.set(bool(execution.get("require_bias_event", True)))
+            exec_state = _ftir_validation_execution_status(sess_use)
+            var_ftir_validation_execution_plan_status.set(str(exec_state.get("planner_note") or "FTIR execution planner not configured."))
             var_ftir_validation_sweep_min_s.set(_fmt_num(alignment_review.get("sweep_min_seconds"), 2, "-120"))
             var_ftir_validation_sweep_max_s.set(_fmt_num(alignment_review.get("sweep_max_seconds"), 2, "120"))
             var_ftir_validation_sweep_step_s.set(_fmt_num(alignment_review.get("sweep_step_seconds"), 2, "15"))
@@ -16156,10 +16284,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "enabled": bool(var_ftir_validation_execution_enabled.get()),
                     "profile": str(var_ftir_validation_execution_profile.get() or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
                     "comparison_set_policy": "RUN_EQUALS_SET",
+                    "planned_run_count_override": int(_parse_float(var_ftir_validation_planned_sets.get(), default=0.0)) if _parse_float(var_ftir_validation_planned_sets.get(), default=0.0) > 0 else None,
+                    "planned_run_minutes_override": _parse_float(var_ftir_validation_planned_run_min.get(), default=None),
                     "purge_minutes_required": _parse_float(var_ftir_validation_purge_min.get(), default=5.0),
                     "require_purge_event": bool(var_ftir_validation_require_purge.get()),
                     "require_bias_event": bool(var_ftir_validation_require_bias.get()),
-                    "planned_run_count": ((ftir_validation.get("execution") or {}).get("planned_run_count") if isinstance(ftir_validation.get("execution"), dict) else None),
                     "comparison_sets_completed": ((ftir_validation.get("execution") or {}).get("comparison_sets_completed") if isinstance(ftir_validation.get("execution"), dict) else 0),
                     "next_comparison_set_no": ((ftir_validation.get("execution") or {}).get("next_comparison_set_no") if isinstance(ftir_validation.get("execution"), dict) else 1),
                     "purge_due_after_run_no": ((ftir_validation.get("execution") or {}).get("purge_due_after_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
@@ -16173,6 +16302,20 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "last_bias_run_no": ((ftir_validation.get("execution") or {}).get("last_bias_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
                     "last_bias_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("last_bias_iso") or "")).strip(),
                     "live_review_status": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("live_review_status") or "")).strip(),
+                    "planned_run_count": ((ftir_validation.get("execution") or {}).get("planned_run_count") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "planned_run_minutes": ((ftir_validation.get("execution") or {}).get("planned_run_minutes") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "planned_total_minutes": ((ftir_validation.get("execution") or {}).get("planned_total_minutes") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "remaining_run_count": ((ftir_validation.get("execution") or {}).get("remaining_run_count") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "completion_pct": ((ftir_validation.get("execution") or {}).get("completion_pct") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "next_run_minutes": ((ftir_validation.get("execution") or {}).get("next_run_minutes") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "next_run_minutes_source": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("next_run_minutes_source") or "")).strip(),
+                    "expected_purge_after_runs": list((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("expected_purge_after_runs") or [])),
+                    "expected_bias_after_runs": list((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("expected_bias_after_runs") or [])),
+                    "remaining_expected_purge_after_runs": list((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("remaining_expected_purge_after_runs") or [])),
+                    "remaining_expected_bias_after_runs": list((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("remaining_expected_bias_after_runs") or [])),
+                    "cadence_plan_label": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("cadence_plan_label") or "")).strip(),
+                    "planner_status": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("planner_status") or "")).strip(),
+                    "planner_note": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("planner_note") or "")).strip(),
                 },
                 "alignment_review": {
                     **(dict(ftir_validation.get("alignment_review") or {}) if isinstance(ftir_validation.get("alignment_review"), dict) else {}),
@@ -16239,6 +16382,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if not isinstance(ftir_blk, dict) or not ftir_blk:
                 ftir_blk = dict(ftir_cfg)
             ftir_exec_state = _ftir_validation_execution_status(sess_use)
+            try:
+                var_ftir_validation_execution_plan_status.set(str(ftir_exec_state.get("planner_note") or "FTIR execution planner not configured."))
+            except Exception:
+                pass
 
             report_context = _read_json(pths["report_context_json"]) if pths["report_context_json"].exists() else {}
             coverage = report_context.get("coverage") if isinstance(report_context, dict) else {}
@@ -16350,11 +16497,20 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if isinstance(ftir_exec_state, dict) and bool(ftir_exec_state.get("enabled")):
                     lines.append(f"- FTIR live execution profile: {ftir_exec_state.get('profile') or '(n/a)'}")
                     lines.append(
+                        f"- FTIR execution plan status / planned / completed / remaining: "
+                        f"{ftir_exec_state.get('planner_status') or '(n/a)'} / "
+                        f"{ftir_exec_state.get('planned_run_count') or '(n/a)'} / "
+                        f"{ftir_exec_state.get('comparison_sets_completed') or 0} / "
+                        f"{ftir_exec_state.get('remaining_run_count') if ftir_exec_state.get('remaining_run_count') is not None else '(n/a)'}"
+                    )
+                    lines.append(
                         f"- FTIR live comparison sets completed / next / frozen: "
                         f"{ftir_exec_state.get('comparison_sets_completed') or 0} / "
                         f"{ftir_exec_state.get('next_comparison_set_no') or '(n/a)'} / "
                         f"{ftir_exec_state.get('frozen_comparison_set_count') or 0}"
                     )
+                    lines.append(f"- FTIR cadence plan: {ftir_exec_state.get('cadence_plan_label') or '(n/a)'}")
+                    lines.append(f"- FTIR planner note: {ftir_exec_state.get('planner_note') or '(n/a)'}")
                     lines.append(f"- FTIR live cadence status: {ftir_exec_state.get('live_review_status') or '(n/a)'}")
                     lines.append(f"- FTIR live cadence note: {ftir_exec_state.get('note') or '(n/a)'}")
             tpl = _ftir_validation_template_paths()

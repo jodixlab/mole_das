@@ -531,6 +531,14 @@ def _build_execution_summary(
     comparison_sets: Iterable[Dict[str, Any]],
     actual_runs: Iterable[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    def _int_or_none(raw: Any) -> Optional[int]:
+        try:
+            if raw in (None, ""):
+                return None
+            return int(raw)
+        except Exception:
+            return None
+
     execution = dict(cfg.get("execution") or {}) if isinstance(cfg.get("execution"), dict) else {}
     set_rows = [row for row in list(comparison_sets or []) if isinstance(row, dict)]
     run_rows = [row for row in list(actual_runs or []) if isinstance(row, dict)]
@@ -538,6 +546,23 @@ def _build_execution_summary(
         row for row in run_rows
         if str(row.get("end_ts_iso") or row.get("run_end_iso") or "").strip()
     ]
+    planned_run_count = _int_or_none(execution.get("planned_run_count"))
+    planned_run_count_override = _int_or_none(execution.get("planned_run_count_override"))
+    if planned_run_count_override is not None and planned_run_count_override > 0:
+        planned_run_count = planned_run_count_override
+    planned_run_minutes = _safe_float(execution.get("planned_run_minutes"))
+    planned_run_minutes_override = _safe_float(execution.get("planned_run_minutes_override"))
+    if planned_run_minutes_override is not None and planned_run_minutes_override > 0:
+        planned_run_minutes = planned_run_minutes_override
+    next_comparison_set_no = int(execution.get("next_comparison_set_no") or (len(completed_runs) + 1))
+    next_run_minutes = None
+    next_run_minutes_source = "NONE"
+    if planned_run_minutes_override is not None and planned_run_minutes_override > 0:
+        next_run_minutes = float(planned_run_minutes_override)
+        next_run_minutes_source = "EXECUTION_OVERRIDE"
+    elif planned_run_minutes is not None and planned_run_minutes > 0:
+        next_run_minutes = float(planned_run_minutes)
+        next_run_minutes_source = "EXECUTION_PLAN"
     purge_due_run = execution.get("purge_due_after_run_no")
     bias_due_run = execution.get("bias_due_after_run_no")
     cadence_ready = not bool(purge_due_run not in (None, "") or bias_due_run not in (None, ""))
@@ -553,6 +578,65 @@ def _build_execution_summary(
     else:
         status = "READY"
         note = "FTIR execution cadence is clear for the next comparison set."
+    remaining_run_count = (
+        max(int(planned_run_count or 0) - len(completed_runs), 0)
+        if planned_run_count is not None
+        else None
+    )
+    completion_pct = (
+        round((float(len(completed_runs)) / float(planned_run_count)) * 100.0, 1)
+        if planned_run_count not in (None, 0)
+        else None
+    )
+    planned_total_minutes = (
+        float(planned_run_count) * float(planned_run_minutes)
+        if planned_run_count not in (None, 0) and planned_run_minutes is not None
+        else None
+    )
+    expected_checkpoint_runs = list(range(1, int(planned_run_count or 0) + 1)) if planned_run_count not in (None, 0) else []
+    expected_purge_after_runs = expected_checkpoint_runs if bool(execution.get("require_purge_event")) else []
+    expected_bias_after_runs = expected_checkpoint_runs if bool(execution.get("require_bias_event")) else []
+    remaining_expected_purge_after_runs = [run_no for run_no in expected_purge_after_runs if run_no >= next_comparison_set_no]
+    remaining_expected_bias_after_runs = [run_no for run_no in expected_bias_after_runs if run_no >= next_comparison_set_no]
+    cadence_plan_label = " | ".join([
+        (
+            f"{_fmt_num(planned_run_minutes, 2)} min comparison sets"
+            if planned_run_minutes is not None
+            else "comparison-set duration not planned"
+        ),
+        (
+            f"{_fmt_num(execution.get('purge_minutes_required'), 2)} min purge"
+            if bool(execution.get("require_purge_event"))
+            else "no purge event required"
+        ),
+        ("bias after each set" if bool(execution.get("require_bias_event")) else "no bias event required"),
+    ])
+    if not bool(execution.get("enabled")):
+        planner_status = "DISABLED"
+    elif planned_run_count in (None, 0):
+        planner_status = "UNPLANNED"
+    elif len(completed_runs) >= int(planned_run_count):
+        planner_status = "COMPLETE"
+    elif len(completed_runs) > 0:
+        planner_status = "IN_PROGRESS"
+    else:
+        planner_status = "READY_TO_START"
+    if planner_status == "DISABLED":
+        planner_note = "FTIR execution planner is disabled."
+    elif planner_status == "UNPLANNED":
+        planner_note = "Planned FTIR comparison-set count is not defined."
+    elif planner_status == "COMPLETE":
+        planner_note = (
+            f"Planned FTIR comparison sets complete: {len(completed_runs)}/{int(planned_run_count)}."
+        )
+    else:
+        planner_note = " | ".join([
+            f"planned sets={int(planned_run_count)}",
+            f"completed={len(completed_runs)}",
+            f"remaining={int(remaining_run_count or 0)}",
+            f"next set={next_comparison_set_no}",
+            cadence_plan_label,
+        ])
     return {
         "enabled": bool(execution.get("enabled")),
         "profile": str(execution.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
@@ -560,10 +644,25 @@ def _build_execution_summary(
         "purge_minutes_required": _safe_float(execution.get("purge_minutes_required")),
         "require_purge_event": bool(execution.get("require_purge_event")),
         "require_bias_event": bool(execution.get("require_bias_event")),
-        "planned_run_count": execution.get("planned_run_count"),
+        "planned_run_count": planned_run_count,
+        "planned_run_count_override": planned_run_count_override,
+        "planned_run_minutes": planned_run_minutes,
+        "planned_run_minutes_override": planned_run_minutes_override,
+        "planned_total_minutes": planned_total_minutes,
         "completed_run_count": len(completed_runs),
         "comparison_set_count": len(set_rows),
-        "next_comparison_set_no": int(execution.get("next_comparison_set_no") or (len(completed_runs) + 1)),
+        "remaining_run_count": remaining_run_count,
+        "completion_pct": completion_pct,
+        "next_comparison_set_no": next_comparison_set_no,
+        "next_run_minutes": next_run_minutes,
+        "next_run_minutes_source": next_run_minutes_source,
+        "expected_purge_after_runs": expected_purge_after_runs,
+        "expected_bias_after_runs": expected_bias_after_runs,
+        "remaining_expected_purge_after_runs": remaining_expected_purge_after_runs,
+        "remaining_expected_bias_after_runs": remaining_expected_bias_after_runs,
+        "cadence_plan_label": cadence_plan_label,
+        "planner_status": planner_status,
+        "planner_note": planner_note,
         "purge_due_after_run_no": purge_due_run,
         "purge_due_after_iso": str(execution.get("purge_due_after_iso") or "").strip(),
         "bias_due_after_run_no": bias_due_run,
@@ -719,7 +818,10 @@ def _normalize_execution(value: Any) -> Dict[str, Any]:
         "purge_minutes_required": float(_safe_float(block.get("purge_minutes_required")) or 5.0),
         "require_purge_event": bool(block.get("require_purge_event", True)),
         "require_bias_event": bool(block.get("require_bias_event", True)),
+        "planned_run_count_override": _int_or_none(block.get("planned_run_count_override")),
         "planned_run_count": _int_or_none(block.get("planned_run_count")),
+        "planned_run_minutes_override": _safe_float(block.get("planned_run_minutes_override")),
+        "planned_run_minutes": _safe_float(block.get("planned_run_minutes")),
         "comparison_sets_completed": int(_int_or_none(block.get("comparison_sets_completed")) or 0),
         "next_comparison_set_no": int(_int_or_none(block.get("next_comparison_set_no")) or 1),
         "purge_due_after_run_no": _int_or_none(block.get("purge_due_after_run_no")),
