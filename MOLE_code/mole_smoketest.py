@@ -165,6 +165,7 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         "ledger_csv": "ftir_appendix_ledger_path",
         "method301_csv": "ftir_appendix_method301_path",
         "exclusions_csv": "ftir_appendix_exclusions_path",
+        "workbook_xlsx": "ftir_appendix_workbook_path",
         "index_json": "ftir_appendix_index_path",
     }
     appendix_paths: Dict[str, Path] = {}
@@ -196,6 +197,7 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         "ftir_validation_signed_comparison_ledger.csv",
         "ftir_validation_signed_method301_stats.csv",
         "ftir_validation_signed_exclusion_register.csv",
+        "ftir_validation_reviewer_workbook_v1.xlsx",
     }:
         if expected_name not in appendix_file_names:
             out["error"] = f"FTIR appendix index does not include {expected_name}"
@@ -224,6 +226,8 @@ def _format_integration_report(result: Dict[str, Any]) -> str:
         lines.append(f"  ftir_appendix_method301: {result.get('ftir_appendix_method301_path')}")
     if result.get("ftir_appendix_exclusions_path"):
         lines.append(f"  ftir_appendix_exclusions: {result.get('ftir_appendix_exclusions_path')}")
+    if result.get("ftir_appendix_workbook_path"):
+        lines.append(f"  ftir_appendix_workbook: {result.get('ftir_appendix_workbook_path')}")
     if result.get("ftir_appendix_index_path"):
         lines.append(f"  ftir_appendix_index: {result.get('ftir_appendix_index_path')}")
     if result.get("error"):

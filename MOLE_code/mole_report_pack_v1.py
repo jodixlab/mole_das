@@ -3146,6 +3146,7 @@ def _report_appendix_manifest(
         ("F", "FTIR validation signed comparison ledger", "csv", paths.ftir_validation_appendix_ledger_csv, "ftir_validation_appendix_v1", "Signed aligned-window ledger bound to the frozen FTIR validation snapshot."),
         ("F", "FTIR validation signed Method 301 stats", "csv", paths.ftir_validation_appendix_method301_csv, "ftir_validation_appendix_v1", "Signed Method 301 bias / precision statistics bound to the frozen FTIR validation snapshot."),
         ("F", "FTIR validation signed exclusion register", "csv", paths.ftir_validation_appendix_exclusions_csv, "ftir_validation_appendix_v1", "Signed exclusion register for FTIR validation windows."),
+        ("F", "FTIR validation reviewer workbook", "xlsx", paths.ftir_validation_appendix_workbook_xlsx, "ftir_validation_appendix_v1", "Reviewer workbook containing signoff summary, comparison sets, aligned rows, Method 301 stats, and exclusions."),
         ("F", "FTIR validation appendix index", "json", paths.ftir_validation_appendix_index_json, "ftir_validation_appendix_v1", "Index of reviewer-facing FTIR validation appendix artifacts."),
         ("E", "Workstep log", "jsonl", ((sources.get("worksteps") or {}).get("path") if isinstance(sources.get("worksteps"), dict) else ""), "evidence_bundle.sources.worksteps", "Field and activity log"),
         ("E", "Raw samples", "jsonl", ((sources.get("raw_samples") or {}).get("path") if isinstance(sources.get("raw_samples"), dict) else ""), "evidence_bundle.sources.raw_samples", "Raw sample evidence"),
@@ -4331,6 +4332,7 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
     signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
     snap = ftir.get("review_snapshot") if isinstance(ftir.get("review_snapshot"), dict) else {}
     config = ftir.get("config") if isinstance(ftir.get("config"), dict) else {}
+    comparison_sets = list(ftir.get("comparison_sets") or [])
     aligned_rows = list(ftir.get("aligned_rows") or [])
     method301_rows = list(ftir.get("method301") or [])
     excluded_rows = list(ftir.get("excluded_rows") or [])
@@ -4362,6 +4364,7 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         f"- Comparison ledger CSV: {paths.ftir_validation_appendix_ledger_csv}",
         f"- Method 301 stats CSV: {paths.ftir_validation_appendix_method301_csv}",
         f"- Exclusion register CSV: {paths.ftir_validation_appendix_exclusions_csv}",
+        f"- Reviewer workbook XLSX: {paths.ftir_validation_appendix_workbook_xlsx}",
     ]
     paths.ftir_validation_appendix_cover_md.write_text("\n".join(cover_lines).strip() + "\n", encoding="utf-8")
 
@@ -4416,12 +4419,185 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
                 row.get("reason"), row.get("reviewer"), row.get("updated_iso"),
             ])
 
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        def _xlsx_value(value: Any) -> Any:
+            if value is None:
+                return ""
+            if isinstance(value, bool):
+                return "TRUE" if value else "FALSE"
+            if isinstance(value, (list, tuple, set, dict)):
+                try:
+                    return json.dumps(value, ensure_ascii=True)
+                except Exception:
+                    return str(value)
+            return value
+
+        def _add_sheet(wb: Any, title: str, headers: List[str], rows: Iterable[Iterable[Any]]) -> None:
+            ws = wb.create_sheet(title=title[:31])
+            ws.append(headers)
+            header_fill = PatternFill(fill_type="solid", fgColor="D9EAF7")
+            for cell in ws[1]:
+                cell.font = Font(bold=True)
+                cell.fill = header_fill
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+            widths = [max(len(str(h or "")), 10) for h in headers]
+            for row in rows:
+                cleaned = [_xlsx_value(v) for v in row]
+                ws.append(cleaned)
+                for idx, value in enumerate(cleaned):
+                    widths[idx] = min(max(widths[idx], len(str(value or "")) + 2), 60)
+            for idx, width in enumerate(widths, start=1):
+                ws.column_dimensions[get_column_letter(idx)].width = width
+
+        wb = Workbook()
+        summary_ws = wb.active
+        summary_ws.title = "Signoff Summary"
+        summary_headers = ["Field", "Value"]
+        summary_ws.append(summary_headers)
+        header_fill = PatternFill(fill_type="solid", fgColor="D9EAF7")
+        for cell in summary_ws[1]:
+            cell.font = Font(bold=True)
+            cell.fill = header_fill
+        summary_rows = [
+            ("Validation status", ftir.get("status")),
+            ("Overall status", ftir.get("overall_status")),
+            ("Source", ftir.get("source")),
+            ("Validation mode", config.get("validation_mode")),
+            ("Comparator method", config.get("comparator_method")),
+            ("Comparison set count", ftir.get("comparison_set_count")),
+            ("Included comparison set count", ftir.get("included_comparison_set_count")),
+            ("Excluded comparison set count", ftir.get("excluded_comparison_set_count")),
+            ("Paired window count", ftir.get("paired_window_count")),
+            ("Excluded row count", ftir.get("excluded_count")),
+            ("Review locked", ftir.get("review_locked")),
+            ("Review lock by", ftir.get("review_lock_by")),
+            ("Review lock at", ftir.get("review_lock_iso")),
+            ("Signoff decision", signoff.get("decision") or "UNSIGNED"),
+            ("Signoff basis", signoff.get("basis")),
+            ("Signoff by", signoff.get("by")),
+            ("Signoff role", signoff.get("role")),
+            ("Signoff at", signoff.get("iso")),
+            ("Signoff note", signoff.get("note")),
+            ("Frozen snapshot JSON", snap.get("json_path")),
+            ("Frozen snapshot by", snap.get("snapshot_by")),
+            ("Frozen snapshot at", snap.get("snapshot_iso")),
+            ("Coverage note", ftir.get("coverage_note")),
+        ]
+        for key, value in summary_rows:
+            summary_ws.append([key, _xlsx_value(value)])
+        summary_ws.freeze_panes = "A2"
+        summary_ws.auto_filter.ref = summary_ws.dimensions
+        summary_ws.column_dimensions["A"].width = 30
+        summary_ws.column_dimensions["B"].width = 80
+
+        _add_sheet(
+            wb,
+            "Comparison Sets",
+            [
+                "set_no", "set_key", "run_no", "label", "window_start_iso", "window_end_iso",
+                "validation_mode", "review_state", "inclusion_status", "formal_basis",
+                "row_count", "paired_row_count", "included_row_count", "included_paired_row_count",
+                "excluded_row_count", "error_row_count", "warning_row_count",
+                "analytes", "paired_analytes", "excluded_analytes", "note",
+            ],
+            [
+                [
+                    row.get("set_no"), row.get("set_key"), row.get("run_no"), row.get("label"),
+                    row.get("window_start_iso"), row.get("window_end_iso"), row.get("validation_mode"),
+                    row.get("review_state"), row.get("inclusion_status"), row.get("formal_basis"),
+                    row.get("row_count"), row.get("paired_row_count"), row.get("included_row_count"),
+                    row.get("included_paired_row_count"), row.get("excluded_row_count"),
+                    row.get("error_row_count"), row.get("warning_row_count"),
+                    row.get("analytes"), row.get("paired_analytes"), row.get("excluded_analytes"), row.get("note"),
+                ]
+                for row in comparison_sets
+                if isinstance(row, dict)
+            ],
+        )
+
+        _add_sheet(
+            wb,
+            "Aligned Rows",
+            [
+                "comparison_set_no", "comparison_set_key", "comparison_set_status", "comparison_set_basis",
+                "run_no", "label", "window_start_iso", "window_end_iso", "analyte", "row_key",
+                "mole_count", "ftir_count", "mole_avg", "ftir_avg", "difference", "paired", "status",
+                "excluded", "exclusion_reason", "reviewer", "updated_iso", "qa_status", "qa_flags",
+                "offset_seconds_adjusted", "drift_seconds_adjusted", "mole_coverage_ratio", "ftir_coverage_ratio",
+            ],
+            [
+                [
+                    row.get("comparison_set_no"), row.get("comparison_set_key"), row.get("comparison_set_status"),
+                    row.get("comparison_set_basis"), row.get("run_no"), row.get("label"),
+                    row.get("window_start_iso"), row.get("window_end_iso"), row.get("analyte"), row.get("row_key"),
+                    row.get("mole_count"), row.get("ftir_count"), row.get("mole_avg"), row.get("ftir_avg"),
+                    row.get("difference"), row.get("paired"), row.get("status"), row.get("excluded"),
+                    row.get("exclusion_reason"), row.get("reviewer"), row.get("updated_iso"),
+                    row.get("qa_status"), row.get("qa_flags"), row.get("offset_seconds_adjusted"),
+                    row.get("drift_seconds_adjusted"), row.get("mole_coverage_ratio"), row.get("ftir_coverage_ratio"),
+                ]
+                for row in aligned_rows
+                if isinstance(row, dict)
+            ],
+        )
+
+        _add_sheet(
+            wb,
+            "Method301 Stats",
+            [
+                "analyte", "mode", "comparison_set_count", "included_comparison_set_count",
+                "excluded_comparison_set_count", "paired_window_count", "excluded_window_count",
+                "mole_mean", "ftir_mean", "mean_difference", "relative_bias_pct", "correction_factor",
+                "difference_sd", "t_statistic", "t_critical_95_two_sided", "candidate_variance",
+                "validated_variance", "f_statistic", "f_critical_95", "bias_status",
+                "precision_status", "overall_status", "note",
+            ],
+            [
+                [
+                    row.get("analyte"), row.get("mode"), row.get("comparison_set_count"),
+                    row.get("included_comparison_set_count"), row.get("excluded_comparison_set_count"),
+                    row.get("paired_window_count"), row.get("excluded_window_count"),
+                    row.get("mole_mean"), row.get("ftir_mean"), row.get("mean_difference"),
+                    row.get("relative_bias_pct"), row.get("correction_factor"), row.get("difference_sd"),
+                    row.get("t_statistic"), row.get("t_critical_95_two_sided"), row.get("candidate_variance"),
+                    row.get("validated_variance"), row.get("f_statistic"), row.get("f_critical_95"),
+                    row.get("bias_status"), row.get("precision_status"), row.get("overall_status"), row.get("note"),
+                ]
+                for row in method301_rows
+                if isinstance(row, dict)
+            ],
+        )
+
+        _add_sheet(
+            wb,
+            "Exclusions",
+            ["row_key", "run_no", "label", "analyte", "reason", "reviewer", "updated_iso"],
+            [
+                [
+                    row.get("row_key"), row.get("run_no"), row.get("label"),
+                    row.get("analyte"), row.get("reason"), row.get("reviewer"), row.get("updated_iso"),
+                ]
+                for row in excluded_rows
+                if isinstance(row, dict)
+            ],
+        )
+
+        wb.save(str(paths.ftir_validation_appendix_workbook_xlsx))
+    except Exception:
+        _remove_if_exists(paths.ftir_validation_appendix_workbook_xlsx)
+
     appendix_files: List[Dict[str, Any]] = []
     for p in [
         paths.ftir_validation_appendix_cover_md,
         paths.ftir_validation_appendix_ledger_csv,
         paths.ftir_validation_appendix_method301_csv,
         paths.ftir_validation_appendix_exclusions_csv,
+        paths.ftir_validation_appendix_workbook_xlsx,
     ]:
         try:
             appendix_files.append({
@@ -4447,6 +4623,7 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         "ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
         "method301_csv": str(paths.ftir_validation_appendix_method301_csv),
         "exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+        "workbook_xlsx": str(paths.ftir_validation_appendix_workbook_xlsx),
         "index_json": str(paths.ftir_validation_appendix_index_json),
     }
 
@@ -4470,6 +4647,7 @@ class ReportPackPaths:
     ftir_validation_appendix_ledger_csv: Path
     ftir_validation_appendix_method301_csv: Path
     ftir_validation_appendix_exclusions_csv: Path
+    ftir_validation_appendix_workbook_xlsx: Path
     ftir_validation_appendix_index_json: Path
     final_report_md: Path
     final_report_docx: Path
@@ -4554,6 +4732,7 @@ def generate_report_pack_v1(
         ftir_validation_appendix_ledger_csv=ftir_validation_appendix_dir / "ftir_validation_signed_comparison_ledger.csv",
         ftir_validation_appendix_method301_csv=ftir_validation_appendix_dir / "ftir_validation_signed_method301_stats.csv",
         ftir_validation_appendix_exclusions_csv=ftir_validation_appendix_dir / "ftir_validation_signed_exclusion_register.csv",
+        ftir_validation_appendix_workbook_xlsx=ftir_validation_appendix_dir / "ftir_validation_reviewer_workbook_v1.xlsx",
         ftir_validation_appendix_index_json=ftir_validation_appendix_dir / "index.json",
         final_report_md=final_report_dir / "final_test_report_v1.md",
         final_report_docx=final_report_dir / "final_test_report_v1.docx",
@@ -4950,6 +5129,7 @@ def generate_report_pack_v1(
             "ftir_validation_appendix_ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
             "ftir_validation_appendix_method301_csv": str(paths.ftir_validation_appendix_method301_csv),
             "ftir_validation_appendix_exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+            "ftir_validation_appendix_workbook_xlsx": str(paths.ftir_validation_appendix_workbook_xlsx),
             "ftir_validation_appendix_index_json": str(paths.ftir_validation_appendix_index_json),
             "spec_engine_shadow": evidence_bundle.get("spec_engine_shadow"),
             "static_artifacts": {
