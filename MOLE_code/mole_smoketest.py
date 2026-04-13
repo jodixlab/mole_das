@@ -20,6 +20,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import py_compile
@@ -39,7 +41,117 @@ def _walk_py_files(code_dir: Path) -> List[Path]:
     return sorted(files, key=lambda x: str(x).lower())
 
 
-def _find_integration_session(root: Path) -> Optional[Path]:
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _slug_text(value: Any) -> str:
+    text = re.sub(r"[^A-Za-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+    return text or "session"
+
+
+def _seed_integration_session(root: Path) -> Optional[Path]:
+    config_dir = root / "mole_das_data" / "configs"
+    candidates: List[Path] = []
+    preferred = config_dir / "mole_session_2026_03_31_1209.json"
+    if preferred.exists():
+        candidates.append(preferred)
+    candidates.extend(sorted(config_dir.glob("mole_session_*.json"), key=lambda p: str(p).lower()))
+
+    seen: set[str] = set()
+    ordered: List[Path] = []
+    for path in candidates:
+        key = str(path.resolve()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(path)
+
+    session_cfg_path = next((path for path in ordered if path.exists()), None)
+    if session_cfg_path is None:
+        return None
+
+    try:
+        session = json.loads(session_cfg_path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return None
+    if not isinstance(session, dict):
+        return None
+
+    meta = session.get("meta") if isinstance(session.get("meta"), dict) else {}
+    project = session.get("project") if isinstance(session.get("project"), dict) else {}
+    source = session.get("source") if isinstance(session.get("source"), dict) else {}
+    job_id = str(project.get("job_id") or session_cfg_path.stem).strip() or session_cfg_path.stem
+    site_slug = _slug_text(project.get("site_facility") or "fixture_site")
+    run_id = f"{job_id}__SMOKETEST"
+
+    fixture_root = root / "mole_das_data" / "validation" / "_smoke"
+    session_dir = fixture_root / run_id
+    if session_dir.exists():
+        shutil.rmtree(session_dir, ignore_errors=True)
+    (session_dir / "meta").mkdir(parents=True, exist_ok=True)
+    (session_dir / "raw").mkdir(parents=True, exist_ok=True)
+    (session_dir / "exports").mkdir(parents=True, exist_ok=True)
+
+    session["run_id"] = run_id
+    paths = session.get("paths") if isinstance(session.get("paths"), dict) else {}
+    paths["session_dir"] = str(session_dir)
+    paths["daq_run_dir"] = str(session_dir)
+    paths["db_path"] = str((root / "mole_das_data" / "db" / "mole_master.sqlite").resolve())
+    paths["logs_dir"] = str((root / "mole_das_data" / "logs").resolve())
+    session["paths"] = paths
+
+    meta = dict(meta)
+    meta["seeded_for_smoketest"] = True
+    meta["seed_source_config"] = str(session_cfg_path.name)
+    session["meta"] = meta
+
+    runner_config_path = session_dir / "runner_config.json"
+    runner_config_path.write_text(json.dumps(session, indent=2), encoding="utf-8")
+
+    created_iso = str(meta.get("applied_iso") or meta.get("created_iso") or "").strip()
+    session_profile = {
+        "session_id": run_id,
+        "run_id": run_id,
+        "created_at": created_iso,
+        "site_id": job_id,
+        "location_id": str(project.get("asset_unit_id") or "001").strip() or "001",
+        "source_category": str(source.get("source_category") or "").strip(),
+        "manufacturer": str(source.get("manufacturer") or "").strip(),
+        "model_number": str(source.get("model_number") or "").strip(),
+        "serial_number": str(source.get("serial_number") or "").strip(),
+        "asset_tag": str(source.get("asset_tag") or "").strip(),
+        "instance_id": source.get("instance_id"),
+        "paths": {
+            "runner_config_path": str(runner_config_path),
+            "session_config_path": str(session_cfg_path.resolve()),
+            "session_dir": str(session_dir),
+            "daq_run_dir": str(session_dir),
+            "db_path": str((root / "mole_das_data" / "db" / "mole_master.sqlite").resolve()),
+            "logs_dir": str((root / "mole_das_data" / "logs").resolve()),
+        },
+    }
+    (session_dir / "session_profile.json").write_text(json.dumps(session_profile, indent=2), encoding="utf-8")
+
+    session_meta = {
+        "schema": "mole_smoketest_session_meta_v1",
+        "session_id": run_id,
+        "seeded_from": str(session_cfg_path.resolve()),
+        "seeded_at": _now_iso(),
+    }
+    (session_dir / "meta" / "session.json").write_text(json.dumps(session_meta, indent=2), encoding="utf-8")
+    return session_dir
+
+
+def _find_integration_session(root: Path, explicit: Optional[Path] = None) -> Optional[Path]:
+    if explicit is not None:
+        candidate = Path(explicit).expanduser().resolve()
+        if (candidate / "runner_config.json").exists():
+            return candidate
+        return None
+
     candidates: List[Path] = []
     for base in (root / "mole_das_data" / "sessions", root / "mole_das_data" / "training" / "sessions"):
         if not base.exists():
@@ -47,14 +159,18 @@ def _find_integration_session(root: Path) -> Optional[Path]:
         for cfg in base.rglob("runner_config.json"):
             candidates.append(cfg.parent)
     if not candidates:
+        seeded = _seed_integration_session(root)
+        if seeded is not None and (seeded / "runner_config.json").exists():
+            return seeded
         return None
     return sorted(candidates, key=lambda p: str(p).lower())[0]
 
 
-def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[str, Any]:
+def _run_launcher_report_pack_integration(root: Path, code_dir: Path, integration_session_dir: Optional[Path] = None) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "ok": False,
         "session_dir": "",
+        "session_source": "",
         "summary_path": "",
         "final_report_path": "",
         "final_report_index_path": "",
@@ -85,10 +201,15 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path) -> Dict[st
         out["error"] = f"launcher bootstrap failed with exit code {boot.returncode}"
         return out
 
-    session_dir = _find_integration_session(root)
+    session_dir = _find_integration_session(root, explicit=integration_session_dir)
     if session_dir is None:
         out["error"] = "no session fixture with runner_config.json found under mole_das_data"
         return out
+    try:
+        validation_fixture_root = (root / "mole_das_data" / "validation" / "_smoke").resolve()
+        out["session_source"] = "SEEDED_FIXTURE" if session_dir.resolve().is_relative_to(validation_fixture_root) else "SESSION_TREE"
+    except Exception:
+        out["session_source"] = "SESSION_TREE"
 
     py = code_dir / ".venv" / "Scripts" / "python.exe"
     if not py.exists():
@@ -218,6 +339,8 @@ def _format_integration_report(result: Dict[str, Any]) -> str:
     lines.append(f"  ok: {'YES' if bool(result.get('ok')) else 'NO'}")
     if result.get("session_dir"):
         lines.append(f"  session: {result.get('session_dir')}")
+    if result.get("session_source"):
+        lines.append(f"  session_source: {result.get('session_source')}")
     if result.get("summary_path"):
         lines.append(f"  summary: {result.get('summary_path')}")
     if result.get("final_report_path"):
@@ -252,6 +375,7 @@ def main() -> int:
     ap.add_argument("--no-compile", action="store_true", help="Skip py_compile step.")
     ap.add_argument("--no-policy-regression", action="store_true", help="Skip post-cal carry-forward regression checks.")
     ap.add_argument("--integration-launcher-report-pack", action="store_true", help="Run launcher bootstrap + report-pack export integration smoke path.")
+    ap.add_argument("--integration-session-dir", default=None, help="Optional explicit session directory for the integration smoke path.")
     args = ap.parse_args()
 
     code_dir = Path(__file__).resolve().parent
@@ -284,7 +408,8 @@ def main() -> int:
             return 3
 
     if args.integration_launcher_report_pack:
-        integration = _run_launcher_report_pack_integration(root=root, code_dir=code_dir)
+        integration_dir = Path(str(args.integration_session_dir)).expanduser().resolve() if args.integration_session_dir else None
+        integration = _run_launcher_report_pack_integration(root=root, code_dir=code_dir, integration_session_dir=integration_dir)
         print("\n" + _format_integration_report(integration))
         if not bool(integration.get("ok")):
             return 3

@@ -1,0 +1,38 @@
+name: Clean Release Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - codex/report-context-phase1
+  pull_request:
+
+jobs:
+  windows-clean-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run clean release workflow
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass
+          .\scripts\run_clean_release_workflow.ps1 `
+            -RepoRoot "${{ github.workspace }}" `
+            -ScratchRoot "$env:RUNNER_TEMP\mole_rel" `
+            -ArtifactOutDir "${{ github.workspace }}\RELEASES\clean_release_workflow"
+
+      - name: Upload clean release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-release-validation
+          path: RELEASES/clean_release_workflow/**
+          if-no-files-found: warn

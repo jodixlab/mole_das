@@ -24,3 +24,7 @@ Notes
   - The packager excludes the RELEASES folder so builds don't recursively include
     prior artifacts.
   - Use run_release_gate_console.bat for CI / non-interactive execution.
+  - For a clean-machine release candidate run, use:
+      <root>\RUN_CLEAN_RELEASE_WORKFLOW.bat
+    This copies tracked files into a fresh workspace, installs the runtime,
+    runs unit tests + smoketest integration, then runs the release gate.
