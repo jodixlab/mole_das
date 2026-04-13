@@ -146,22 +146,26 @@ catch {
     throw
 }
 finally {
-    $summary.finished_at = (Get-Date).ToUniversalTime().ToString("o")
-    $summaryJson = $summary | ConvertTo-Json -Depth 6
-    Set-Content -LiteralPath $summaryPath -Value $summaryJson -Encoding UTF8
-    $summaryText = @(
-        "MOLE-DAS Clean Release Workflow"
-        "Status: $($summary.status)"
-        "Repo: $repo"
-        "Workspace: $workspace"
-        "Artifacts: $artifactDir"
-        ""
-        "Steps:"
-    )
-    foreach ($step in $summary.steps) {
-        $summaryText += "- $($step.name): $($step.status) :: $($step.detail)"
+    function Write-SummaryFiles {
+        $summary.finished_at = (Get-Date).ToUniversalTime().ToString("o")
+        $summaryJson = $summary | ConvertTo-Json -Depth 6
+        Set-Content -LiteralPath $summaryPath -Value $summaryJson -Encoding UTF8
+        $summaryText = @(
+            "MOLE-DAS Clean Release Workflow"
+            "Status: $($summary.status)"
+            "Repo: $repo"
+            "Workspace: $workspace"
+            "Artifacts: $artifactDir"
+            ""
+            "Steps:"
+        )
+        foreach ($step in $summary.steps) {
+            $summaryText += "- $($step.name): $($step.status) :: $($step.detail)"
+        }
+        Set-Content -LiteralPath $summaryTxtPath -Value ($summaryText -join [Environment]::NewLine) -Encoding UTF8
     }
-    Set-Content -LiteralPath $summaryTxtPath -Value ($summaryText -join [Environment]::NewLine) -Encoding UTF8
+
+    Write-SummaryFiles
 
     try {
         $acceptanceScript = Join-Path $repo "scripts\build_release_acceptance_pack.py"
@@ -172,15 +176,34 @@ finally {
                 "--output-dir", $artifactDir,
                 "--summary-json", $summaryPath
             ) -WorkingDirectory $repo
+            Add-StepResult -Name "acceptance_pack" -Status "PASS" -Detail "Acceptance matrix and go/no-go checklist generated."
+            Write-SummaryFiles
         }
     }
     catch {
         Add-StepResult -Name "acceptance_pack" -Status "FAIL" -Detail $_.Exception.Message
         $summary.status = "FAIL"
-        $summaryJson = $summary | ConvertTo-Json -Depth 6
-        Set-Content -LiteralPath $summaryPath -Value $summaryJson -Encoding UTF8
-        $summaryText += "- acceptance_pack: FAIL :: $($_.Exception.Message)"
-        Set-Content -LiteralPath $summaryTxtPath -Value ($summaryText -join [Environment]::NewLine) -Encoding UTF8
+        Write-SummaryFiles
+    }
+
+    try {
+        $artifactContractScript = Join-Path $repo "scripts\build_release_artifact_contract.py"
+        if ((Test-Path $artifactContractScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $artifactContractScript,
+                "--repo-root", $repo,
+                "--output-dir", $artifactDir,
+                "--summary-json", $summaryPath,
+                "--python-exe", $python
+            ) -WorkingDirectory $repo
+            Add-StepResult -Name "artifact_contract" -Status "PASS" -Detail "Release artifact contract, dependency manifest, and bundle summary generated."
+            Write-SummaryFiles
+        }
+    }
+    catch {
+        Add-StepResult -Name "artifact_contract" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        Write-SummaryFiles
     }
 
     if ((-not $KeepScratch) -and (Test-Path $scratch)) {

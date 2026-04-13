@@ -1,0 +1,124 @@
+{
+  "schema": "mole_release_artifact_contract_source_v1",
+  "artifacts": [
+    {
+      "id": "runtime_zip",
+      "required": true,
+      "match": "glob",
+      "pattern": "*_RUNTIME_READY_FULL_DATA.zip",
+      "description": "Certified runtime ZIP generated from the clean workspace."
+    },
+    {
+      "id": "release_cert_json",
+      "required": true,
+      "match": "glob",
+      "pattern": "RELEASE_CERT_*.json",
+      "description": "Structured release certificate emitted by the release gate."
+    },
+    {
+      "id": "release_cert_txt",
+      "required": true,
+      "match": "glob",
+      "pattern": "RELEASE_CERT_*.txt",
+      "description": "Human-readable release certificate emitted by the release gate."
+    },
+    {
+      "id": "release_hygiene_json",
+      "required": true,
+      "match": "glob",
+      "pattern": "RELEASE_HYGIENE_*.json",
+      "description": "Structured package hygiene audit for the runtime ZIP."
+    },
+    {
+      "id": "release_hygiene_txt",
+      "required": true,
+      "match": "glob",
+      "pattern": "RELEASE_HYGIENE_*.txt",
+      "description": "Human-readable package hygiene audit for the runtime ZIP."
+    },
+    {
+      "id": "clean_release_summary_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "clean_release_summary.json",
+      "description": "Structured clean-workspace workflow summary."
+    },
+    {
+      "id": "clean_release_summary_txt",
+      "required": true,
+      "match": "exact",
+      "pattern": "clean_release_summary.txt",
+      "description": "Human-readable clean-workspace workflow summary."
+    },
+    {
+      "id": "production_acceptance_matrix_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "production_acceptance_matrix.md",
+      "description": "Operator-facing production acceptance matrix."
+    },
+    {
+      "id": "production_acceptance_matrix_csv",
+      "required": true,
+      "match": "exact",
+      "pattern": "production_acceptance_matrix.csv",
+      "description": "CSV export of the production acceptance matrix."
+    },
+    {
+      "id": "operator_go_no_go_checklist_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "operator_go_no_go_checklist.md",
+      "description": "Operator go/no-go checklist."
+    },
+    {
+      "id": "operator_go_no_go_checklist_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "operator_go_no_go_checklist.json",
+      "description": "Structured operator go/no-go checklist."
+    },
+    {
+      "id": "dependency_manifest_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "dependency_manifest.json",
+      "description": "Structured dependency manifest from the clean runtime."
+    },
+    {
+      "id": "dependency_manifest_txt",
+      "required": true,
+      "match": "exact",
+      "pattern": "dependency_manifest.txt",
+      "description": "Freeze-style dependency manifest from the clean runtime."
+    },
+    {
+      "id": "release_bundle_summary_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_bundle_summary.json",
+      "description": "Structured release bundle pass/fail summary."
+    },
+    {
+      "id": "release_bundle_summary_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_bundle_summary.md",
+      "description": "Human-readable release bundle pass/fail summary."
+    },
+    {
+      "id": "release_artifact_contract_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_artifact_contract.json",
+      "description": "Structured release artifact contract."
+    },
+    {
+      "id": "release_artifact_contract_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_artifact_contract.md",
+      "description": "Human-readable release artifact contract."
+    }
+  ]
+}

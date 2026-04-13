@@ -106,6 +106,9 @@ Release metadata standard:
   - The release gate also writes package-hygiene reports and rejects runtime
     ZIPs that contain banned paths or absolute local path drift in packaged
     config/runtime text files.
+  - The clean release workflow emits the release artifact contract,
+    dependency manifest, and release bundle summary under
+    RELEASES\clean_release_workflow\.
 
 Operational troubleshooting notes:
   - Use console launchers first when debugging startup or UI issues.
