@@ -19,6 +19,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 VALIDATION_MODES = ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON")
 SIGNOFF_ACCEPTANCE_BASES = ("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON", "NOT_ACCEPTED")
 FTIR_VENDOR_PROFILES = ("AUTO", "GENERIC", "GASMET_CSV", "MKS_MULTIGAS_CSV", "OPSIS_CSV", "THERMOFISHER_MAX_CSV")
+FTIR_EXECUTION_PROFILES = ("SESSION_RUNS", "MANUAL_WINDOWS_ONLY")
+FTIR_COMPARISON_SET_POLICIES = ("RUN_EQUALS_SET",)
 LEGACY_SIGNOFF_BASIS_MAP = {
     "FORMAL_METHOD_301_PASS": "FORMAL_METHOD_301",
     "INFORMED_COMPARISON_ONLY": "METHOD_301_INFORMED_COMPARISON",
@@ -375,6 +377,7 @@ def _build_validation_qa(
     row_status_counts: Dict[str, int] = {}
     blocking_issues: List[str] = []
     warnings: List[str] = []
+    execution = dict(cfg.get("execution") or {}) if isinstance(cfg.get("execution"), dict) else {}
     for row in included_rows:
         qa_status = str(row.get("qa_status") or "NO_DATA").strip().upper() or "NO_DATA"
         row_status_counts[qa_status] = int(row_status_counts.get(qa_status) or 0) + 1
@@ -426,6 +429,16 @@ def _build_validation_qa(
                 + ", ".join([code for code in insufficient if code])
             )
 
+    if bool(execution.get("enabled")):
+        purge_due = execution.get("purge_due_after_run_no")
+        bias_due = execution.get("bias_due_after_run_no")
+        if execution.get("profile") == "SESSION_RUNS" and str(windows.get("source") or "").strip().upper() != "ACTUAL_RUNS":
+            warnings.append("FTIR live execution mode expects session actual runs, but validation is not using actual-run windows.")
+        if execution.get("require_purge_event") and purge_due not in (None, ""):
+            blocking_issues.append(f"Ambient purge is still due after Run {purge_due} before the next comparison set.")
+        if execution.get("require_bias_event") and bias_due not in (None, ""):
+            blocking_issues.append(f"Bias logging is still due after Run {bias_due} before the next comparison set.")
+
     lock_ready = len(blocking_issues) == 0
     signoff_ready = lock_ready and not any(
         str(row.get("overall_status") or "").strip().upper() in ("NO_DATA", "GAP")
@@ -442,6 +455,8 @@ def _build_validation_qa(
         )
     if ts_col:
         summary_parts.append(f"timestamp: {ts_col}")
+    if bool(execution.get("enabled")):
+        summary_parts.append(f"execution: {str(execution.get('profile') or 'SESSION_RUNS').strip().upper()}")
     return {
         "thresholds": {
             "min_rows_per_side": QA_MIN_ROWS_PER_SIDE,
@@ -471,6 +486,63 @@ def _build_validation_qa(
         "lock_ready": lock_ready,
         "signoff_ready": signoff_ready,
         "summary": " | ".join(summary_parts),
+    }
+
+
+def _build_execution_summary(
+    cfg: Dict[str, Any],
+    windows: Dict[str, Any],
+    comparison_sets: Iterable[Dict[str, Any]],
+    actual_runs: Iterable[Dict[str, Any]],
+) -> Dict[str, Any]:
+    execution = dict(cfg.get("execution") or {}) if isinstance(cfg.get("execution"), dict) else {}
+    set_rows = [row for row in list(comparison_sets or []) if isinstance(row, dict)]
+    run_rows = [row for row in list(actual_runs or []) if isinstance(row, dict)]
+    completed_runs = [
+        row for row in run_rows
+        if str(row.get("end_ts_iso") or row.get("run_end_iso") or "").strip()
+    ]
+    purge_due_run = execution.get("purge_due_after_run_no")
+    bias_due_run = execution.get("bias_due_after_run_no")
+    cadence_ready = not bool(purge_due_run not in (None, "") or bias_due_run not in (None, ""))
+    if not bool(execution.get("enabled")):
+        status = "DISABLED"
+        note = "FTIR live execution mode is disabled."
+    elif purge_due_run not in (None, ""):
+        status = "PURGE_DUE"
+        note = f"Ambient purge is due after Run {purge_due_run} before the next comparison set."
+    elif bias_due_run not in (None, ""):
+        status = "BIAS_DUE"
+        note = f"Bias logging is due after Run {bias_due_run} before the next comparison set."
+    else:
+        status = "READY"
+        note = "FTIR execution cadence is clear for the next comparison set."
+    return {
+        "enabled": bool(execution.get("enabled")),
+        "profile": str(execution.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
+        "comparison_set_policy": str(execution.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET",
+        "purge_minutes_required": _safe_float(execution.get("purge_minutes_required")),
+        "require_purge_event": bool(execution.get("require_purge_event")),
+        "require_bias_event": bool(execution.get("require_bias_event")),
+        "planned_run_count": execution.get("planned_run_count"),
+        "completed_run_count": len(completed_runs),
+        "comparison_set_count": len(set_rows),
+        "next_comparison_set_no": int(execution.get("next_comparison_set_no") or (len(completed_runs) + 1)),
+        "purge_due_after_run_no": purge_due_run,
+        "purge_due_after_iso": str(execution.get("purge_due_after_iso") or "").strip(),
+        "bias_due_after_run_no": bias_due_run,
+        "bias_due_after_iso": str(execution.get("bias_due_after_iso") or "").strip(),
+        "last_completed_run_no": execution.get("last_completed_run_no"),
+        "last_completed_iso": str(execution.get("last_completed_iso") or "").strip(),
+        "last_purge_run_no": execution.get("last_purge_run_no"),
+        "last_purge_iso": str(execution.get("last_purge_iso") or "").strip(),
+        "last_bias_run_no": execution.get("last_bias_run_no"),
+        "last_bias_iso": str(execution.get("last_bias_iso") or "").strip(),
+        "cadence_ready_for_next_run": cadence_ready,
+        "status": status,
+        "note": note,
+        "review_live_status": str(execution.get("live_review_status") or status).strip(),
+        "window_source": str(windows.get("source") or "").strip(),
     }
 
 
@@ -556,6 +628,47 @@ def _normalize_exclusions(value: Any) -> Dict[str, Dict[str, Any]]:
                 "updated_iso": str(item.get("updated_iso") or "").strip(),
             }
     return out
+
+
+def _normalize_execution(value: Any) -> Dict[str, Any]:
+    block = dict(value or {}) if isinstance(value, dict) else {}
+    profile = str(block.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS"
+    if profile not in FTIR_EXECUTION_PROFILES:
+        profile = "SESSION_RUNS"
+    policy = str(block.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET"
+    if policy not in FTIR_COMPARISON_SET_POLICIES:
+        policy = "RUN_EQUALS_SET"
+
+    def _int_or_none(raw: Any) -> Optional[int]:
+        try:
+            if raw in (None, ""):
+                return None
+            return int(raw)
+        except Exception:
+            return None
+
+    return {
+        "enabled": bool(block.get("enabled")),
+        "profile": profile,
+        "comparison_set_policy": policy,
+        "purge_minutes_required": float(_safe_float(block.get("purge_minutes_required")) or 5.0),
+        "require_purge_event": bool(block.get("require_purge_event", True)),
+        "require_bias_event": bool(block.get("require_bias_event", True)),
+        "planned_run_count": _int_or_none(block.get("planned_run_count")),
+        "comparison_sets_completed": int(_int_or_none(block.get("comparison_sets_completed")) or 0),
+        "next_comparison_set_no": int(_int_or_none(block.get("next_comparison_set_no")) or 1),
+        "purge_due_after_run_no": _int_or_none(block.get("purge_due_after_run_no")),
+        "purge_due_after_iso": str(block.get("purge_due_after_iso") or "").strip(),
+        "bias_due_after_run_no": _int_or_none(block.get("bias_due_after_run_no")),
+        "bias_due_after_iso": str(block.get("bias_due_after_iso") or "").strip(),
+        "last_completed_run_no": _int_or_none(block.get("last_completed_run_no")),
+        "last_completed_iso": str(block.get("last_completed_iso") or "").strip(),
+        "last_purge_run_no": _int_or_none(block.get("last_purge_run_no")),
+        "last_purge_iso": str(block.get("last_purge_iso") or "").strip(),
+        "last_bias_run_no": _int_or_none(block.get("last_bias_run_no")),
+        "last_bias_iso": str(block.get("last_bias_iso") or "").strip(),
+        "live_review_status": str(block.get("live_review_status") or "").strip(),
+    }
 
 
 def _normalize_review_snapshot(value: Any) -> Dict[str, Any]:
@@ -678,6 +791,7 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "review_snapshot": _normalize_review_snapshot(block.get("review_snapshot")),
         "signoff": _normalize_signoff(block.get("signoff")),
         "exclusions": _normalize_exclusions(block.get("exclusions")),
+        "execution": _normalize_execution(block.get("execution")),
     }
 
 
@@ -935,11 +1049,23 @@ def build_windows(cfg: Dict[str, Any], actual_runs: Iterable[Dict[str, Any]]) ->
             if start_dt is None or end_dt is None or end_dt <= start_dt:
                 continue
             rows.append({
+                "comparison_set_no": int(item.get("comparison_set_no") or item.get("run_no") or idx),
+                "comparison_set_key": str(item.get("comparison_set_key") or f"MANUAL_SET_{idx:02d}").strip(),
                 "run_no": item.get("run_no") or idx,
                 "window_start_iso": _normalize_iso(start_dt),
                 "window_end_iso": _normalize_iso(end_dt),
                 "source": "MANUAL_WINDOWS",
                 "label": str(item.get("label") or f"Manual window {idx}").strip(),
+                "execution_profile": "MANUAL_WINDOWS_ONLY",
+                "comparison_set_policy": "RUN_EQUALS_SET",
+                "target_run_minutes": _safe_float(item.get("target_run_minutes")),
+                "purge_minutes_required": _safe_float(item.get("purge_minutes_required")),
+                "purge_required": bool(item.get("purge_required")),
+                "bias_required": bool(item.get("bias_required")),
+                "cadence_status": str(item.get("cadence_status") or "MANUAL_WINDOW").strip().upper() or "MANUAL_WINDOW",
+                "cadence_note": str(item.get("cadence_note") or "Manual FTIR comparison window.").strip(),
+                "run_start_iso": _normalize_iso(start_dt),
+                "run_end_iso": _normalize_iso(end_dt),
             })
         return {
             "status": "Available" if rows else "Gap",
@@ -948,19 +1074,34 @@ def build_windows(cfg: Dict[str, Any], actual_runs: Iterable[Dict[str, Any]]) ->
             "note": "Manual FTIR validation windows were used." if rows else "Manual FTIR validation windows were configured but invalid.",
         }
 
-    for item in actual_runs:
+    execution = dict(cfg.get("execution") or {}) if isinstance(cfg.get("execution"), dict) else {}
+    for idx, item in enumerate(actual_runs, start=1):
         if not isinstance(item, dict):
             continue
         start_dt = _parse_iso_dt(item.get("start_ts_iso"))
         end_dt = _parse_iso_dt(item.get("end_ts_iso"))
         if start_dt is None or end_dt is None or end_dt <= start_dt:
             continue
+        comparison_set_no = int(item.get("comparison_set_no") or item.get("run_no") or idx)
         rows.append({
+            "comparison_set_no": comparison_set_no,
+            "comparison_set_key": str(item.get("comparison_set_key") or f"RUN_SET_{comparison_set_no:02d}").strip(),
             "run_no": item.get("run_no"),
             "window_start_iso": _normalize_iso(start_dt),
             "window_end_iso": _normalize_iso(end_dt),
-            "source": "ACTUAL_RUNS",
-            "label": f"Run {item.get('run_no')}",
+            "source": str(item.get("source") or "ACTUAL_RUNS").strip() or "ACTUAL_RUNS",
+            "label": str(item.get("label") or f"Run {item.get('run_no')}").strip(),
+            "execution_profile": str(item.get("execution_profile") or execution.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
+            "comparison_set_policy": str(item.get("comparison_set_policy") or execution.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET",
+            "target_run_minutes": _safe_float(item.get("target_run_minutes")),
+            "purge_minutes_required": _safe_float(item.get("purge_minutes_required") if item.get("purge_minutes_required") not in (None, "") else execution.get("purge_minutes_required")),
+            "purge_required": bool(item.get("purge_required", execution.get("require_purge_event"))),
+            "bias_required": bool(item.get("bias_required", execution.get("require_bias_event"))),
+            "cadence_status": str(item.get("cadence_status") or "RUN_COMPLETE").strip().upper() or "RUN_COMPLETE",
+            "cadence_note": str(item.get("cadence_note") or "Actual run window captured from the session run log.").strip(),
+            "run_start_iso": str(item.get("start_ts_iso") or "").strip(),
+            "run_end_iso": str(item.get("end_ts_iso") or "").strip(),
+            "review_live_status": str(item.get("review_live_status") or "").strip(),
         })
     return {
         "status": "Available" if rows else "Gap",
@@ -1017,6 +1158,17 @@ def align_windows(
             mole_avg = _mean(mole_stats.get("values") or [])
             ftir_avg = _mean(ftir_stats.get("values") or [])
             row = {
+                "comparison_set_no": window.get("comparison_set_no"),
+                "comparison_set_key": window.get("comparison_set_key"),
+                "comparison_set_policy": window.get("comparison_set_policy"),
+                "execution_profile": window.get("execution_profile"),
+                "target_run_minutes": window.get("target_run_minutes"),
+                "purge_minutes_required": window.get("purge_minutes_required"),
+                "purge_required": bool(window.get("purge_required")),
+                "bias_required": bool(window.get("bias_required")),
+                "cadence_status": window.get("cadence_status"),
+                "cadence_note": window.get("cadence_note"),
+                "review_live_status": window.get("review_live_status"),
                 "run_no": window.get("run_no"),
                 "label": window.get("label"),
                 "window_start_iso": window.get("window_start_iso"),
@@ -1101,18 +1253,29 @@ def build_comparison_sets(
     for idx, window in enumerate(list(windows or []), start=1):
         if not isinstance(window, dict):
             continue
-        key = _set_key(window)
+        key = str(window.get("comparison_set_key") or _set_key(window)).strip()
         if not key or key in set_map:
             continue
         ordered_keys.append(key)
         set_map[key] = {
-            "set_no": idx,
+            "set_no": int(window.get("comparison_set_no") or idx),
             "set_key": key,
             "run_no": window.get("run_no"),
             "label": window.get("label"),
             "window_start_iso": window.get("window_start_iso"),
             "window_end_iso": window.get("window_end_iso"),
             "source": window.get("source"),
+            "execution_profile": window.get("execution_profile"),
+            "comparison_set_policy": window.get("comparison_set_policy"),
+            "target_run_minutes": window.get("target_run_minutes"),
+            "purge_minutes_required": window.get("purge_minutes_required"),
+            "purge_required": bool(window.get("purge_required")),
+            "bias_required": bool(window.get("bias_required")),
+            "cadence_status": window.get("cadence_status"),
+            "cadence_note": window.get("cadence_note"),
+            "run_start_iso": window.get("run_start_iso"),
+            "run_end_iso": window.get("run_end_iso"),
+            "review_live_status": window.get("review_live_status"),
             "validation_mode": mode,
             "review_state": (
                 "SIGNED_OFF"
@@ -1123,15 +1286,15 @@ def build_comparison_sets(
         }
 
     for row in aligned_list:
-        key = "|".join([
+        key = str(row.get("comparison_set_key") or "|".join([
             str(row.get("run_no") or "").strip(),
             str(row.get("window_start_iso") or "").strip(),
             str(row.get("window_end_iso") or "").strip(),
-        ])
+        ])).strip()
         if key not in set_map:
             ordered_keys.append(key)
             set_map[key] = {
-                "set_no": len(ordered_keys),
+                "set_no": int(row.get("comparison_set_no") or len(ordered_keys)),
                 "set_key": key,
                 "run_no": row.get("run_no"),
                 "label": row.get("label"),
@@ -1579,6 +1742,7 @@ def build_validation_package(
     comparison_sets = build_comparison_sets(normalized, windows.get("rows") or [], aligned_rows)
     method301 = compute_method301_stats(normalized, comparison_sets)
     qa = _build_validation_qa(normalized, ftir.get("summary") or {}, mole.get("summary") or {}, windows, aligned_rows, method301)
+    execution = _build_execution_summary(normalized, windows, comparison_sets, actual_runs)
 
     statuses = [str(row.get("overall_status") or "") for row in method301]
     overall = "Gap"
@@ -1621,6 +1785,7 @@ def build_validation_package(
         ]),
         "excluded_rows": excluded_rows,
         "method301": method301,
+        "execution": execution,
         "coverage_note": coverage_note,
         "overall_status": overall,
         "acceptance_basis": acceptance.get("basis"),
@@ -1675,6 +1840,14 @@ def write_validation_exports(
             "comparison_set_key",
             "comparison_set_status",
             "comparison_set_basis",
+            "execution_profile",
+            "comparison_set_policy",
+            "target_run_minutes",
+            "purge_minutes_required",
+            "purge_required",
+            "bias_required",
+            "cadence_status",
+            "review_live_status",
             "run_no",
             "label",
             "window_start_iso",
@@ -1707,6 +1880,14 @@ def write_validation_exports(
                 row.get("comparison_set_key"),
                 row.get("comparison_set_status"),
                 row.get("comparison_set_basis"),
+                row.get("execution_profile"),
+                row.get("comparison_set_policy"),
+                row.get("target_run_minutes"),
+                row.get("purge_minutes_required"),
+                row.get("purge_required"),
+                row.get("bias_required"),
+                row.get("cadence_status"),
+                row.get("review_live_status"),
                 row.get("run_no"),
                 row.get("label"),
                 row.get("window_start_iso"),

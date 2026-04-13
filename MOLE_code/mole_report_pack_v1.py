@@ -3414,6 +3414,7 @@ def _build_report_context(
                     "included_comparison_set_count": ftir_validation.get("included_comparison_set_count"),
                     "excluded_comparison_set_count": ftir_validation.get("excluded_comparison_set_count"),
                     "comparison_sets": ftir_validation.get("comparison_sets"),
+                    "execution": ftir_validation.get("execution"),
                     "paired_window_count": ftir_validation.get("paired_window_count"),
                     "excluded_count": ftir_validation.get("excluded_count"),
                     "coverage_note": ftir_validation.get("coverage_note"),
@@ -3896,6 +3897,12 @@ def _write_final_report_markdown(
     lines.append(f"- Comparison set count: {_md_scalar((ftir_validation_summary.get('comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Included comparison sets: {_md_scalar((ftir_validation_summary.get('included_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Excluded comparison sets: {_md_scalar((ftir_validation_summary.get('excluded_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
+    execution = (ftir_validation_summary.get("execution") if isinstance(ftir_validation_summary, dict) else {}) or {}
+    if isinstance(execution, dict) and execution:
+        lines.append(f"- Live execution profile: {_md_scalar((execution.get('profile') if isinstance(execution, dict) else None))}")
+        lines.append(f"- Live execution status: {_md_scalar((execution.get('live_review_status') if isinstance(execution, dict) else None))}")
+        lines.append(f"- Live comparison sets completed / next / frozen: {_md_scalar({'completed': (execution.get('comparison_sets_completed') if isinstance(execution, dict) else None), 'next': (execution.get('next_comparison_set_no') if isinstance(execution, dict) else None), 'frozen': (execution.get('frozen_comparison_set_count') if isinstance(execution, dict) else None)})}")
+        lines.append(f"- Live cadence note: {_md_scalar((execution.get('note') if isinstance(execution, dict) else None))}")
     lines.append(f"- Paired window count: {_md_scalar((ftir_validation_summary.get('paired_window_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Excluded row count: {_md_scalar((ftir_validation_summary.get('excluded_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Coverage note: {_md_scalar((ftir_validation_summary.get('coverage_note') if isinstance(ftir_validation_summary, dict) else None))}")

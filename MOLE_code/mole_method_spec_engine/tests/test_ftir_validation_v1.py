@@ -13,6 +13,91 @@ from mole_ftir_validation_v1 import build_validation_package, load_ftir_records,
 
 
 class FtirValidationTests(unittest.TestCase):
+    def test_live_execution_metadata_flows_into_comparison_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_csv.write_text(
+                "\n".join([
+                    "timestamp,NO",
+                    "2026-04-10T12:01:00Z,10.0",
+                    "2026-04-10T12:06:00Z,10.5",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            raw_samples.write_text(
+                "\n".join([
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:01:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 10.0,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                    json.dumps({
+                        "ts_utc": "2026-04-10T12:06:00Z",
+                        "channel_id": "NO",
+                        "value_eng": 10.5,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }),
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "analytes": ["NO"],
+                "execution": {
+                    "enabled": True,
+                    "profile": "SESSION_RUNS",
+                    "comparison_set_policy": "RUN_EQUALS_SET",
+                    "purge_minutes_required": 5.0,
+                    "require_purge_event": True,
+                    "require_bias_event": True,
+                    "purge_due_after_run_no": None,
+                    "bias_due_after_run_no": 1,
+                    "live_review_status": "BIAS_DUE",
+                },
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": [{
+                    "run_no": 7,
+                    "start_ts_iso": "2026-04-10T12:00:00Z",
+                    "end_ts_iso": "2026-04-10T12:20:00Z",
+                    "comparison_set_no": 7,
+                    "comparison_set_key": "RUN_SET_07",
+                    "source": "LIVE_SESSION_RUNS",
+                    "label": "Run 7",
+                    "execution_profile": "SESSION_RUNS",
+                    "comparison_set_policy": "RUN_EQUALS_SET",
+                    "target_run_minutes": 20.0,
+                    "purge_minutes_required": 5.0,
+                    "purge_required": True,
+                    "bias_required": True,
+                    "cadence_status": "BIAS_DUE",
+                    "cadence_note": "Bias logging is due after Run 7.",
+                    "review_live_status": "BIAS_DUE",
+                }]},
+                raw_samples_path=raw_samples,
+            )
+            comparison_sets = payload.get("comparison_sets") or []
+            self.assertEqual(len(comparison_sets), 1)
+            self.assertEqual(comparison_sets[0].get("set_no"), 7)
+            self.assertEqual(comparison_sets[0].get("set_key"), "RUN_SET_07")
+            self.assertEqual(comparison_sets[0].get("comparison_set_policy"), "RUN_EQUALS_SET")
+            self.assertEqual(comparison_sets[0].get("cadence_status"), "BIAS_DUE")
+            execution = payload.get("execution") or {}
+            self.assertTrue(execution.get("enabled"))
+            self.assertEqual(execution.get("profile"), "SESSION_RUNS")
+            self.assertEqual(execution.get("comparison_set_count"), 1)
+            self.assertEqual(execution.get("completed_run_count"), 1)
+            self.assertEqual(execution.get("bias_due_after_run_no"), 1)
+            self.assertEqual(execution.get("status"), "BIAS_DUE")
+
     def test_formal_validation_passes_for_six_paired_windows(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

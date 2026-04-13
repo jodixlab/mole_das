@@ -10034,6 +10034,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_ftir_validation_offset_s = tk.StringVar(value="0")
     var_ftir_validation_analytes = tk.StringVar(value="")
     var_ftir_validation_master_clock = tk.StringVar(value="SESSION_MASTER_CLOCK")
+    var_ftir_validation_execution_enabled = tk.BooleanVar(value=False)
+    var_ftir_validation_execution_profile = tk.StringVar(value="SESSION_RUNS")
+    var_ftir_validation_purge_min = tk.StringVar(value="5")
+    var_ftir_validation_require_purge = tk.BooleanVar(value=True)
+    var_ftir_validation_require_bias = tk.BooleanVar(value=True)
     var_ftir_validation_exclusion_reason = tk.StringVar(value="")
     var_ftir_validation_lock_status = tk.StringVar(value="FTIR validation review state: UNLOCKED")
     var_ftir_validation_signoff_by = tk.StringVar(value="")
@@ -10105,6 +10110,56 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     cbo_ftir_validation_master_clock.grid(row=4, column=3, sticky="ew", pady=(0, 6))
+
+    chk_ftir_validation_execution_enabled = tk.Checkbutton(
+        report_builder_ftir_form,
+        text="Use live session runs as comparison sets",
+        variable=var_ftir_validation_execution_enabled,
+        bg=BG,
+        fg=FG,
+        selectcolor=BG,
+        activebackground=BG,
+        activeforeground=FG,
+        font=("Consolas", 9),
+    )
+    chk_ftir_validation_execution_enabled.grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Execution profile:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    cbo_ftir_validation_execution_profile = ttk.Combobox(
+        report_builder_ftir_form,
+        textvariable=var_ftir_validation_execution_profile,
+        values=("SESSION_RUNS", "MANUAL_WINDOWS_ONLY"),
+        state="readonly",
+        font=("Consolas", 9),
+    )
+    cbo_ftir_validation_execution_profile.grid(row=5, column=3, sticky="ew", pady=(0, 6))
+
+    tk.Label(report_builder_ftir_form, text="Purge minutes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=6, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_ftir_validation_purge_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_purge_min, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_ftir_validation_purge_min.grid(row=6, column=1, sticky="ew", pady=(0, 6))
+    chk_ftir_validation_require_purge = tk.Checkbutton(
+        report_builder_ftir_form,
+        text="Require ambient purge event",
+        variable=var_ftir_validation_require_purge,
+        bg=BG,
+        fg=FG,
+        selectcolor=BG,
+        activebackground=BG,
+        activeforeground=FG,
+        font=("Consolas", 9),
+    )
+    chk_ftir_validation_require_purge.grid(row=6, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    chk_ftir_validation_require_bias = tk.Checkbutton(
+        report_builder_ftir_form,
+        text="Require bias valve event",
+        variable=var_ftir_validation_require_bias,
+        bg=BG,
+        fg=FG,
+        selectcolor=BG,
+        activebackground=BG,
+        activeforeground=FG,
+        font=("Consolas", 9),
+    )
+    chk_ftir_validation_require_bias.grid(row=6, column=3, sticky="w", pady=(0, 6))
 
     report_builder_ftir_btns = tk.Frame(report_builder_ftir_wrap, bg=BG)
     report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
@@ -12049,6 +12104,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             sess["side_by_side"] = dict(side)
             daq_local["side_by_side"] = dict(side)
             sess["daq_runner"] = daq_local
+            _apply_ftir_validation_side_event(sess, payload)
             _save_session(sess)
             _ws_log_event(sess, "SIDE_BY_SIDE_EVENT", dict(payload))
             _refresh_side_by_side_panel(sess)
@@ -14739,9 +14795,269 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "column_map": dict(blk.get("column_map") or {}) if isinstance(blk.get("column_map"), dict) else {},
                 "manual_windows": list(blk.get("manual_windows") or []) if isinstance(blk.get("manual_windows"), list) else [],
                 "notes": str(blk.get("notes") or "").strip(),
+                "execution": {
+                    "enabled": False,
+                    "profile": "SESSION_RUNS",
+                    "comparison_set_policy": "RUN_EQUALS_SET",
+                    "purge_minutes_required": 5.0,
+                    "require_purge_event": True,
+                    "require_bias_event": True,
+                    "planned_run_count": None,
+                    "comparison_sets_completed": 0,
+                    "next_comparison_set_no": 1,
+                    "purge_due_after_run_no": None,
+                    "purge_due_after_iso": "",
+                    "bias_due_after_run_no": None,
+                    "bias_due_after_iso": "",
+                    "last_completed_run_no": None,
+                    "last_completed_iso": "",
+                    "last_purge_run_no": None,
+                    "last_purge_iso": "",
+                    "last_bias_run_no": None,
+                    "last_bias_iso": "",
+                    "live_review_status": "",
+                },
             }
         sess_local["ftir_validation"] = blk
         return blk
+
+    def _ftir_validation_execution_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        cfg = _ftir_validation_block(sess_local)
+        blk = cfg.get("execution")
+        if not isinstance(blk, dict):
+            blk = {}
+            cfg["execution"] = blk
+        return blk
+
+    def _ftir_validation_live_execution_enabled(sess_local: Dict[str, Any]) -> bool:
+        cfg = _ftir_validation_block(sess_local)
+        execution = _ftir_validation_execution_block(sess_local)
+        return (
+            bool(cfg.get("enabled"))
+            and bool(execution.get("enabled"))
+            and str(execution.get("profile") or "SESSION_RUNS").strip().upper() == "SESSION_RUNS"
+        )
+
+    def _ftir_validation_execution_status(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        cfg = _ftir_validation_block(sess_local)
+        execution = _ftir_validation_execution_block(sess_local)
+        daq = sess_local.get("daq_runner") if isinstance(sess_local.get("daq_runner"), dict) else {}
+        runs = daq.get("runs") if isinstance(daq.get("runs"), list) else []
+        completed_runs = [row for row in list(runs or []) if isinstance(row, dict) and str(row.get("end_iso") or "").strip()]
+        recording = bool(((daq.get("acq") or {}) if isinstance(daq.get("acq"), dict) else {}).get("recording"))
+        planned_run_count = None
+        try:
+            planned_run_count = int((((sess_local.get("test_matrix") or {}).get("plan") or {}).get("sample_runs") or 0) or 0)
+            if planned_run_count <= 0:
+                planned_run_count = None
+        except Exception:
+            planned_run_count = None
+        if planned_run_count is not None:
+            execution["planned_run_count"] = planned_run_count
+        execution["comparison_sets_completed"] = len(completed_runs)
+        execution["next_comparison_set_no"] = len(completed_runs) + 1
+        if completed_runs:
+            last_completed = completed_runs[-1]
+            try:
+                execution["last_completed_run_no"] = int(last_completed.get("run_no") or len(completed_runs))
+            except Exception:
+                execution["last_completed_run_no"] = len(completed_runs)
+            execution["last_completed_iso"] = str(last_completed.get("end_iso") or "").strip()
+        bias_gate = _side_bias_gate(sess_local) if bool(execution.get("require_bias_event")) else None
+        execution["bias_due_after_run_no"] = (
+            int(bias_gate.get("bias_due_after_run_no"))
+            if isinstance(bias_gate, dict) and bias_gate.get("bias_due_after_run_no") not in (None, "")
+            else None
+        )
+        execution["bias_due_after_iso"] = (
+            str(bias_gate.get("bias_due_after_iso") or "").strip() if isinstance(bias_gate, dict) else ""
+        )
+        purge_due_run = execution.get("purge_due_after_run_no")
+        bias_due_run = execution.get("bias_due_after_run_no")
+        if not bool(cfg.get("enabled")) or not bool(execution.get("enabled")):
+            live_status = "DISABLED"
+            note = "FTIR live execution mode is disabled."
+        elif purge_due_run not in (None, ""):
+            live_status = "PURGE_DUE"
+            note = f"Ambient purge is due after Run {purge_due_run}."
+        elif bias_due_run not in (None, ""):
+            live_status = "BIAS_DUE"
+            note = f"Bias logging is due after Run {bias_due_run}."
+        elif recording:
+            live_status = "ACTIVE_COMPARISON_SET"
+            note = "A live FTIR comparison set is currently in progress."
+        else:
+            live_status = "READY"
+            note = "Live FTIR comparison execution is ready for the next set."
+        execution["live_review_status"] = live_status
+        cfg["execution"] = execution
+        sess_local["ftir_validation"] = cfg
+        snap = _load_ftir_validation_locked_snapshot(cfg) if _ftir_validation_is_locked(cfg) else {}
+        frozen_set_count = len(list((snap.get("comparison_sets") if isinstance(snap, dict) else []) or []))
+        return {
+            "enabled": bool(execution.get("enabled")),
+            "profile": str(execution.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
+            "comparison_set_policy": str(execution.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET",
+            "planned_run_count": execution.get("planned_run_count"),
+            "comparison_sets_completed": execution.get("comparison_sets_completed"),
+            "next_comparison_set_no": execution.get("next_comparison_set_no"),
+            "purge_minutes_required": execution.get("purge_minutes_required"),
+            "require_purge_event": bool(execution.get("require_purge_event")),
+            "require_bias_event": bool(execution.get("require_bias_event")),
+            "purge_due_after_run_no": execution.get("purge_due_after_run_no"),
+            "purge_due_after_iso": execution.get("purge_due_after_iso"),
+            "bias_due_after_run_no": execution.get("bias_due_after_run_no"),
+            "bias_due_after_iso": execution.get("bias_due_after_iso"),
+            "last_completed_run_no": execution.get("last_completed_run_no"),
+            "last_completed_iso": execution.get("last_completed_iso"),
+            "last_purge_run_no": execution.get("last_purge_run_no"),
+            "last_purge_iso": execution.get("last_purge_iso"),
+            "last_bias_run_no": execution.get("last_bias_run_no"),
+            "last_bias_iso": execution.get("last_bias_iso"),
+            "cadence_ready_for_next_run": not bool(purge_due_run not in (None, "") or bias_due_run not in (None, "")),
+            "live_review_status": live_status,
+            "note": note,
+            "frozen_comparison_set_count": frozen_set_count,
+        }
+
+    def _ftir_validation_purge_gate(sess_local: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        state = _ftir_validation_execution_status(sess_local)
+        if not bool(state.get("enabled")) or not bool(state.get("require_purge_event")):
+            return None
+        due_run = state.get("purge_due_after_run_no")
+        if due_run in (None, ""):
+            return None
+        return {
+            "purge_due_after_run_no": due_run,
+            "purge_due_after_iso": state.get("purge_due_after_iso"),
+            "purge_minutes_required": state.get("purge_minutes_required"),
+            "note": state.get("note"),
+        }
+
+    def _prime_ftir_run_execution(sess_local: Dict[str, Any], run_local: Dict[str, Any]) -> None:
+        if not isinstance(run_local, dict):
+            return
+        cfg = _ftir_validation_block(sess_local)
+        state = _ftir_validation_execution_status(sess_local)
+        run_no = int(run_local.get("run_no") or 0) if str(run_local.get("run_no") or "").strip() else None
+        if run_no is None:
+            return
+        run_exec = run_local.get("ftir_validation_execution")
+        if not isinstance(run_exec, dict):
+            run_exec = {}
+        target_min = _parse_float(run_local.get("target_duration_min"), default=None)
+        if target_min is None:
+            planned_min, _planned_src = _tm_planned_run_minutes(sess_local, run_no)
+            target_min = planned_min
+        run_exec.update({
+            "comparison_set_no": int(run_exec.get("comparison_set_no") or run_no),
+            "comparison_set_key": str(run_exec.get("comparison_set_key") or f"RUN_SET_{int(run_no):02d}").strip(),
+            "execution_profile": state.get("profile"),
+            "comparison_set_policy": state.get("comparison_set_policy"),
+            "target_run_minutes": target_min,
+            "purge_minutes_required": state.get("purge_minutes_required"),
+            "purge_required": bool(state.get("require_purge_event")),
+            "bias_required": bool(state.get("require_bias_event")),
+            "run_start_iso": str(run_local.get("start_iso") or "").strip(),
+            "run_end_iso": str(run_local.get("end_iso") or "").strip(),
+            "cadence_status": ("RUN_COMPLETE" if str(run_local.get("end_iso") or "").strip() else "RUN_ACTIVE"),
+            "cadence_note": state.get("note"),
+            "review_live_status": state.get("live_review_status"),
+        })
+        run_local["ftir_validation_execution"] = run_exec
+
+    def _finalize_ftir_run_execution(sess_local: Dict[str, Any], run_local: Dict[str, Any], end_iso: str) -> None:
+        if not _ftir_validation_live_execution_enabled(sess_local) or not isinstance(run_local, dict):
+            return
+        cfg = _ftir_validation_block(sess_local)
+        execution = _ftir_validation_execution_block(sess_local)
+        run_no = int(run_local.get("run_no") or 0) if str(run_local.get("run_no") or "").strip() else None
+        if run_no is None:
+            return
+        run_exec = run_local.get("ftir_validation_execution")
+        if not isinstance(run_exec, dict):
+            run_exec = {}
+        run_exec["run_end_iso"] = str(end_iso or "").strip()
+        run_exec["review_live_status"] = "LIVE_REVIEW"
+        if bool(execution.get("require_purge_event")):
+            execution["purge_due_after_run_no"] = run_no
+            execution["purge_due_after_iso"] = str(end_iso or "").strip()
+            run_exec["cadence_status"] = "PURGE_DUE"
+            run_exec["cadence_note"] = f"Ambient purge is required after Run {run_no} before the next comparison set."
+        else:
+            run_exec["cadence_status"] = "READY_FOR_NEXT_SET"
+            run_exec["cadence_note"] = "No FTIR purge event is required before the next comparison set."
+        cfg["execution"] = execution
+        run_local["ftir_validation_execution"] = run_exec
+        sess_local["ftir_validation"] = cfg
+
+    def _apply_ftir_validation_side_event(sess_local: Dict[str, Any], payload: Dict[str, Any]) -> None:
+        if not isinstance(payload, dict):
+            return
+        cfg = _ftir_validation_block(sess_local)
+        if not bool(cfg.get("enabled")):
+            return
+        execution = _ftir_validation_execution_block(sess_local)
+        if not bool(execution.get("enabled")):
+            return
+        event_type = str(payload.get("event_type") or "").strip().upper()
+        try:
+            event_run_no = int(payload.get("run_no") or 0) if str(payload.get("run_no") or "").strip() else None
+        except Exception:
+            event_run_no = None
+        ts_iso = str(payload.get("timestamp_iso") or "").strip()
+        daq_local = sess_local.get("daq_runner") if isinstance(sess_local.get("daq_runner"), dict) else {}
+        runs_local = daq_local.get("runs") if isinstance(daq_local.get("runs"), list) else []
+        if event_type == "AMBIENT_PURGE":
+            target_run_no = execution.get("purge_due_after_run_no") or event_run_no
+            if target_run_no not in (None, ""):
+                execution["last_purge_run_no"] = int(target_run_no)
+                execution["last_purge_iso"] = ts_iso
+                execution["purge_due_after_run_no"] = None
+                execution["purge_due_after_iso"] = ""
+                for run_local in list(runs_local or []):
+                    if not isinstance(run_local, dict):
+                        continue
+                    try:
+                        run_no = int(run_local.get("run_no") or 0)
+                    except Exception:
+                        continue
+                    if run_no != int(target_run_no):
+                        continue
+                    run_exec = run_local.get("ftir_validation_execution")
+                    if not isinstance(run_exec, dict):
+                        run_exec = {}
+                    run_exec["purge_completed_iso"] = ts_iso
+                    run_exec["cadence_status"] = "READY_FOR_NEXT_SET"
+                    run_exec["cadence_note"] = f"Ambient purge logged after Run {target_run_no}."
+                    run_local["ftir_validation_execution"] = run_exec
+                    break
+        elif event_type == "BIAS_VALVE":
+            target_run_no = event_run_no
+            if target_run_no not in (None, ""):
+                execution["last_bias_run_no"] = int(target_run_no)
+                execution["last_bias_iso"] = ts_iso
+                for run_local in list(runs_local or []):
+                    if not isinstance(run_local, dict):
+                        continue
+                    try:
+                        run_no = int(run_local.get("run_no") or 0)
+                    except Exception:
+                        continue
+                    if run_no != int(target_run_no):
+                        continue
+                    run_exec = run_local.get("ftir_validation_execution")
+                    if not isinstance(run_exec, dict):
+                        run_exec = {}
+                    run_exec["bias_logged_iso"] = ts_iso
+                    run_local["ftir_validation_execution"] = run_exec
+                    break
+        cfg["execution"] = execution
+        sess_local["ftir_validation"] = cfg
+        if isinstance(daq_local, dict):
+            daq_local["runs"] = runs_local
+            sess_local["daq_runner"] = daq_local
+        _ftir_validation_execution_status(sess_local)
 
     def _report_builder_text_get(widget: Any) -> str:
         try:
@@ -14819,6 +15135,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         return obj if isinstance(obj, dict) else {}
 
     def _build_ftir_validation_preview_payload(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        _ftir_validation_execution_status(sess_local)
         cfg = _ftir_validation_block(sess_local)
         if not bool(cfg.get("enabled")):
             return {
@@ -14908,13 +15225,18 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             for widget in [
                 chk_ftir_validation_enabled,
+                chk_ftir_validation_execution_enabled,
                 cbo_ftir_validation_mode,
+                cbo_ftir_validation_execution_profile,
                 ent_ftir_validation_file,
                 ent_ftir_validation_timestamp_col,
                 cbo_ftir_validation_delimiter,
                 ent_ftir_validation_offset_s,
                 ent_ftir_validation_analytes,
                 cbo_ftir_validation_master_clock,
+                ent_ftir_validation_purge_min,
+                chk_ftir_validation_require_purge,
+                chk_ftir_validation_require_bias,
                 btn_ftir_validation_browse,
                 btn_ftir_validation_exclude,
                 btn_ftir_validation_include,
@@ -14924,7 +15246,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if locked:
                     _set_widget_state(widget, "disabled")
                 else:
-                    if widget in (cbo_ftir_validation_mode, cbo_ftir_validation_delimiter, cbo_ftir_validation_master_clock):
+                    if widget in (cbo_ftir_validation_mode, cbo_ftir_validation_execution_profile, cbo_ftir_validation_delimiter, cbo_ftir_validation_master_clock):
                         _set_widget_state(widget, "readonly")
                     else:
                         _set_widget_state(widget, "normal")
@@ -14962,6 +15284,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             blk = sess_local.get("daq_runner") or {}
             runs = blk.get("runs") or []
+            ftir_state = _ftir_validation_execution_status(sess_local)
             for idx, run in enumerate(list(runs or []), start=1):
                 if not isinstance(run, dict):
                     continue
@@ -14969,11 +15292,25 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 end_iso = str(run.get("end_iso") or "").strip()
                 if not start_iso or not end_iso:
                     continue
+                run_exec = run.get("ftir_validation_execution") if isinstance(run.get("ftir_validation_execution"), dict) else {}
+                run_no = int(run.get("run_no") or idx)
                 out.append({
-                    "run_no": int(run.get("run_no") or idx),
+                    "run_no": run_no,
                     "start_ts_iso": start_iso,
                     "end_ts_iso": end_iso,
-                    "label": f"Run {int(run.get('run_no') or idx)}",
+                    "label": str(run_exec.get("label") or f"Run {run_no}").strip() or f"Run {run_no}",
+                    "comparison_set_no": int(run_exec.get("comparison_set_no") or run_no),
+                    "comparison_set_key": str(run_exec.get("comparison_set_key") or f"RUN_SET_{run_no:02d}").strip(),
+                    "source": "LIVE_SESSION_RUNS",
+                    "execution_profile": str(run_exec.get("execution_profile") or ftir_state.get("profile") or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
+                    "comparison_set_policy": str(run_exec.get("comparison_set_policy") or ftir_state.get("comparison_set_policy") or "RUN_EQUALS_SET").strip().upper() or "RUN_EQUALS_SET",
+                    "target_run_minutes": _parse_float(run_exec.get("target_run_minutes"), default=_parse_float(run.get("target_duration_min"), default=None)),
+                    "purge_minutes_required": _parse_float(run_exec.get("purge_minutes_required"), default=_parse_float(ftir_state.get("purge_minutes_required"), default=None)),
+                    "purge_required": bool(run_exec.get("purge_required", ftir_state.get("require_purge_event"))),
+                    "bias_required": bool(run_exec.get("bias_required", ftir_state.get("require_bias_event"))),
+                    "cadence_status": str(run_exec.get("cadence_status") or "RUN_COMPLETE").strip().upper() or "RUN_COMPLETE",
+                    "cadence_note": str(run_exec.get("cadence_note") or "").strip(),
+                    "review_live_status": str(run_exec.get("review_live_status") or ftir_state.get("live_review_status") or "").strip(),
                 })
         except Exception:
             return []
@@ -15089,6 +15426,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ftir_src = preview.get("ftir_source") if isinstance(preview.get("ftir_source"), dict) else {}
             mole_src = preview.get("mole_source") if isinstance(preview.get("mole_source"), dict) else {}
             qa = preview.get("qa") if isinstance(preview.get("qa"), dict) else {}
+            execution = preview.get("execution") if isinstance(preview.get("execution"), dict) else {}
             import_preview = qa.get("import_preview") if isinstance(qa.get("import_preview"), dict) else {}
             aligned_rows = list(preview.get("aligned_rows") or [])
             unpaired_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
@@ -15139,6 +15477,19 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     status_lines.append("Blocking issues: " + " ; ".join(blocking_issues))
                 if qa_warnings:
                     status_lines.append("Warnings: " + " ; ".join(qa_warnings))
+            if execution:
+                status_lines.append(
+                    "Execution: "
+                    + " | ".join([
+                        f"profile={execution.get('profile') or '(n/a)'}",
+                        f"sets completed={execution.get('completed_run_count') or 0}",
+                        f"next set={execution.get('next_comparison_set_no') or '(n/a)'}",
+                        f"live status={execution.get('live_review_status') or '(n/a)'}",
+                        f"frozen sets={execution.get('frozen_comparison_set_count') or 0}",
+                    ])
+                )
+                if str(execution.get("note") or "").strip():
+                    status_lines.append("Execution note: " + str(execution.get("note") or "").strip())
             if acceptance_note:
                 status_lines.append("Acceptance basis note: " + acceptance_note)
             if str(snap.get("delta_trace_json_path") or "").strip():
@@ -15274,6 +15625,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             var_ftir_validation_offset_s.set(_fmt_num(ftir_validation.get("time_offset_seconds"), 3, "0"))
             var_ftir_validation_analytes.set("; ".join([str(item) for item in list(ftir_validation.get("analytes") or []) if str(item or "").strip()]))
             var_ftir_validation_master_clock.set(str(ftir_validation.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK"))
+            execution = ftir_validation.get("execution") if isinstance(ftir_validation.get("execution"), dict) else {}
+            var_ftir_validation_execution_enabled.set(bool(execution.get("enabled")))
+            var_ftir_validation_execution_profile.set(str(execution.get("profile") or "SESSION_RUNS"))
+            var_ftir_validation_purge_min.set(_fmt_num(execution.get("purge_minutes_required"), 2, "5"))
+            var_ftir_validation_require_purge.set(bool(execution.get("require_purge_event", True)))
+            var_ftir_validation_require_bias.set(bool(execution.get("require_bias_event", True)))
             _report_builder_text_set(
                 txt_ftir_validation_column_map,
                 "\n".join([f"{k}={v}" for k, v in sorted((ftir_validation.get("column_map") or {}).items())]),
@@ -15490,6 +15847,28 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     if mole_ftir_validation is not None
                     else []
                 ),
+                "execution": {
+                    "enabled": bool(var_ftir_validation_execution_enabled.get()),
+                    "profile": str(var_ftir_validation_execution_profile.get() or "SESSION_RUNS").strip().upper() or "SESSION_RUNS",
+                    "comparison_set_policy": "RUN_EQUALS_SET",
+                    "purge_minutes_required": _parse_float(var_ftir_validation_purge_min.get(), default=5.0),
+                    "require_purge_event": bool(var_ftir_validation_require_purge.get()),
+                    "require_bias_event": bool(var_ftir_validation_require_bias.get()),
+                    "planned_run_count": ((ftir_validation.get("execution") or {}).get("planned_run_count") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "comparison_sets_completed": ((ftir_validation.get("execution") or {}).get("comparison_sets_completed") if isinstance(ftir_validation.get("execution"), dict) else 0),
+                    "next_comparison_set_no": ((ftir_validation.get("execution") or {}).get("next_comparison_set_no") if isinstance(ftir_validation.get("execution"), dict) else 1),
+                    "purge_due_after_run_no": ((ftir_validation.get("execution") or {}).get("purge_due_after_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "purge_due_after_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("purge_due_after_iso") or "")).strip(),
+                    "bias_due_after_run_no": ((ftir_validation.get("execution") or {}).get("bias_due_after_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "bias_due_after_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("bias_due_after_iso") or "")).strip(),
+                    "last_completed_run_no": ((ftir_validation.get("execution") or {}).get("last_completed_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "last_completed_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("last_completed_iso") or "")).strip(),
+                    "last_purge_run_no": ((ftir_validation.get("execution") or {}).get("last_purge_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "last_purge_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("last_purge_iso") or "")).strip(),
+                    "last_bias_run_no": ((ftir_validation.get("execution") or {}).get("last_bias_run_no") if isinstance(ftir_validation.get("execution"), dict) else None),
+                    "last_bias_iso": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("last_bias_iso") or "")).strip(),
+                    "live_review_status": str((((ftir_validation.get("execution") or {}) if isinstance(ftir_validation.get("execution"), dict) else {}).get("live_review_status") or "")).strip(),
+                },
                 "notes": _report_builder_text_get(txt_ftir_validation_notes),
                 "review_notes": _report_builder_text_get(txt_ftir_validation_review_notes),
                 "reviewer": _report_builder_actor(sess),
@@ -15514,6 +15893,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         blk["meta"] = meta
         sess["report_builder"] = blk
         sess["ftir_validation"] = ftir_validation
+        _ftir_validation_execution_status(sess)
         _save_session(sess)
         _refresh_report_builder_status(sess)
         _apply_ftir_validation_lock_state(sess)
@@ -15547,6 +15927,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     pths["report_context_json"] = Path(str(rc_blk.get("json_path")))
             if not isinstance(ftir_blk, dict) or not ftir_blk:
                 ftir_blk = dict(ftir_cfg)
+            ftir_exec_state = _ftir_validation_execution_status(sess_use)
 
             report_context = _read_json(pths["report_context_json"]) if pths["report_context_json"].exists() else {}
             coverage = report_context.get("coverage") if isinstance(report_context, dict) else {}
@@ -15653,6 +16034,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 if str(sign.get("by") or "").strip() or str(sign.get("iso") or "").strip():
                     lines.append(f"  by: {sign.get('by') or '(n/a)'} | role: {sign.get('role') or '(n/a)'} | at: {sign.get('iso') or '(n/a)'}")
                 lines.append(f"- FTIR validation note: {ftir_blk.get('coverage_note') or '(n/a)'}")
+                if isinstance(ftir_exec_state, dict) and bool(ftir_exec_state.get("enabled")):
+                    lines.append(f"- FTIR live execution profile: {ftir_exec_state.get('profile') or '(n/a)'}")
+                    lines.append(
+                        f"- FTIR live comparison sets completed / next / frozen: "
+                        f"{ftir_exec_state.get('comparison_sets_completed') or 0} / "
+                        f"{ftir_exec_state.get('next_comparison_set_no') or '(n/a)'} / "
+                        f"{ftir_exec_state.get('frozen_comparison_set_count') or 0}"
+                    )
+                    lines.append(f"- FTIR live cadence status: {ftir_exec_state.get('live_review_status') or '(n/a)'}")
+                    lines.append(f"- FTIR live cadence note: {ftir_exec_state.get('note') or '(n/a)'}")
             tpl = _ftir_validation_template_paths()
             lines.extend([
                 "",
@@ -15881,6 +16272,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             completeness = _report_builder_completeness(sess)
             warn_rows = list(completeness.get("warn_sections") or [])
             ftir_blk = _ftir_validation_block(sess)
+            ftir_exec = _ftir_validation_execution_status(sess)
             if warn_rows:
                 msg_lines = [
                     "Formal report metadata is incomplete.",
@@ -15899,6 +16291,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 msg_lines.append("")
                 msg_lines.append("Build anyway?")
                 if not messagebox.askyesno("Report Builder", "\n".join(msg_lines)):
+                    _refresh_report_builder_status(sess)
+                    return
+            if bool(ftir_blk.get("enabled")) and bool(ftir_exec.get("enabled")) and not bool(ftir_exec.get("cadence_ready_for_next_run")):
+                if not messagebox.askyesno(
+                    "Report Builder",
+                    "FTIR live execution cadence is not clear.\n\n"
+                    + f"Status: {ftir_exec.get('live_review_status') or '(n/a)'}\n"
+                    + f"Note: {ftir_exec.get('note') or '(n/a)'}\n\n"
+                    + "Build anyway?",
+                ):
                     _refresh_report_builder_status(sess)
                     return
             if bool(ftir_blk.get("enabled")) and not _ftir_validation_is_locked(ftir_blk):
@@ -16081,6 +16483,32 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             except Exception:
                 pass
 
+            try:
+                ftir_gate = _ftir_validation_purge_gate(sess)
+                if isinstance(ftir_gate, dict):
+                    rn = ftir_gate.get("purge_due_after_run_no") or "?"
+                    messagebox.showwarning(
+                        "FTIR Purge Required",
+                        f"Ambient purge logging is required after Run {rn} before starting the next FTIR comparison set.\n\n"
+                        f"Purge minutes: {ftir_gate.get('purge_minutes_required') or '(n/a)'}",
+                    )
+                    return
+            except Exception:
+                pass
+
+            try:
+                ftir_gate = _ftir_validation_purge_gate(sess)
+                if isinstance(ftir_gate, dict):
+                    rn = ftir_gate.get("purge_due_after_run_no") or "?"
+                    messagebox.showwarning(
+                        "FTIR Purge Required",
+                        f"Ambient purge logging is required after Run {rn} before creating the next FTIR comparison set.\n\n"
+                        f"Purge minutes: {ftir_gate.get('purge_minutes_required') or '(n/a)'}",
+                    )
+                    return
+            except Exception:
+                pass
+
             _ensure_runs(sess)
             runs = blk.get("runs") or []
             next_no = int(runs[-1].get("run_no") or len(runs)) + 1 if runs else 1
@@ -16091,6 +16519,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "notes": "",
                 "method_inputs": {},
             })
+            _prime_ftir_run_execution(sess, runs[-1])
             blk["runs"] = runs
             blk["active_run_index"] = len(runs) - 1
             # Run counter (planned runs + total planned time)
@@ -16122,6 +16551,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             if run.get("end_iso"):
                 return
             run["end_iso"] = _now_iso_local()
+            _finalize_ftir_run_execution(sess, run, str(run.get("end_iso") or ""))
 
             # Trigger post-cal (bias/drift check) gate for this run as well (end-run implies completion)
             try:
@@ -16147,7 +16577,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             try:
                 side = _side_by_side_block(sess)
                 sched = _side_bias_schedule(sess, int(run.get("run_no") or (idx + 1)))
-                if bool((blk.get("reference_audit") or {}).get("enabled")) or bool(side.get("enabled")) or bool(side.get("events")):
+                if bool((blk.get("reference_audit") or {}).get("enabled")) or bool(side.get("enabled")) or bool(side.get("events")) or _ftir_validation_live_execution_enabled(sess):
                     side["enabled"] = True
                     side["bias_due_after_run_no"] = int(run.get("run_no") or (idx + 1))
                     side["bias_due_after_iso"] = str(run.get("end_iso") or "")
@@ -23134,6 +23564,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     return
                 run = {"run_no": len(runs) + 1, "start_iso": now_iso, "end_iso": "", "notes": "AUTO_START_TEST"}
                 runs.append(run)
+                _prime_ftir_run_execution(sess, run)
                 blk["runs"] = runs
                 blk["active_run_index"] = len(runs) - 1
                 try:
@@ -23151,7 +23582,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             else:
                 if not str(run.get("start_iso") or "").strip():
-                    run["start_iso"] = now_iso            # Planned duration for this run (seconds). Used for the operator countdown.
+                    run["start_iso"] = now_iso
+                _prime_ftir_run_execution(sess, run)
+            # Planned duration for this run (seconds). Used for the operator countdown.
             # Source of truth:
             #   - Test Matrix plan.run_durations_min[run_no-1] (per-run override)
             #   - else Test Matrix plan.minutes_per_run
@@ -23179,6 +23612,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     run["target_duration_source"] = "NONE"
             except Exception:
                 dur_s_i = 0
+
+            try:
+                _prime_ftir_run_execution(sess, run)
+            except Exception:
+                pass
 
             # set phase flag
             blk.get("acq", {})["recording"] = True
@@ -23259,6 +23697,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 run = runs[idx]
                 if not str(run.get("end_iso") or "").strip():
                     run["end_iso"] = now_iso
+                _finalize_ftir_run_execution(sess, run, str(run.get("end_iso") or now_iso))
 
                 # Trigger post-cal (bias/drift check) gate for this run
                 try:
@@ -23277,6 +23716,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         ws_q["post_runs"][rn] = {"zero": {}, "span": {}, "channel_valid": {}, "transitions": {}}
 
                     _ws_log_event(sess, "POSTCAL_REQUIRED", {"run_no": int(postcal.get("run_no") or 0), "active_run_index": idx})
+                except Exception:
+                    pass
+
+                try:
+                    side = _side_by_side_block(sess)
+                    sched = _side_bias_schedule(sess, int(run.get("run_no") or (idx + 1)))
+                    if bool((blk.get("reference_audit") or {}).get("enabled")) or bool(side.get("enabled")) or bool(side.get("events")) or _ftir_validation_live_execution_enabled(sess):
+                        side["enabled"] = True
+                        side["bias_due_after_run_no"] = int(run.get("run_no") or (idx + 1))
+                        side["bias_due_after_iso"] = str(run.get("end_iso") or "")
+                        side["bias_schedule_source"] = str(sched.get("source") or "")
+                        side["bias_schedule_minutes"] = float(sched.get("planned_minutes") or 0.0)
+                        sess["side_by_side"] = dict(side)
+                        blk["side_by_side"] = dict(side)
+                        _ws_log_event(
+                            sess,
+                            "SIDE_BY_SIDE_BIAS_REQUIRED",
+                            {
+                                "run_no": int(run.get("run_no") or (idx + 1)),
+                                "planned_minutes": sched.get("planned_minutes"),
+                                "schedule_source": sched.get("source"),
+                                "source": "TEST_END",
+                            },
+                        )
+                        _refresh_side_by_side_panel(sess)
                 except Exception:
                     pass
 
