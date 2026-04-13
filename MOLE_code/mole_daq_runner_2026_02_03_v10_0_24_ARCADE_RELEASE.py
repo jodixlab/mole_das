@@ -15648,17 +15648,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             auto_map = import_preview.get("autodetected_columns_used") if isinstance(import_preview.get("autodetected_columns_used"), dict) else {}
             vendor_note = str(import_preview.get("vendor_profile_note") or "").strip()
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            hard_blocking_issues = [str(v) for v in list(qa.get("hard_blocking_issues") or []) if str(v or "").strip()]
             qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
             acceptance_basis = str(preview.get("acceptance_basis") or "").strip() or "(n/a)"
             acceptance_note = str(preview.get("acceptance_basis_note") or "").strip()
             recommended_offset = alignment_review.get("recommended_offset") if isinstance(alignment_review.get("recommended_offset"), dict) else {}
             before_summary = alignment_review.get("before_summary") if isinstance(alignment_review.get("before_summary"), dict) else {}
             after_summary = alignment_review.get("after_summary") if isinstance(alignment_review.get("after_summary"), dict) else {}
-            set_review_counts = {"ACCEPTED": 0, "REJECTED": 0}
-            for block in comparison_sets:
-                decision = str(block.get("review_decision") or "").strip().upper()
-                if decision in set_review_counts:
-                    set_review_counts[decision] += 1
+            set_review_counts = qa.get("comparison_set_review_counts") if isinstance(qa.get("comparison_set_review_counts"), dict) else {"ACCEPTED": 0, "REJECTED": 0, "UNREVIEWED": 0}
             status_lines = [
                 " | ".join([
                     f"Source: {source_label}",
@@ -15693,6 +15690,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     )
                 if vendor_note:
                     status_lines.append("Vendor profile note: " + vendor_note)
+                if hard_blocking_issues:
+                    status_lines.append("Hard blocks: " + " ; ".join(hard_blocking_issues))
                 if blocking_issues:
                     status_lines.append("Blocking issues: " + " ; ".join(blocking_issues))
                 if qa_warnings:
@@ -15731,6 +15730,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         f"sets={len(comparison_sets)}",
                         f"accepted={set_review_counts['ACCEPTED']}",
                         f"rejected={set_review_counts['REJECTED']}",
+                        f"unreviewed={int(set_review_counts.get('UNREVIEWED') or 0)}",
                     ])
                 )
             if acceptance_note:
@@ -16323,6 +16323,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     lines.append(f"- FTIR validation QA summary: {qa.get('summary') or '(n/a)'}")
                     lines.append(f"- FTIR validation lock ready: {'YES' if bool(qa.get('lock_ready')) else 'NO'}")
                     lines.append(f"- FTIR validation signoff ready: {'YES' if bool(qa.get('signoff_ready')) else 'NO'}")
+                    if list(qa.get("hard_blocking_issues") or []):
+                        lines.append(f"  hard blocks: {len(list(qa.get('hard_blocking_issues') or []))}")
                     if list(qa.get("blocking_issues") or []):
                         lines.append(f"  blocking issues: {len(list(qa.get('blocking_issues') or []))}")
                     if list(qa.get("warnings") or []):
@@ -16398,7 +16400,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             preview = _build_ftir_validation_preview_payload(sess)
             qa = preview.get("qa") if isinstance(preview.get("qa"), dict) else {}
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            hard_blocking_issues = [str(v) for v in list(qa.get("hard_blocking_issues") or []) if str(v or "").strip()]
             qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
+            if hard_blocking_issues:
+                raise ValueError(
+                    "FTIR validation review cannot be locked until every comparison set has an explicit reviewer disposition.\n\n"
+                    + "\n".join([f"- {item}" for item in hard_blocking_issues])
+                )
             if blocking_issues:
                 if not messagebox.askyesno(
                     "FTIR Validation Review",
@@ -16445,7 +16453,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             snap_payload = _load_ftir_validation_locked_snapshot(blk) or _build_ftir_validation_preview_payload(sess)
             qa = snap_payload.get("qa") if isinstance(snap_payload.get("qa"), dict) else {}
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
+            hard_blocking_issues = [str(v) for v in list(qa.get("hard_blocking_issues") or []) if str(v or "").strip()]
             derived_basis = str(snap_payload.get("acceptance_basis") or "").strip().upper()
+            if hard_blocking_issues:
+                raise ValueError(
+                    "FTIR validation signoff is blocked until every comparison set has an explicit reviewer disposition.\n\n"
+                    + "\n".join([f"- {item}" for item in hard_blocking_issues])
+                )
             if decision == "ACCEPTED":
                 if derived_basis == "NOT_ACCEPTED":
                     raise ValueError("Current FTIR comparison package does not support accepted signoff. Use NOT_ACCEPTED.")

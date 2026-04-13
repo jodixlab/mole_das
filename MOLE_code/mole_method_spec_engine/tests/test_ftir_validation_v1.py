@@ -698,6 +698,127 @@ class FtirValidationTests(unittest.TestCase):
             self.assertIn("set_review_decision", windows_csv)
             self.assertIn("timestamp spread out of tolerance", windows_csv)
 
+    def test_unreviewed_comparison_sets_hard_block_lock_and_signoff(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_lines = ["timestamp,NO"]
+            raw_lines = []
+            actual_runs = []
+
+            for idx in range(2):
+                start = base + timedelta(minutes=idx * 25)
+                end = start + timedelta(minutes=20)
+                actual_runs.append({
+                    "run_no": idx + 1,
+                    "start_ts_iso": start.isoformat().replace("+00:00", "Z"),
+                    "end_ts_iso": end.isoformat().replace("+00:00", "Z"),
+                    "comparison_set_no": idx + 1,
+                    "comparison_set_key": f"RUN_SET_{idx+1:02d}",
+                    "label": f"Run {idx+1}",
+                })
+                for step in range(2):
+                    ts = start + timedelta(minutes=(step * 8) + 2)
+                    value = 40.0 + idx + step
+                    ts_iso = ts.isoformat().replace("+00:00", "Z")
+                    ftir_lines.append(f"{ts_iso},{value}")
+                    raw_lines.append(json.dumps({
+                        "ts_utc": ts_iso,
+                        "channel_id": "NO",
+                        "value_eng": value,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }))
+
+            ftir_csv.write_text("\n".join(ftir_lines) + "\n", encoding="utf-8")
+            raw_samples.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "analytes": ["NO"],
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples,
+            )
+            qa = payload.get("qa") or {}
+            self.assertFalse(bool(qa.get("lock_ready")))
+            self.assertFalse(bool(qa.get("signoff_ready")))
+            self.assertEqual(int(qa.get("unreviewed_comparison_set_count") or 0), 2)
+            self.assertEqual((qa.get("comparison_set_review_counts") or {}).get("UNREVIEWED"), 2)
+            self.assertTrue(any("explicit reviewer decision" in str(item) for item in list(qa.get("hard_blocking_issues") or [])))
+
+    def test_explicit_set_reviews_clear_hard_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "ftir.csv"
+            raw_samples = root / "raw_samples.jsonl"
+            base = datetime(2026, 4, 10, 12, 0, 0, tzinfo=timezone.utc)
+            ftir_lines = ["timestamp,NO"]
+            raw_lines = []
+            actual_runs = []
+
+            for idx in range(2):
+                start = base + timedelta(minutes=idx * 25)
+                end = start + timedelta(minutes=20)
+                actual_runs.append({
+                    "run_no": idx + 1,
+                    "start_ts_iso": start.isoformat().replace("+00:00", "Z"),
+                    "end_ts_iso": end.isoformat().replace("+00:00", "Z"),
+                    "comparison_set_no": idx + 1,
+                    "comparison_set_key": f"RUN_SET_{idx+1:02d}",
+                    "label": f"Run {idx+1}",
+                })
+                for step in range(2):
+                    ts = start + timedelta(minutes=(step * 8) + 2)
+                    value = 45.0 + idx + step
+                    ts_iso = ts.isoformat().replace("+00:00", "Z")
+                    ftir_lines.append(f"{ts_iso},{value}")
+                    raw_lines.append(json.dumps({
+                        "ts_utc": ts_iso,
+                        "channel_id": "NO",
+                        "value_eng": value,
+                        "quality_flags": {"comm_ok": True, "decode_ok": True},
+                    }))
+
+            ftir_csv.write_text("\n".join(ftir_lines) + "\n", encoding="utf-8")
+            raw_samples.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+            cfg = normalize_config({
+                "enabled": True,
+                "validation_mode": "METHOD_301_INFORMED_COMPARISON",
+                "ftir_file_path": str(ftir_csv),
+                "ftir_timestamp_column": "timestamp",
+                "analytes": ["NO"],
+                "set_reviews": {
+                    "RUN_SET_01": {
+                        "decision": "ACCEPTED",
+                        "reason": "alignment verified",
+                        "reviewer": "peer_scientist",
+                        "updated_iso": "2026-04-10T18:20:00Z",
+                    },
+                    "RUN_SET_02": {
+                        "decision": "REJECTED",
+                        "reason": "operator marked invalid",
+                        "reviewer": "peer_scientist",
+                        "updated_iso": "2026-04-10T18:21:00Z",
+                    },
+                },
+            })
+            payload = build_validation_package(
+                cfg,
+                run_aggregation={"actual_runs": actual_runs},
+                raw_samples_path=raw_samples,
+            )
+            qa = payload.get("qa") or {}
+            self.assertEqual(list(qa.get("hard_blocking_issues") or []), [])
+            self.assertEqual(int(qa.get("unreviewed_comparison_set_count") or 0), 0)
+            self.assertEqual((qa.get("comparison_set_review_counts") or {}).get("ACCEPTED"), 1)
+            self.assertEqual((qa.get("comparison_set_review_counts") or {}).get("REJECTED"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

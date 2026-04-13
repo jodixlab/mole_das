@@ -371,12 +371,15 @@ def _build_validation_qa(
     mole_summary: Dict[str, Any],
     windows: Dict[str, Any],
     aligned_rows: Iterable[Dict[str, Any]],
+    comparison_sets: Iterable[Dict[str, Any]],
     method301: Iterable[Dict[str, Any]],
 ) -> Dict[str, Any]:
     rows = [dict(row) for row in list(aligned_rows or []) if isinstance(row, dict)]
+    sets = [dict(row) for row in list(comparison_sets or []) if isinstance(row, dict)]
     included_rows = [row for row in rows if not bool(row.get("excluded"))]
     row_status_counts: Dict[str, int] = {}
     blocking_issues: List[str] = []
+    hard_blocking_issues: List[str] = []
     warnings: List[str] = []
     execution = dict(cfg.get("execution") or {}) if isinstance(cfg.get("execution"), dict) else {}
     for row in included_rows:
@@ -415,6 +418,32 @@ def _build_validation_qa(
     if warn_rows:
         warnings.append(f"{len(warn_rows)} included FTIR comparison row(s) have QA warnings.")
 
+    set_review_counts: Dict[str, int] = {"ACCEPTED": 0, "REJECTED": 0, "UNREVIEWED": 0}
+    unreviewed_sets: List[str] = []
+    unresolved_qa_sets: List[str] = []
+    for block in sets:
+        decision = str(block.get("review_decision") or "").strip().upper()
+        label = str(block.get("label") or f"Set {block.get('set_no') or '?'}").strip() or f"Set {block.get('set_no') or '?'}"
+        if decision in ("ACCEPTED", "REJECTED"):
+            set_review_counts[decision] += 1
+        else:
+            set_review_counts["UNREVIEWED"] += 1
+            unreviewed_sets.append(label)
+            if (
+                int(block.get("error_row_count") or 0) > 0
+                or str(block.get("inclusion_status") or "").strip().upper() in ("NO_DATA", "NO_ROWS", "EXCLUDED", "MIXED")
+            ):
+                unresolved_qa_sets.append(label)
+    if unreviewed_sets:
+        hard_blocking_issues.append(
+            f"{len(unreviewed_sets)} comparison set(s) do not have an explicit reviewer decision."
+        )
+    if unresolved_qa_sets:
+        hard_blocking_issues.append(
+            "Comparison sets with QA gaps or non-standard inclusion status require explicit reviewer disposition: "
+            + ", ".join(unresolved_qa_sets)
+        )
+
     method_rows = [row for row in list(method301 or []) if isinstance(row, dict)]
     if not method_rows:
         blocking_issues.append("No FTIR validation statistics were produced from the current aligned rows.")
@@ -440,7 +469,7 @@ def _build_validation_qa(
         if execution.get("require_bias_event") and bias_due not in (None, ""):
             blocking_issues.append(f"Bias logging is still due after Run {bias_due} before the next comparison set.")
 
-    lock_ready = len(blocking_issues) == 0
+    lock_ready = len(blocking_issues) == 0 and len(hard_blocking_issues) == 0
     signoff_ready = lock_ready and not any(
         str(row.get("overall_status") or "").strip().upper() in ("NO_DATA", "GAP")
         for row in method_rows
@@ -449,6 +478,7 @@ def _build_validation_qa(
         f"lock ready: {'YES' if lock_ready else 'NO'}",
         f"signoff ready: {'YES' if signoff_ready else 'NO'}",
         f"qa rows pass/warn/error: {int(row_status_counts.get('PASS') or 0)}/{int(row_status_counts.get('WARN') or 0)}/{int(row_status_counts.get('ERROR') or 0)}",
+        f"set reviews A/R/U: {int(set_review_counts.get('ACCEPTED') or 0)}/{int(set_review_counts.get('REJECTED') or 0)}/{int(set_review_counts.get('UNREVIEWED') or 0)}",
     ]
     if auto_cols:
         summary_parts.append(
@@ -482,7 +512,12 @@ def _build_validation_qa(
         "row_status_counts": row_status_counts,
         "error_row_count": len(error_rows),
         "warning_row_count": len(warn_rows),
+        "comparison_set_count": len(sets),
+        "comparison_set_review_counts": set_review_counts,
+        "unreviewed_comparison_set_count": int(set_review_counts.get("UNREVIEWED") or 0),
+        "unreviewed_comparison_sets": unreviewed_sets,
         "blocking_issues": blocking_issues,
+        "hard_blocking_issues": hard_blocking_issues,
         "warnings": warnings,
         "lock_ready": lock_ready,
         "signoff_ready": signoff_ready,
@@ -1977,7 +2012,15 @@ def build_validation_package(
             "set_review_updated_iso": str(row.get("set_review_updated_iso") or "").strip(),
         })
     method301 = compute_method301_stats(normalized, comparison_sets)
-    qa = _build_validation_qa(normalized, ftir.get("summary") or {}, mole.get("summary") or {}, windows, aligned_rows, method301)
+    qa = _build_validation_qa(
+        normalized,
+        ftir.get("summary") or {},
+        mole.get("summary") or {},
+        windows,
+        aligned_rows,
+        comparison_sets,
+        method301,
+    )
     execution = _build_execution_summary(normalized, windows, comparison_sets, actual_runs)
     alignment_review = _build_alignment_review(
         normalized,
