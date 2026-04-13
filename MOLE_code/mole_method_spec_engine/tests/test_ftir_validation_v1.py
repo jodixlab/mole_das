@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from mole_ftir_validation_v1 import build_validation_package, normalize_config, write_validation_exports
+from mole_ftir_validation_v1 import build_validation_package, load_ftir_records, normalize_config, write_validation_exports
 
 
 class FtirValidationTests(unittest.TestCase):
@@ -383,6 +383,62 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(row.get("comparison_set_no"), 1)
             self.assertEqual(row.get("qa_status"), "ERROR")
             self.assertTrue("HIGH_TIME_OFFSET" in list(row.get("qa_flags") or []))
+
+    def test_mks_vendor_profile_parses_record_date_time_and_unit_headers(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "mks.csv"
+            ftir_csv.write_text(
+                "\n".join([
+                    "Record Date,Record Time,NO (ppm),CO2 (%)",
+                    "04/10/2026,12:00:05,11.5,2.5",
+                    "04/10/2026,12:05:05,11.8,2.6",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            cfg = normalize_config({
+                "enabled": True,
+                "ftir_vendor_profile": "MKS_MULTIGAS_CSV",
+                "ftir_file_path": str(ftir_csv),
+                "analytes": ["NO", "CO2"],
+            })
+            loaded = load_ftir_records(cfg)
+            summary = loaded.get("summary") or {}
+            rows = loaded.get("rows") or []
+            self.assertEqual(summary.get("vendor_profile_used"), "MKS_MULTIGAS_CSV")
+            self.assertEqual(summary.get("timestamp_column"), "Record Date+Record Time")
+            self.assertEqual((summary.get("effective_column_map") or {}).get("NO"), "NO (ppm)")
+            self.assertEqual((summary.get("effective_column_map") or {}).get("CO2"), "CO2 (%)")
+            self.assertEqual(len(rows), 2)
+            self.assertEqual((rows[0].get("values") or {}).get("NO"), 11.5)
+
+    def test_thermofisher_max_profile_parses_datestamp_and_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            ftir_csv = root / "thermo_max.csv"
+            ftir_csv.write_text(
+                "\n".join([
+                    "DateStamp,TimeStampUTC,NOX ppm,O2 %",
+                    "2026-04-10,12:00:05,21.5,5.1",
+                    "2026-04-10,12:05:05,21.7,5.0",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            cfg = normalize_config({
+                "enabled": True,
+                "ftir_vendor_profile": "THERMOFISHER_MAX_CSV",
+                "ftir_file_path": str(ftir_csv),
+                "analytes": ["NOX", "O2"],
+            })
+            loaded = load_ftir_records(cfg)
+            summary = loaded.get("summary") or {}
+            rows = loaded.get("rows") or []
+            self.assertEqual(summary.get("vendor_profile_used"), "THERMOFISHER_MAX_CSV")
+            self.assertEqual(summary.get("timestamp_column"), "DateStamp+TimeStampUTC")
+            self.assertEqual((summary.get("effective_column_map") or {}).get("NOX"), "NOX ppm")
+            self.assertEqual((summary.get("effective_column_map") or {}).get("O2"), "O2 %")
+            self.assertEqual(len(rows), 2)
+            self.assertEqual((rows[1].get("values") or {}).get("O2"), 5.0)
 
 
 if __name__ == "__main__":

@@ -3887,6 +3887,8 @@ def _write_final_report_markdown(
     lines.append(f"- Validation source: {_md_scalar((ftir_validation_summary.get('source') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Validation mode: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('validation_mode')))}")
     lines.append(f"- Comparator method: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('comparator_method')))}")
+    lines.append(f"- Vendor profile requested: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('ftir_vendor_profile')))}")
+    lines.append(f"- Vendor profile used: {_md_scalar((((ftir_validation.get('ftir_source') or {}) if isinstance(ftir_validation.get('ftir_source'), dict) else {}).get('vendor_profile_used')))}")
     lines.append(f"- Comparison set count: {_md_scalar((ftir_validation_summary.get('comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Included comparison sets: {_md_scalar((ftir_validation_summary.get('included_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Excluded comparison sets: {_md_scalar((ftir_validation_summary.get('excluded_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
@@ -4350,6 +4352,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         f"- Source: {ftir.get('source') or '(n/a)'}",
         f"- Validation mode: {config.get('validation_mode') or '(n/a)'}",
         f"- Comparator method: {config.get('comparator_method') or '(n/a)'}",
+        f"- Vendor profile requested: {config.get('ftir_vendor_profile') or '(n/a)'}",
+        f"- Vendor profile used: {(ftir.get('ftir_source') or {}).get('vendor_profile_used') if isinstance(ftir.get('ftir_source'), dict) else '(n/a)'}",
         f"- Acceptance basis: {ftir.get('acceptance_basis') or '(n/a)'}",
         f"- Acceptance recommendation: {ftir.get('acceptance_recommended_decision') or '(n/a)'}",
         f"- Acceptance basis note: {ftir.get('acceptance_basis_note') or '(n/a)'}",
@@ -4475,6 +4479,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
             ("Source", ftir.get("source")),
             ("Validation mode", config.get("validation_mode")),
             ("Comparator method", config.get("comparator_method")),
+            ("Vendor profile requested", config.get("ftir_vendor_profile")),
+            ("Vendor profile used", ((ftir.get("ftir_source") or {}).get("vendor_profile_used") if isinstance(ftir.get("ftir_source"), dict) else "")),
             ("Acceptance basis", ftir.get("acceptance_basis")),
             ("Acceptance recommendation", ftir.get("acceptance_recommended_decision")),
             ("Acceptance basis note", ftir.get("acceptance_basis_note")),

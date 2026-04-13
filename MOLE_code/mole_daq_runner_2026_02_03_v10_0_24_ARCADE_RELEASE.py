@@ -10027,6 +10027,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     var_ftir_validation_enabled = tk.BooleanVar(value=False)
     var_ftir_validation_mode = tk.StringVar(value="METHOD_301_INFORMED_COMPARISON")
+    var_ftir_validation_vendor = tk.StringVar(value="AUTO")
     var_ftir_validation_file = tk.StringVar(value="")
     var_ftir_validation_timestamp_col = tk.StringVar(value="timestamp")
     var_ftir_validation_delimiter = tk.StringVar(value="AUTO")
@@ -10063,14 +10064,23 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     cbo_ftir_validation_mode.grid(row=0, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="FTIR data file:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Vendor profile:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    cbo_ftir_validation_vendor = ttk.Combobox(
+        report_builder_ftir_form,
+        textvariable=var_ftir_validation_vendor,
+        values=("AUTO", "GENERIC", "GASMET_CSV", "MKS_MULTIGAS_CSV", "OPSIS_CSV", "THERMOFISHER_MAX_CSV"),
+        state="readonly",
+        font=("Consolas", 9),
+    )
+    cbo_ftir_validation_vendor.grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="FTIR data file:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_file = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_file, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_file.grid(row=1, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Timestamp column:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_file.grid(row=2, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Timestamp column:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_timestamp_col = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_timestamp_col, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_timestamp_col.grid(row=1, column=3, sticky="ew", pady=(0, 6))
+    ent_ftir_validation_timestamp_col.grid(row=2, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Delimiter:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Delimiter:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     cbo_ftir_validation_delimiter = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_delimiter,
@@ -10078,15 +10088,15 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         state="readonly",
         font=("Consolas", 9),
     )
-    cbo_ftir_validation_delimiter.grid(row=2, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Time offset (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    cbo_ftir_validation_delimiter.grid(row=3, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Time offset (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_offset_s = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_offset_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_offset_s.grid(row=2, column=3, sticky="ew", pady=(0, 6))
+    ent_ftir_validation_offset_s.grid(row=3, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Analytes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Analytes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_analytes = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_analytes, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
-    ent_ftir_validation_analytes.grid(row=3, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Master clock:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_ftir_validation_analytes.grid(row=4, column=1, sticky="ew", pady=(0, 6))
+    tk.Label(report_builder_ftir_form, text="Master clock:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     cbo_ftir_validation_master_clock = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_master_clock,
@@ -10094,7 +10104,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         state="readonly",
         font=("Consolas", 9),
     )
-    cbo_ftir_validation_master_clock.grid(row=3, column=3, sticky="ew", pady=(0, 6))
+    cbo_ftir_validation_master_clock.grid(row=4, column=3, sticky="ew", pady=(0, 6))
 
     report_builder_ftir_btns = tk.Frame(report_builder_ftir_wrap, bg=BG)
     report_builder_ftir_btns.pack(fill="x", pady=(0, 6))
@@ -15080,6 +15090,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             sign = preview.get("signoff") if isinstance(preview.get("signoff"), dict) else {}
             qa_counts = qa.get("row_status_counts") if isinstance(qa.get("row_status_counts"), dict) else {}
             auto_map = import_preview.get("autodetected_columns_used") if isinstance(import_preview.get("autodetected_columns_used"), dict) else {}
+            vendor_note = str(import_preview.get("vendor_profile_note") or "").strip()
             blocking_issues = [str(v) for v in list(qa.get("blocking_issues") or []) if str(v or "").strip()]
             qa_warnings = [str(v) for v in list(qa.get("warnings") or []) if str(v or "").strip()]
             acceptance_basis = str(preview.get("acceptance_basis") or "").strip() or "(n/a)"
@@ -15090,6 +15101,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     f"Status: {preview.get('status') or '(n/a)'}",
                     f"Overall: {preview.get('overall_status') or '(n/a)'}",
                     f"Acceptance basis: {acceptance_basis}",
+                    f"Vendor: {str((ftir_src.get('vendor_profile_used') if isinstance(ftir_src, dict) else '') or '(n/a)')}",
                     f"Mode: {cfg.get('validation_mode') or '(n/a)'}",
                     f"Paired windows: {int(preview.get('paired_window_count') or 0)}",
                     f"Aligned rows: {len(aligned_rows)}",
@@ -15115,6 +15127,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                         "Auto-map preview: "
                         + ", ".join([f"{code}->{col}" for code, col in sorted(auto_map.items())])
                     )
+                if vendor_note:
+                    status_lines.append("Vendor profile note: " + vendor_note)
                 if blocking_issues:
                     status_lines.append("Blocking issues: " + " ; ".join(blocking_issues))
                 if qa_warnings:
@@ -15245,6 +15259,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _report_builder_text_set(txt_report_correspondence_notes, correspondence.get("notes"))
             var_ftir_validation_enabled.set(bool(ftir_validation.get("enabled")))
             var_ftir_validation_mode.set(str(ftir_validation.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON"))
+            var_ftir_validation_vendor.set(str(ftir_validation.get("ftir_vendor_profile") or "AUTO"))
             var_ftir_validation_file.set(str(ftir_validation.get("ftir_file_path") or ""))
             var_ftir_validation_timestamp_col.set(str(ftir_validation.get("ftir_timestamp_column") or ""))
             var_ftir_validation_delimiter.set(str(ftir_validation.get("ftir_delimiter") or "AUTO"))
@@ -15450,6 +15465,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ftir_validation.update({
                 "enabled": bool(var_ftir_validation_enabled.get()),
                 "validation_mode": str(var_ftir_validation_mode.get() or "METHOD_301_INFORMED_COMPARISON").strip().upper() or "METHOD_301_INFORMED_COMPARISON",
+                "ftir_vendor_profile": str(var_ftir_validation_vendor.get() or "AUTO").strip().upper() or "AUTO",
                 "ftir_file_path": str(var_ftir_validation_file.get() or "").strip(),
                 "ftir_timestamp_column": str(var_ftir_validation_timestamp_col.get() or "").strip(),
                 "ftir_delimiter": str(var_ftir_validation_delimiter.get() or "AUTO").strip().upper() or "AUTO",

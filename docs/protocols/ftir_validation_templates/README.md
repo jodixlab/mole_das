@@ -19,7 +19,15 @@ Operator use:
 1. Normalize the FTIR export into the import template columns, or use the column map if the raw FTIR file already contains the needed fields.
 2. Record comparison windows and purge boundaries in the alignment worksheet.
 3. If manual windows are needed, use the workbook `Runner_Manual_Windows` sheet or the companion manual windows CSV.
-4. In the full DAQ Runner `Report Builder`, enable `FTIR validation`, browse to the FTIR file, and populate any manual windows or column-map entries as needed.
+4. In the full DAQ Runner `Report Builder`, enable `FTIR validation`, select the FTIR vendor profile, browse to the FTIR file, and populate any manual windows or column-map entries as needed.
+
+Supported FTIR vendor profiles:
+- `AUTO`
+- `GENERIC`
+- `GASMET_CSV`
+- `MKS_MULTIGAS_CSV`
+- `OPSIS_CSV`
+- `THERMOFISHER_MAX_CSV`
 
 Common analytes included in the templates:
 - `O2`

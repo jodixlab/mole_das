@@ -18,12 +18,56 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 VALIDATION_MODES = ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON")
 SIGNOFF_ACCEPTANCE_BASES = ("FORMAL_METHOD_301", "METHOD_301_INFORMED_COMPARISON", "NOT_ACCEPTED")
+FTIR_VENDOR_PROFILES = ("AUTO", "GENERIC", "GASMET_CSV", "MKS_MULTIGAS_CSV", "OPSIS_CSV", "THERMOFISHER_MAX_CSV")
 LEGACY_SIGNOFF_BASIS_MAP = {
     "FORMAL_METHOD_301_PASS": "FORMAL_METHOD_301",
     "INFORMED_COMPARISON_ONLY": "METHOD_301_INFORMED_COMPARISON",
     "REJECTED_NOT_ACCEPTED": "NOT_ACCEPTED",
 }
 COMMON_TS_COLUMNS = ("ts_iso", "ts_utc", "timestamp", "datetime", "date_time", "time")
+ANALYTE_HEADER_ALIASES = {
+    "O2": ("o2", "oxygen"),
+    "CO2": ("co2", "carbondioxide"),
+    "CO": ("co", "carbonmonoxide"),
+    "NO": ("no", "nitricoxide"),
+    "NO2": ("no2", "nitrogendioxide"),
+    "NOX": ("nox", "nitrogenoxides"),
+    "SO2": ("so2", "sulfurdioxide"),
+    "VOC": ("voc", "totalvoc", "thc", "nmhc", "nonmethanehydrocarbons"),
+    "NH3": ("nh3", "ammonia"),
+    "CH4": ("ch4", "methane"),
+}
+HEADER_NOISE_TOKENS = (
+    "ppm", "ppmv", "ppmd", "ppb", "percent", "pct", "vol", "volume", "conc", "concentration",
+    "avg", "average", "mean", "dry", "wet", "corr", "corrected", "raw", "stack", "gas",
+)
+VENDOR_TIMESTAMP_HINTS = {
+    "GENERIC": {
+        "timestamp": COMMON_TS_COLUMNS,
+        "date": (),
+        "time": (),
+    },
+    "GASMET_CSV": {
+        "timestamp": ("timestamp", "datetime", "sampletime", "time"),
+        "date": ("date", "sampledate", "recorddate"),
+        "time": ("time", "sampletime", "recordtime"),
+    },
+    "MKS_MULTIGAS_CSV": {
+        "timestamp": ("recordtimestamp", "timestamp", "datetime"),
+        "date": ("recorddate", "date"),
+        "time": ("recordtime", "time"),
+    },
+    "OPSIS_CSV": {
+        "timestamp": ("datetime", "sampletime", "timestamp", "timesampled"),
+        "date": ("sampledate", "date", "recorddate"),
+        "time": ("sampletime", "time", "recordtime"),
+    },
+    "THERMOFISHER_MAX_CSV": {
+        "timestamp": ("datetime", "datetimestamp", "timestamp", "timestamputc", "sampletime", "timesampled"),
+        "date": ("date", "sampledate", "recorddate", "datestamp"),
+        "time": ("time", "sampletime", "recordtime", "timestamp", "timestamputc"),
+    },
+}
 QA_MIN_ROWS_PER_SIDE = 2
 QA_MIN_WINDOW_COVERAGE_RATIO = 0.50
 QA_MAX_ABS_OFFSET_SECONDS = 30.0
@@ -52,6 +96,13 @@ def _canon_name(value: Any) -> str:
     return "".join(ch.lower() for ch in str(value or "") if ch.isalnum())
 
 
+def _canon_measurement_name(value: Any) -> str:
+    canon = _canon_name(value)
+    for token in HEADER_NOISE_TOKENS:
+        canon = canon.replace(token, "")
+    return canon
+
+
 def _parse_iso_dt(text: Any) -> Optional[datetime]:
     try:
         s = str(text or "").strip()
@@ -65,6 +116,33 @@ def _parse_iso_dt(text: Any) -> Optional[datetime]:
         return dt
     except Exception:
         return None
+
+
+def _parse_dt_flexible(text: Any) -> Optional[datetime]:
+    dt = _parse_iso_dt(text)
+    if dt is not None:
+        return dt
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+    raw_norm = raw.replace("/", "-")
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%m-%d-%Y %H:%M:%S.%f",
+        "%m-%d-%Y %H:%M:%S",
+        "%m-%d-%Y %H:%M",
+        "%d-%m-%Y %H:%M:%S",
+        "%d-%m-%Y %H:%M",
+        "%m-%d-%y %H:%M:%S",
+        "%m-%d-%y %H:%M",
+    ):
+        try:
+            return datetime.strptime(raw_norm, fmt).replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+    return None
 
 
 def _normalize_iso(dt: Optional[datetime]) -> Optional[str]:
@@ -137,23 +215,84 @@ def _guess_timestamp_column(headers: Iterable[str]) -> str:
     return ""
 
 
+def _find_header_match(headers: Iterable[str], hints: Iterable[str]) -> str:
+    canon_map = {_canon_name(col): str(col or "").strip() for col in headers if str(col or "").strip()}
+    for hint in hints:
+        found = canon_map.get(_canon_name(hint))
+        if found:
+            return found
+    return ""
+
+
+def _resolve_vendor_profile(headers: Iterable[str], requested: str) -> Tuple[str, str]:
+    req = str(requested or "AUTO").strip().upper() or "AUTO"
+    if req not in FTIR_VENDOR_PROFILES:
+        req = "AUTO"
+    header_list = [str(col or "").strip() for col in headers if str(col or "").strip()]
+    if req != "AUTO":
+        return req, "configured"
+    canon = {_canon_name(col) for col in header_list}
+    if "recorddate" in canon and "recordtime" in canon:
+        return "MKS_MULTIGAS_CSV", "auto-detected from Record Date/Time columns"
+    if "sampledate" in canon and ("sampletime" in canon or "timesampled" in canon):
+        return "OPSIS_CSV", "auto-detected from Sample Date/Time columns"
+    if "datestamp" in canon and "timestamp" in canon:
+        return "THERMOFISHER_MAX_CSV", "auto-detected from MAX date/timestamp columns"
+    if "date" in canon and "time" in canon and any(("[%"
+        in col) or ("[ppm" in col.lower()) or ("(ppm" in col.lower()) for col in header_list):
+        return "GASMET_CSV", "auto-detected from Date/Time columns and unit-tagged analyte headers"
+    return "GENERIC", "generic FTIR import profile"
+
+
+def _parse_vendor_timestamp(row: Dict[str, Any], headers: Iterable[str], profile: str, configured_ts: str = "") -> Tuple[Optional[datetime], str]:
+    header_list = [str(col or "").strip() for col in headers if str(col or "").strip()]
+    hints = VENDOR_TIMESTAMP_HINTS.get(profile, VENDOR_TIMESTAMP_HINTS["GENERIC"])
+    ts_col = str(configured_ts or "").strip()
+    if ts_col and ts_col in row and row.get(ts_col) not in (None, ""):
+        dt = _parse_dt_flexible(row.get(ts_col))
+        if dt is not None:
+            return dt, ts_col
+    for candidate in [ts_col] if ts_col else []:
+        dt = _parse_dt_flexible(row.get(candidate))
+        if dt is not None:
+            return dt, candidate
+    ts_hint = _find_header_match(header_list, hints.get("timestamp") or [])
+    if ts_hint and row.get(ts_hint) not in (None, ""):
+        dt = _parse_dt_flexible(row.get(ts_hint))
+        if dt is not None:
+            return dt, ts_hint
+    date_col = _find_header_match(header_list, hints.get("date") or [])
+    time_col = _find_header_match(header_list, hints.get("time") or [])
+    if date_col and time_col:
+        dt = _parse_dt_flexible(f"{row.get(date_col, '')} {row.get(time_col, '')}")
+        if dt is not None:
+            return dt, f"{date_col}+{time_col}"
+    return None, (ts_col or ts_hint or f"{date_col}+{time_col}" if (date_col and time_col) else "")
+
+
 def _guess_column_map(headers: Iterable[str], analytes: Iterable[str]) -> Dict[str, str]:
     header_list = [str(col or "").strip() for col in headers if str(col or "").strip()]
     canon_headers = {col: _canon_name(col) for col in header_list}
+    measure_headers = {col: _canon_measurement_name(col) for col in header_list}
     out: Dict[str, str] = {}
     for analyte in analytes:
         code = str(analyte or "").strip().upper()
         if not code:
             continue
         code_canon = _canon_name(code)
+        aliases = tuple(_canon_name(alias) for alias in ANALYTE_HEADER_ALIASES.get(code, (code,)))
         exact = next((col for col, canon in canon_headers.items() if canon == code_canon), "")
         if exact:
             out[code] = exact
             continue
+        exact_measure = next((col for col, canon in measure_headers.items() if canon in aliases), "")
+        if exact_measure:
+            out[code] = exact_measure
+            continue
         candidates = [
             col
-            for col, canon in canon_headers.items()
-            if code_canon and code_canon in canon and not any(tok in canon for tok in ("time", "date"))
+            for col, canon in measure_headers.items()
+            if any(alias and alias in canon for alias in aliases) and not any(tok in canon for tok in ("time", "date"))
         ]
         if candidates:
             out[code] = sorted(candidates, key=lambda item: (len(item), item.lower()))[0]
@@ -311,6 +450,9 @@ def _build_validation_qa(
             "max_abs_drift_seconds": QA_MAX_ABS_DRIFT_SECONDS,
         },
         "import_preview": {
+            "vendor_profile_requested": str(ftir_summary.get("vendor_profile_requested") or ""),
+            "vendor_profile_used": str(ftir_summary.get("vendor_profile_used") or ""),
+            "vendor_profile_note": str(ftir_summary.get("vendor_profile_note") or ""),
             "timestamp_column": ts_col,
             "timestamp_candidates": list(ftir_summary.get("timestamp_candidates") or []),
             "suggested_timestamp_column": suggested_ts,
@@ -495,6 +637,9 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
     mode = str(block.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
     if mode not in VALIDATION_MODES:
         mode = "METHOD_301_INFORMED_COMPARISON"
+    vendor = str(block.get("ftir_vendor_profile") or "AUTO").strip().upper() or "AUTO"
+    if vendor not in FTIR_VENDOR_PROFILES:
+        vendor = "AUTO"
     analytes = block.get("analytes")
     if isinstance(analytes, str):
         analytes = [part.strip().upper() for part in analytes.replace(",", ";").split(";") if part.strip()]
@@ -515,6 +660,7 @@ def normalize_config(cfg: Any, *, analytes_default: Optional[Iterable[str]] = No
         "comparator_method": comparator_method,
         "timestamp_master_clock": clock,
         "ftir_file_path": str(block.get("ftir_file_path") or "").strip(),
+        "ftir_vendor_profile": vendor,
         "ftir_timestamp_column": timestamp_column,
         "ftir_delimiter": str(block.get("ftir_delimiter") or "AUTO").strip().upper() or "AUTO",
         "time_offset_seconds": _safe_float(block.get("time_offset_seconds")) or 0.0,
@@ -539,6 +685,7 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
     src = Path(str(cfg.get("ftir_file_path") or "")).expanduser()
     analytes = [str(code or "").strip().upper() for code in (cfg.get("analytes") or []) if str(code or "").strip()]
     column_map = cfg.get("column_map") if isinstance(cfg.get("column_map"), dict) else {}
+    requested_vendor = str(cfg.get("ftir_vendor_profile") or "AUTO").strip().upper() or "AUTO"
     out_rows: List[Dict[str, Any]] = []
     header_keys: set[str] = set()
     summary = {
@@ -552,6 +699,9 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "timestamp_candidates": [],
         "headers": [],
         "requested_analytes": analytes,
+        "vendor_profile_requested": requested_vendor,
+        "vendor_profile_used": "",
+        "vendor_profile_note": "",
         "configured_column_map": dict(column_map),
         "column_map_suggestions": {},
         "effective_column_map": {},
@@ -610,6 +760,9 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 })
             headers = sorted(header_keys)
             summary["headers"] = headers
+            vendor_used, vendor_note = _resolve_vendor_profile(headers, requested_vendor)
+            summary["vendor_profile_used"] = vendor_used
+            summary["vendor_profile_note"] = vendor_note
             summary["timestamp_candidates"] = [
                 col for col in headers if col in COMMON_TS_COLUMNS or _guess_timestamp_column([col]) == col
             ]
@@ -638,11 +791,19 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 ts_col = str(cfg.get("ftir_timestamp_column") or "").strip()
                 header = list(reader.fieldnames or [])
                 summary["headers"] = header
+                vendor_used, vendor_note = _resolve_vendor_profile(header, requested_vendor)
+                summary["vendor_profile_used"] = vendor_used
+                summary["vendor_profile_note"] = vendor_note
                 summary["timestamp_candidates"] = [
                     col for col in header if col in COMMON_TS_COLUMNS or _guess_timestamp_column([col]) == col
                 ]
-                summary["suggested_timestamp_column"] = _guess_timestamp_column(header)
-                if ts_col and ts_col not in header:
+                suggested_ts = _guess_timestamp_column(header)
+                if not suggested_ts and vendor_used != "GENERIC":
+                    vendor_ts_hint = _find_header_match(header, (VENDOR_TIMESTAMP_HINTS.get(vendor_used, {}).get("timestamp") or []))
+                    if vendor_ts_hint:
+                        suggested_ts = vendor_ts_hint
+                summary["suggested_timestamp_column"] = suggested_ts
+                if ts_col and ts_col not in header and "+" not in ts_col:
                     ts_col = ""
                 if not ts_col:
                     ts_col = str(summary.get("suggested_timestamp_column") or "")
@@ -662,9 +823,15 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
                 summary["effective_column_map"] = effective_map
                 summary["autodetected_columns_used"] = auto_used
                 for idx, row in enumerate(reader, start=2):
-                    src_dt = _parse_iso_dt(row.get(ts_col) if ts_col else None)
+                    src_dt, ts_used = _parse_vendor_timestamp(row, header, vendor_used, ts_col)
                     if src_dt is None:
                         continue
+                    if ts_used and (
+                        not summary["timestamp_column"]
+                        or "+" in ts_used
+                        or str(summary.get("timestamp_column") or "").strip() == str(ts_col or "").strip()
+                    ):
+                        summary["timestamp_column"] = ts_used
                     dt = src_dt + timedelta(seconds=float(cfg.get("time_offset_seconds") or 0.0))
                     values: Dict[str, float] = {}
                     for code in analytes:
@@ -698,6 +865,8 @@ def load_ftir_records(cfg: Dict[str, Any]) -> Dict[str, Any]:
         note_parts.append("FTIR ingest complete.")
     else:
         note_parts.append("No FTIR rows were parsed.")
+    if summary["vendor_profile_used"]:
+        note_parts.append(f"Vendor profile: {summary['vendor_profile_used']}.")
     if summary["autodetected_columns_used"]:
         note_parts.append(
             "Auto-detected analyte columns: "
