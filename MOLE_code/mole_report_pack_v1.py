@@ -3405,6 +3405,10 @@ def _build_report_context(
                     "source": ftir_validation.get("source"),
                     "validation_mode": ((ftir_validation.get("config") or {}).get("validation_mode") if isinstance(ftir_validation.get("config"), dict) else None),
                     "comparator_method": ((ftir_validation.get("config") or {}).get("comparator_method") if isinstance(ftir_validation.get("config"), dict) else None),
+                    "comparison_set_count": ftir_validation.get("comparison_set_count"),
+                    "included_comparison_set_count": ftir_validation.get("included_comparison_set_count"),
+                    "excluded_comparison_set_count": ftir_validation.get("excluded_comparison_set_count"),
+                    "comparison_sets": ftir_validation.get("comparison_sets"),
                     "paired_window_count": ftir_validation.get("paired_window_count"),
                     "excluded_count": ftir_validation.get("excluded_count"),
                     "coverage_note": ftir_validation.get("coverage_note"),
@@ -3882,6 +3886,9 @@ def _write_final_report_markdown(
     lines.append(f"- Validation source: {_md_scalar((ftir_validation_summary.get('source') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Validation mode: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('validation_mode')))}")
     lines.append(f"- Comparator method: {_md_scalar((((ftir_validation.get('config') or {}) if isinstance(ftir_validation.get('config'), dict) else {}).get('comparator_method')))}")
+    lines.append(f"- Comparison set count: {_md_scalar((ftir_validation_summary.get('comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Included comparison sets: {_md_scalar((ftir_validation_summary.get('included_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
+    lines.append(f"- Excluded comparison sets: {_md_scalar((ftir_validation_summary.get('excluded_comparison_set_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Paired window count: {_md_scalar((ftir_validation_summary.get('paired_window_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Excluded row count: {_md_scalar((ftir_validation_summary.get('excluded_count') if isinstance(ftir_validation_summary, dict) else None))}")
     lines.append(f"- Coverage note: {_md_scalar((ftir_validation_summary.get('coverage_note') if isinstance(ftir_validation_summary, dict) else None))}")
@@ -3922,6 +3929,30 @@ def _write_final_report_markdown(
         ["Analyte", "Paired windows", "Excluded", "Relative bias %", "t-stat", "F-stat", "Bias", "Precision", "Overall"],
         method301_rows,
     ))
+    comparison_sets = list((ftir_validation_summary.get("comparison_sets") if isinstance(ftir_validation_summary, dict) else []) or [])
+    if comparison_sets:
+        lines.append("")
+        lines.append("#### FTIR Comparison Sets")
+        lines.append("")
+        comparison_set_rows = []
+        for row in comparison_sets:
+            if not isinstance(row, dict):
+                continue
+            comparison_set_rows.append([
+                row.get("set_no"),
+                row.get("run_no"),
+                row.get("window_start_iso"),
+                row.get("window_end_iso"),
+                row.get("analytes"),
+                row.get("inclusion_status"),
+                row.get("formal_basis"),
+                row.get("review_state"),
+                row.get("note"),
+            ])
+        lines.append(_md_table(
+            ["Set", "Run", "Start", "Stop", "Analytes", "Status", "Basis", "Review state", "Note"],
+            comparison_set_rows,
+        ))
     excluded_rows = list((ftir_validation_summary.get("excluded_rows") if isinstance(ftir_validation_summary, dict) else []) or [])
     if excluded_rows:
         lines.append("")

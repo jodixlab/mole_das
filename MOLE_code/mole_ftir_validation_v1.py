@@ -868,17 +868,210 @@ def align_windows(
     return out
 
 
-def compute_method301_stats(cfg: Dict[str, Any], aligned_rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def build_comparison_sets(
+    cfg: Dict[str, Any],
+    windows: Iterable[Dict[str, Any]],
+    aligned_rows: Iterable[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     mode = str(cfg.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
-    analytes = sorted({str(row.get("analyte") or "").strip().upper() for row in aligned_rows if str(row.get("analyte") or "").strip()})
+    review_locked = bool(cfg.get("review_locked"))
+    signoff = dict(cfg.get("signoff") or {}) if isinstance(cfg.get("signoff"), dict) else {}
+    signoff_decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+
+    def _set_key(window: Dict[str, Any]) -> str:
+        return "|".join([
+            str(window.get("run_no") or "").strip(),
+            str(window.get("window_start_iso") or "").strip(),
+            str(window.get("window_end_iso") or "").strip(),
+        ])
+
+    aligned_list = [row for row in list(aligned_rows or []) if isinstance(row, dict)]
+    set_map: Dict[str, Dict[str, Any]] = {}
+    ordered_keys: List[str] = []
+    for idx, window in enumerate(list(windows or []), start=1):
+        if not isinstance(window, dict):
+            continue
+        key = _set_key(window)
+        if not key or key in set_map:
+            continue
+        ordered_keys.append(key)
+        set_map[key] = {
+            "set_no": idx,
+            "set_key": key,
+            "run_no": window.get("run_no"),
+            "label": window.get("label"),
+            "window_start_iso": window.get("window_start_iso"),
+            "window_end_iso": window.get("window_end_iso"),
+            "source": window.get("source"),
+            "validation_mode": mode,
+            "review_state": (
+                "SIGNED_OFF"
+                if signoff_decision in ("ACCEPTED", "REJECTED")
+                else ("LOCKED_REVIEW" if review_locked else "LIVE_REVIEW")
+            ),
+            "analyte_rows": [],
+        }
+
+    for row in aligned_list:
+        key = "|".join([
+            str(row.get("run_no") or "").strip(),
+            str(row.get("window_start_iso") or "").strip(),
+            str(row.get("window_end_iso") or "").strip(),
+        ])
+        if key not in set_map:
+            ordered_keys.append(key)
+            set_map[key] = {
+                "set_no": len(ordered_keys),
+                "set_key": key,
+                "run_no": row.get("run_no"),
+                "label": row.get("label"),
+                "window_start_iso": row.get("window_start_iso"),
+                "window_end_iso": row.get("window_end_iso"),
+                "source": "ALIGNED_ROWS",
+                "validation_mode": mode,
+                "review_state": (
+                    "SIGNED_OFF"
+                    if signoff_decision in ("ACCEPTED", "REJECTED")
+                    else ("LOCKED_REVIEW" if review_locked else "LIVE_REVIEW")
+                ),
+                "analyte_rows": [],
+            }
+        row_view = {
+            "row_key": row.get("row_key"),
+            "analyte": row.get("analyte"),
+            "paired": bool(row.get("paired")),
+            "excluded": bool(row.get("excluded")),
+            "exclusion_reason": row.get("exclusion_reason"),
+            "reviewer": row.get("reviewer"),
+            "updated_iso": row.get("updated_iso"),
+            "qa_status": row.get("qa_status"),
+            "qa_flags": list(row.get("qa_flags") or []),
+            "mole_count": row.get("mole_count"),
+            "ftir_count": row.get("ftir_count"),
+            "mole_avg": row.get("mole_avg"),
+            "ftir_avg": row.get("ftir_avg"),
+            "difference": row.get("difference"),
+            "offset_seconds_adjusted": row.get("offset_seconds_adjusted"),
+            "drift_seconds_adjusted": row.get("drift_seconds_adjusted"),
+            "mole_coverage_ratio": row.get("mole_coverage_ratio"),
+            "ftir_coverage_ratio": row.get("ftir_coverage_ratio"),
+            "status": row.get("status"),
+        }
+        set_map[key]["analyte_rows"].append(row_view)
+
+    out: List[Dict[str, Any]] = []
+    for key in ordered_keys:
+        block = set_map.get(key)
+        if not isinstance(block, dict):
+            continue
+        analyte_rows = list(block.get("analyte_rows") or [])
+        included_rows = [row for row in analyte_rows if not bool(row.get("excluded"))]
+        paired_rows = [row for row in analyte_rows if bool(row.get("paired"))]
+        included_paired_rows = [row for row in included_rows if bool(row.get("paired"))]
+        excluded_rows = [row for row in analyte_rows if bool(row.get("excluded"))]
+        error_rows = [
+            row for row in included_rows
+            if str(row.get("qa_status") or "").strip().upper() == "ERROR"
+        ]
+        warn_rows = [
+            row for row in included_rows
+            if str(row.get("qa_status") or "").strip().upper() == "WARN"
+        ]
+        analytes = sorted({str(row.get("analyte") or "").strip().upper() for row in analyte_rows if str(row.get("analyte") or "").strip()})
+        paired_analytes = sorted({str(row.get("analyte") or "").strip().upper() for row in included_paired_rows if str(row.get("analyte") or "").strip()})
+        excluded_analytes = sorted({str(row.get("analyte") or "").strip().upper() for row in excluded_rows if str(row.get("analyte") or "").strip()})
+
+        if not analyte_rows:
+            inclusion_status = "NO_ROWS"
+        elif included_paired_rows and not excluded_rows and len(included_paired_rows) == len(analyte_rows):
+            inclusion_status = "INCLUDED"
+        elif excluded_rows and len(excluded_rows) == len(analyte_rows):
+            inclusion_status = "EXCLUDED"
+        elif included_paired_rows:
+            inclusion_status = "MIXED"
+        else:
+            inclusion_status = "NO_DATA"
+
+        if included_paired_rows:
+            formal_basis = "FORMAL_COMPARISON_SET" if mode == "METHOD_301_FORMAL" else "INFORMED_COMPARISON_SET"
+        else:
+            formal_basis = "NO_COMPARISON_BASIS"
+
+        note_parts: List[str] = []
+        if included_paired_rows:
+            note_parts.append(f"{len(included_paired_rows)} included paired analyte row(s)")
+        if excluded_rows:
+            note_parts.append(f"{len(excluded_rows)} excluded analyte row(s)")
+        if error_rows:
+            note_parts.append(f"{len(error_rows)} included row(s) with QA errors")
+        elif warn_rows:
+            note_parts.append(f"{len(warn_rows)} included row(s) with QA warnings")
+        block["analytes"] = analytes
+        block["paired_analytes"] = paired_analytes
+        block["excluded_analytes"] = excluded_analytes
+        block["row_count"] = len(analyte_rows)
+        block["paired_row_count"] = len(paired_rows)
+        block["included_row_count"] = len(included_rows)
+        block["included_paired_row_count"] = len(included_paired_rows)
+        block["excluded_row_count"] = len(excluded_rows)
+        block["error_row_count"] = len(error_rows)
+        block["warning_row_count"] = len(warn_rows)
+        block["inclusion_status"] = inclusion_status
+        block["formal_basis"] = formal_basis
+        block["note"] = "; ".join(note_parts) if note_parts else "No analyte comparison rows in this set."
+        out.append(block)
+
+        for row in analyte_rows:
+            row_key = str(row.get("row_key") or "").strip()
+            for source_row in aligned_list:
+                if str(source_row.get("row_key") or "").strip() != row_key:
+                    continue
+                source_row["comparison_set_no"] = block["set_no"]
+                source_row["comparison_set_key"] = block["set_key"]
+                source_row["comparison_set_status"] = block["inclusion_status"]
+                source_row["comparison_set_basis"] = block["formal_basis"]
+                break
+    return out
+
+
+def compute_method301_stats(cfg: Dict[str, Any], comparison_sets: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    mode = str(cfg.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
+    set_list = [dict(row) for row in list(comparison_sets or []) if isinstance(row, dict)]
+    analytes = sorted({
+        str(analyte or "").strip().upper()
+        for row in set_list
+        for analyte in list(row.get("analytes") or [])
+        if str(analyte or "").strip()
+    })
     out: List[Dict[str, Any]] = []
     for code in analytes:
-        pairs_all = [row for row in aligned_rows if str(row.get("analyte") or "").strip().upper() == code and bool(row.get("paired"))]
+        analyte_rows_all = [
+            dict(analyte_row, set_no=row.get("set_no"), set_key=row.get("set_key"))
+            for row in set_list
+            for analyte_row in list(row.get("analyte_rows") or [])
+            if str(analyte_row.get("analyte") or "").strip().upper() == code
+        ]
+        pairs_all = [row for row in analyte_rows_all if bool(row.get("paired"))]
         pairs = [row for row in pairs_all if not bool(row.get("excluded"))]
         mole_vals = [float(row.get("mole_avg")) for row in pairs if row.get("mole_avg") is not None]
         ftir_vals = [float(row.get("ftir_avg")) for row in pairs if row.get("ftir_avg") is not None]
         diffs = [float(row.get("difference")) for row in pairs if row.get("difference") is not None]
         n = len(diffs)
+        comparison_set_count = len({
+            str(row.get("set_key") or "")
+            for row in analyte_rows_all
+            if str(row.get("set_key") or "")
+        })
+        included_set_count = len({
+            str(row.get("set_key") or "")
+            for row in pairs
+            if str(row.get("set_key") or "")
+        })
+        excluded_set_count = len({
+            str(row.get("set_key") or "")
+            for row in pairs_all
+            if bool(row.get("excluded")) and str(row.get("set_key") or "")
+        })
         mole_mean = _mean(mole_vals)
         ftir_mean = _mean(ftir_vals)
         diff_mean = _mean(diffs)
@@ -939,6 +1132,9 @@ def compute_method301_stats(cfg: Dict[str, Any], aligned_rows: Iterable[Dict[str
         out.append({
             "analyte": code,
             "mode": mode,
+            "comparison_set_count": comparison_set_count,
+            "included_comparison_set_count": included_set_count,
+            "excluded_comparison_set_count": excluded_set_count,
             "paired_window_count": n,
             "excluded_window_count": len([row for row in pairs_all if bool(row.get("excluded"))]),
             "mole_mean": mole_mean,
@@ -976,6 +1172,7 @@ def build_validation_package(
             "mole_source": {"status": "Gap", "note": "FTIR validation not enabled."},
             "windows": {"status": "Gap", "rows": [], "note": "FTIR validation not enabled."},
             "aligned_rows": [],
+            "comparison_sets": [],
             "method301": [],
             "coverage_note": "FTIR validation not enabled for this session.",
             "overall_status": "DISABLED",
@@ -1012,7 +1209,8 @@ def build_validation_package(
             row["exclusion_reason"] = ""
             row["reviewer"] = ""
             row["updated_iso"] = ""
-    method301 = compute_method301_stats(normalized, aligned_rows)
+    comparison_sets = build_comparison_sets(normalized, windows.get("rows") or [], aligned_rows)
+    method301 = compute_method301_stats(normalized, comparison_sets)
     qa = _build_validation_qa(normalized, ftir.get("summary") or {}, mole.get("summary") or {}, windows, aligned_rows, method301)
 
     statuses = [str(row.get("overall_status") or "") for row in method301]
@@ -1042,6 +1240,16 @@ def build_validation_package(
         "mole_source": mole.get("summary") or {},
         "windows": windows,
         "aligned_rows": aligned_rows,
+        "comparison_sets": comparison_sets,
+        "comparison_set_count": len(comparison_sets),
+        "included_comparison_set_count": len([
+            row for row in comparison_sets
+            if str(row.get("inclusion_status") or "").strip().upper() in ("INCLUDED", "MIXED")
+        ]),
+        "excluded_comparison_set_count": len([
+            row for row in comparison_sets
+            if str(row.get("inclusion_status") or "").strip().upper() == "EXCLUDED"
+        ]),
         "excluded_rows": excluded_rows,
         "method301": method301,
         "coverage_note": coverage_note,
@@ -1080,6 +1288,10 @@ def write_validation_exports(
     with open(windows_p, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow([
+            "comparison_set_no",
+            "comparison_set_key",
+            "comparison_set_status",
+            "comparison_set_basis",
             "run_no",
             "label",
             "window_start_iso",
@@ -1108,6 +1320,10 @@ def write_validation_exports(
             if not isinstance(row, dict):
                 continue
             w.writerow([
+                row.get("comparison_set_no"),
+                row.get("comparison_set_key"),
+                row.get("comparison_set_status"),
+                row.get("comparison_set_basis"),
                 row.get("run_no"),
                 row.get("label"),
                 row.get("window_start_iso"),
@@ -1138,6 +1354,9 @@ def write_validation_exports(
         w.writerow([
             "analyte",
             "mode",
+            "comparison_set_count",
+            "included_comparison_set_count",
+            "excluded_comparison_set_count",
             "paired_window_count",
             "excluded_window_count",
             "mole_mean",
@@ -1163,6 +1382,9 @@ def write_validation_exports(
             w.writerow([
                 row.get("analyte"),
                 row.get("mode"),
+                row.get("comparison_set_count"),
+                row.get("included_comparison_set_count"),
+                row.get("excluded_comparison_set_count"),
                 row.get("paired_window_count"),
                 row.get("excluded_window_count"),
                 _fmt_num(row.get("mole_mean"), 6),

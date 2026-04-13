@@ -64,9 +64,19 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("status"), "Available")
             self.assertEqual(payload.get("overall_status"), "PASS")
             self.assertEqual(payload.get("paired_window_count"), 6)
+            self.assertEqual(len(payload.get("comparison_sets") or []), 6)
+            self.assertEqual(payload.get("comparison_set_count"), 6)
+            self.assertEqual(payload.get("included_comparison_set_count"), 6)
+            self.assertEqual(payload.get("excluded_comparison_set_count"), 0)
+            first_set = (payload.get("comparison_sets") or [])[0]
+            self.assertEqual(first_set.get("inclusion_status"), "INCLUDED")
+            self.assertEqual(first_set.get("formal_basis"), "FORMAL_COMPARISON_SET")
             self.assertEqual(len(payload.get("method301") or []), 1)
             row = (payload.get("method301") or [])[0]
             self.assertEqual(row.get("analyte"), "NO")
+            self.assertEqual(row.get("comparison_set_count"), 6)
+            self.assertEqual(row.get("included_comparison_set_count"), 6)
+            self.assertEqual(row.get("excluded_comparison_set_count"), 0)
             self.assertEqual(row.get("bias_status"), "PASS")
             self.assertEqual(row.get("precision_status"), "PASS")
             self.assertEqual(row.get("overall_status"), "PASS")
@@ -159,7 +169,17 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("review_notes"), "Reviewer excluded first window.")
             self.assertTrue(payload.get("review_locked"))
             self.assertEqual(payload.get("review_lock_by"), "peer_scientist")
+            comparison_sets = payload.get("comparison_sets") or []
+            self.assertEqual(len(comparison_sets), 6)
+            self.assertEqual(payload.get("comparison_set_count"), 6)
+            self.assertEqual(payload.get("included_comparison_set_count"), 5)
+            self.assertEqual(payload.get("excluded_comparison_set_count"), 1)
+            self.assertEqual(comparison_sets[0].get("inclusion_status"), "EXCLUDED")
+            self.assertEqual(comparison_sets[0].get("excluded_row_count"), 1)
             row = (payload.get("method301") or [])[0]
+            self.assertEqual(row.get("comparison_set_count"), 6)
+            self.assertEqual(row.get("included_comparison_set_count"), 5)
+            self.assertEqual(row.get("excluded_comparison_set_count"), 1)
             self.assertEqual(row.get("paired_window_count"), 5)
             self.assertEqual(row.get("excluded_window_count"), 1)
             self.assertEqual(row.get("overall_status"), "INSUFFICIENT_FORMAL_WINDOWS")
@@ -192,6 +212,10 @@ class FtirValidationTests(unittest.TestCase):
                 },
                 "aligned_rows": [
                     {
+                        "comparison_set_no": 1,
+                        "comparison_set_key": "1|2026-04-10T12:00:00Z|2026-04-10T12:20:00Z",
+                        "comparison_set_status": "EXCLUDED",
+                        "comparison_set_basis": "FORMAL_COMPARISON_SET",
                         "run_no": 1,
                         "label": "Run 1",
                         "window_start_iso": "2026-04-10T12:00:00Z",
@@ -211,10 +235,39 @@ class FtirValidationTests(unittest.TestCase):
                         "updated_iso": "2026-04-10T18:00:00Z",
                     }
                 ],
+                "comparison_sets": [
+                    {
+                        "set_no": 1,
+                        "set_key": "1|2026-04-10T12:00:00Z|2026-04-10T12:20:00Z",
+                        "run_no": 1,
+                        "label": "Run 1",
+                        "window_start_iso": "2026-04-10T12:00:00Z",
+                        "window_end_iso": "2026-04-10T12:20:00Z",
+                        "source": "ACTUAL_RUNS",
+                        "validation_mode": "METHOD_301_FORMAL",
+                        "review_state": "SIGNED_OFF",
+                        "analytes": ["NO"],
+                        "paired_analytes": [],
+                        "excluded_analytes": ["NO"],
+                        "row_count": 1,
+                        "paired_row_count": 1,
+                        "included_row_count": 0,
+                        "included_paired_row_count": 0,
+                        "excluded_row_count": 1,
+                        "error_row_count": 0,
+                        "warning_row_count": 0,
+                        "inclusion_status": "EXCLUDED",
+                        "formal_basis": "NO_COMPARISON_BASIS",
+                        "note": "1 excluded analyte row(s)",
+                    }
+                ],
                 "method301": [
                     {
                         "analyte": "NO",
                         "mode": "METHOD_301_FORMAL",
+                        "comparison_set_count": 1,
+                        "included_comparison_set_count": 0,
+                        "excluded_comparison_set_count": 1,
                         "paired_window_count": 5,
                         "excluded_window_count": 1,
                         "mole_mean": 10.0,
@@ -254,8 +307,10 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual((snapshot.get("signoff") or {}).get("decision"), "ACCEPTED")
             self.assertEqual((snapshot.get("signoff") or {}).get("basis"), "FORMAL_METHOD_301_PASS")
             windows_csv = (root / "locked_windows.csv").read_text(encoding="utf-8")
+            self.assertIn("comparison_set_status", windows_csv)
             self.assertIn("startup stabilization", windows_csv)
             method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
+            self.assertIn("comparison_set_count", method_csv)
             self.assertIn("excluded_window_count", method_csv)
 
     def test_qa_preview_autodetects_columns_and_flags_large_time_offset(self) -> None:
@@ -308,6 +363,7 @@ class FtirValidationTests(unittest.TestCase):
             self.assertFalse(bool(qa.get("signoff_ready")))
             self.assertTrue(any("failed alignment QA" in str(item) for item in list(qa.get("blocking_issues") or [])))
             row = (payload.get("aligned_rows") or [])[0]
+            self.assertEqual(row.get("comparison_set_no"), 1)
             self.assertEqual(row.get("qa_status"), "ERROR")
             self.assertTrue("HIGH_TIME_OFFSET" in list(row.get("qa_flags") or []))
 
