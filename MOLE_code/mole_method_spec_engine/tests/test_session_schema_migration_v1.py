@@ -55,6 +55,8 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertEqual(sess["fuel"]["dg"]["share_basis"], "SELECTED_HEAT_INPUT_PCT")
         self.assertNotIn("STATE_PERMIT_GENERAL", sess["regulatory"]["selected_rule_ids"])
         self.assertNotIn("STATE_PERMIT_GENERAL", sess["regulatory"]["selected_rule_meta"])
+        self.assertEqual(sess["validation_plan"]["session_type"], "STANDARD_TEST")
+        self.assertEqual(sess["validation_plan"]["validation_mode"], "NONE")
 
         note_blob = " | ".join(meta["session_schema_last_notes"])
         self.assertIn("may_support_compliance=true", note_blob)
@@ -72,10 +74,49 @@ class SessionSchemaMigrationTests(unittest.TestCase):
         self.assertNotIn("ui_mode", sess["daq_runner"])
         self.assertEqual(sess["site_conditions"]["z_model"], "IDEAL")
         self.assertNotIn("z_basis", sess["site_conditions"])
+        self.assertEqual(sess["validation_plan"]["session_type"], "STANDARD_TEST")
+        self.assertEqual(sess["validation_plan"]["validation_mode"], "NONE")
 
         note_blob = " | ".join(meta["session_schema_last_notes"])
         self.assertIn("Stale diagnostics UI mode was cleared", note_blob)
         self.assertIn("Legacy site_conditions.z_basis key was retired", note_blob)
+
+    def _assert_ftir_validation_backfill(self, ensure_fn: Callable[..., Dict[str, Any]]) -> None:
+        sess = ensure_fn({
+            "session_mode": {"record_data": True, "tokenize": True, "diagnostic_only": False, "may_support_compliance": False},
+            "ftir_validation": {
+                "enabled": True,
+                "validation_mode": "METHOD_301_FORMAL",
+                "comparator_method": "FTIR_VALIDATED_METHOD",
+                "timestamp_master_clock": "SESSION_MASTER_CLOCK",
+                "ftir_vendor_profile": "THERMOFISHER_MAX_CSV",
+                "reviewer": "Peer Scientist",
+                "signoff": {"by": "Lead Scientist", "role": "Principal Scientist"},
+                "execution": {
+                    "planned_run_count_override": 6,
+                    "planned_run_minutes_override": 20.0,
+                    "purge_minutes_required": 5.0,
+                    "require_purge_event": True,
+                    "require_bias_event": True,
+                },
+            },
+        }, actor="unit_test")
+        plan = sess["validation_plan"]
+        notes = " | ".join(sess["meta"]["session_schema_last_notes"])
+        self.assertTrue(plan["enabled"])
+        self.assertEqual(plan["session_type"], "FTIR_VALIDATION")
+        self.assertEqual(plan["validation_mode"], "METHOD_301_FORMAL")
+        self.assertEqual(plan["comparator_vendor_profile"], "THERMOFISHER_MAX_CSV")
+        self.assertEqual(plan["planned_set_count"], 6)
+        self.assertEqual(plan["planned_run_minutes"], 20.0)
+        self.assertEqual(plan["planned_purge_minutes"], 5.0)
+        self.assertTrue(plan["require_purge_each_set"])
+        self.assertTrue(plan["require_bias_each_set"])
+        self.assertEqual(plan["peer_reviewer"], "Peer Scientist")
+        self.assertEqual(plan["final_approver"], "Lead Scientist")
+        self.assertEqual(plan["final_approver_role"], "Principal Scientist")
+        self.assertIn("Validation test plan", notes)
+        self.assertIn("backfilled from FTIR validation settings", notes)
 
     def test_wizard_migrates_legacy_diagnostic_session(self) -> None:
         self._assert_diag_fixture(self.wizard_mod.ensure_session_schema)
@@ -88,6 +129,12 @@ class SessionSchemaMigrationTests(unittest.TestCase):
 
     def test_runner_migrates_legacy_production_session(self) -> None:
         self._assert_prod_fixture(self.runner_mod.ensure_session_schema)
+
+    def test_wizard_backfills_validation_plan_from_ftir_validation(self) -> None:
+        self._assert_ftir_validation_backfill(self.wizard_mod.ensure_session_schema)
+
+    def test_runner_backfills_validation_plan_from_ftir_validation(self) -> None:
+        self._assert_ftir_validation_backfill(self.runner_mod.ensure_session_schema)
 
 
 if __name__ == "__main__":

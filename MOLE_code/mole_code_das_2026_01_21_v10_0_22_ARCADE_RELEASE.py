@@ -89,6 +89,11 @@ except Exception:
     mole_ftir_offset_recommendations = None
 
 try:
+    import mole_ftir_validation_v1 as mole_ftir_validation
+except Exception:
+    mole_ftir_validation = None
+
+try:
     import mole_spike_recovery_v1 as mole_spike_recovery
 except Exception:
     mole_spike_recovery = None
@@ -478,6 +483,113 @@ def _coerce_int(value: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
+def _coerce_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+VALIDATION_SESSION_TYPES = ("STANDARD_TEST", "FTIR_VALIDATION")
+VALIDATION_PLAN_MODES = ("NONE",) + tuple(
+    getattr(mole_ftir_validation, "VALIDATION_MODES", ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON"))
+)
+VALIDATION_VENDOR_OPTIONS = tuple(
+    getattr(mole_ftir_validation, "FTIR_VENDOR_PROFILES", ("AUTO", "THERMOFISHER_MAX_CSV"))
+)
+VALIDATION_MASTER_CLOCK_OPTIONS = ("SESSION_MASTER_CLOCK", "SITE_NTP", "EXTERNAL_REFERENCE")
+
+
+def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    plan = dict(value or {}) if isinstance(value, dict) else {}
+    ftir = dict(ftir_cfg or {}) if isinstance(ftir_cfg, dict) else {}
+    ftir_exec = ftir.get("execution") if isinstance(ftir.get("execution"), dict) else {}
+    ftir_signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
+
+    enabled = bool(plan.get("enabled"))
+    if not plan and bool(ftir.get("enabled")):
+        enabled = True
+
+    session_type = str(plan.get("session_type") or "").strip().upper()
+    if not session_type:
+        session_type = "FTIR_VALIDATION" if enabled else "STANDARD_TEST"
+    if session_type not in VALIDATION_SESSION_TYPES:
+        session_type = "STANDARD_TEST"
+
+    mode = str(plan.get("validation_mode") or (ftir.get("validation_mode") if not plan.get("validation_mode") else "") or "NONE").strip().upper()
+    if mode not in VALIDATION_PLAN_MODES:
+        mode = "NONE"
+    if session_type == "FTIR_VALIDATION" and mode == "NONE":
+        mode = "METHOD_301_INFORMED_COMPARISON"
+    if session_type != "FTIR_VALIDATION":
+        enabled = False
+        mode = "NONE"
+    else:
+        enabled = True
+
+    vendor = str(plan.get("comparator_vendor_profile") or ftir.get("ftir_vendor_profile") or "AUTO").strip().upper() or "AUTO"
+    if vendor not in VALIDATION_VENDOR_OPTIONS:
+        vendor = "AUTO"
+
+    planned_set_count = _coerce_int(
+        plan.get("planned_set_count"),
+        _coerce_int(ftir_exec.get("planned_run_count_override"), _coerce_int(ftir_exec.get("planned_run_count"))),
+    )
+    if planned_set_count is not None and planned_set_count <= 0:
+        planned_set_count = None
+
+    planned_run_minutes = _coerce_float(
+        plan.get("planned_run_minutes"),
+        _coerce_float(ftir_exec.get("planned_run_minutes_override"), _coerce_float(ftir_exec.get("planned_run_minutes"))),
+    )
+    if planned_run_minutes is not None and planned_run_minutes <= 0:
+        planned_run_minutes = None
+
+    planned_purge_minutes = _coerce_float(
+        plan.get("planned_purge_minutes"),
+        _coerce_float(ftir_exec.get("purge_minutes_required"), 5.0),
+    )
+    if planned_purge_minutes is None or planned_purge_minutes <= 0:
+        planned_purge_minutes = 5.0
+
+    require_purge_each_set = bool(
+        plan.get("require_purge_each_set")
+        if "require_purge_each_set" in plan
+        else ftir_exec.get("require_purge_event", True)
+    )
+    require_bias_each_set = bool(
+        plan.get("require_bias_each_set")
+        if "require_bias_each_set" in plan
+        else ftir_exec.get("require_bias_event", True)
+    )
+
+    clock = str(plan.get("timestamp_master_clock") or ftir.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK").strip().upper() or "SESSION_MASTER_CLOCK"
+    if clock not in VALIDATION_MASTER_CLOCK_OPTIONS:
+        clock = "SESSION_MASTER_CLOCK"
+
+    return {
+        "enabled": enabled,
+        "session_type": session_type,
+        "validation_mode": mode,
+        "comparator_method": str(plan.get("comparator_method") or ftir.get("comparator_method") or "FTIR_VALIDATED_METHOD").strip() or "FTIR_VALIDATED_METHOD",
+        "comparator_vendor_profile": vendor,
+        "comparator_label": str(plan.get("comparator_label") or "").strip(),
+        "timestamp_master_clock": clock,
+        "planned_set_count": planned_set_count,
+        "planned_run_minutes": planned_run_minutes,
+        "planned_purge_minutes": planned_purge_minutes,
+        "require_purge_each_set": require_purge_each_set,
+        "require_bias_each_set": require_bias_each_set,
+        "lead_scientist": str(plan.get("lead_scientist") or "").strip(),
+        "peer_reviewer": str(plan.get("peer_reviewer") or ftir.get("reviewer") or "").strip(),
+        "final_approver": str(plan.get("final_approver") or ftir_signoff.get("by") or "").strip(),
+        "final_approver_role": str(plan.get("final_approver_role") or ftir_signoff.get("role") or "").strip(),
+        "notes": str(plan.get("notes") or "").strip(),
+        "updated_by": str(plan.get("updated_by") or "").strip(),
+        "updated_iso": str(plan.get("updated_iso") or "").strip(),
+    }
+
+
 def ensure_session_schema(session: Dict[str, Any], *, actor: str = "wizard", tool_version: str = VERSION) -> Dict[str, Any]:
     if not isinstance(session, dict):
         session = {}
@@ -573,6 +685,19 @@ def ensure_session_schema(session: Dict[str, Any], *, actor: str = "wizard", too
             sel_meta.pop(stale_placeholder, None)
         migrated = True
         notes.append("Removed stale placeholder regulatory rule id STATE_PERMIT_GENERAL.")
+
+    validation_plan_in = session.get("validation_plan")
+    validation_plan = _normalize_validation_plan_cfg(validation_plan_in, ftir_cfg=(session.get("ftir_validation") if isinstance(session.get("ftir_validation"), dict) else {}))
+    if not isinstance(validation_plan_in, dict):
+        migrated = True
+        notes.append("Validation test plan block was initialized.")
+    elif validation_plan_in != validation_plan:
+        migrated = True
+        notes.append("Validation test plan block was normalized.")
+    if (not validation_plan_in) and bool(((session.get("ftir_validation") or {}) if isinstance(session.get("ftir_validation"), dict) else {}).get("enabled")):
+        migrated = True
+        notes.append("Validation test plan was backfilled from FTIR validation settings.")
+    session["validation_plan"] = validation_plan
 
     session["schema_version"] = SESSION_SCHEMA_VERSION
     meta["session_schema_version"] = SESSION_SCHEMA_VERSION
@@ -2435,6 +2560,7 @@ class MoleDASWizard(tk.Tk):
             "qa_qc": {
                 "secondary_test_options": {"CONVERTER_EFF": False},
             },
+            "validation_plan": _normalize_validation_plan_cfg({}),
             "test_matrix": None,
 
             "regulatory": {
@@ -2506,6 +2632,24 @@ class MoleDASWizard(tk.Tk):
         self.var_diagnostic_only = tk.BooleanVar(value=False)
         self.var_may_support_compliance = tk.BooleanVar(value=False)
         self.var_session_intent_status = tk.StringVar(value="")
+        plan = self.session.get("validation_plan") or {}
+        self.var_validation_session_type = tk.StringVar(value=str(plan.get("session_type") or "STANDARD_TEST"))
+        self.var_validation_mode = tk.StringVar(value=str(plan.get("validation_mode") or "NONE"))
+        self.var_validation_comparator_method = tk.StringVar(value=str(plan.get("comparator_method") or "FTIR_VALIDATED_METHOD"))
+        self.var_validation_vendor_profile = tk.StringVar(value=str(plan.get("comparator_vendor_profile") or "AUTO"))
+        self.var_validation_comparator_label = tk.StringVar(value=str(plan.get("comparator_label") or ""))
+        self.var_validation_master_clock = tk.StringVar(value=str(plan.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK"))
+        self.var_validation_planned_sets = tk.StringVar(value="" if plan.get("planned_set_count") is None else str(plan.get("planned_set_count")))
+        self.var_validation_run_minutes = tk.StringVar(value="" if plan.get("planned_run_minutes") is None else str(plan.get("planned_run_minutes")))
+        self.var_validation_purge_minutes = tk.StringVar(value="" if plan.get("planned_purge_minutes") is None else str(plan.get("planned_purge_minutes")))
+        self.var_validation_require_purge = tk.BooleanVar(value=bool(plan.get("require_purge_each_set", True)))
+        self.var_validation_require_bias = tk.BooleanVar(value=bool(plan.get("require_bias_each_set", True)))
+        self.var_validation_lead_scientist = tk.StringVar(value=str(plan.get("lead_scientist") or ""))
+        self.var_validation_peer_reviewer = tk.StringVar(value=str(plan.get("peer_reviewer") or ""))
+        self.var_validation_final_approver = tk.StringVar(value=str(plan.get("final_approver") or ""))
+        self.var_validation_final_approver_role = tk.StringVar(value=str(plan.get("final_approver_role") or ""))
+        self.var_validation_notes = tk.StringVar(value=str(plan.get("notes") or ""))
+        self.var_validation_status = tk.StringVar(value="")
 
         # Source vars
         self.var_source_category = tk.StringVar(value="")
@@ -2996,6 +3140,7 @@ class MoleDASWizard(tk.Tk):
             f"Record: {sm.get('record_data')} | Token: {sm.get('tokenize')} | Diag: {sm.get('diagnostic_only')}",
 f"Job: {proj.get('job_id')}",
 f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((proj.get('intake') or {}).get('missing') or [])} missing)",
+            f"Validation: {self._validation_plan_summary(self.session.get('validation_plan') or {})}",
             f"Fuel: {(fuel.get('fuel_button_code','') + ' ' + fuel.get('fuel_category','')).strip() or '(unset)'}",
             f"Source: {src.get('source_category') or '(unset)'}",
             f"Pollutants: {', '.join(sel) if sel else '(none)'}",
@@ -3093,6 +3238,11 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             sm["mode"] = "COMPLIANCE_SESSION"
         else:
             sm["mode"] = "PROJECT_SESSION"
+
+        try:
+            self._validation_plan_commit_ui_to_session()
+        except Exception:
+            pass
 
         # Source
         if "source" not in self.session or not isinstance(self.session["source"], dict):
@@ -5863,6 +6013,81 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         ).grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(2, 8))
         self._apply_session_intent_policy(announce=False)
 
+        val_box = tk.LabelFrame(outer, text="Validation Test Plan", bg=self.BG, fg=self.FG)
+        val_box.pack(anchor="nw", pady=(14, 6), fill="x")
+        self._configure_form_grid(val_box, minspec="two_pair_form")
+
+        def _on_validation_change(_evt=None):
+            self._apply_validation_plan_policy()
+
+        r = 0
+        ttk.Label(val_box, text="Session Type").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        cb_session_type = ttk.Combobox(val_box, textvariable=self.var_validation_session_type, values=list(VALIDATION_SESSION_TYPES), state="readonly", width=24)
+        cb_session_type.grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        cb_session_type.bind("<<ComboboxSelected>>", _on_validation_change)
+        ttk.Label(val_box, text="Validation Mode").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        cb_mode = ttk.Combobox(val_box, textvariable=self.var_validation_mode, values=list(VALIDATION_PLAN_MODES), state="readonly", width=28)
+        cb_mode.grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        cb_mode.bind("<<ComboboxSelected>>", _on_validation_change)
+        r += 1
+
+        ttk.Label(val_box, text="Comparator Method").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_comparator_method, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="FTIR Vendor Profile").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        ttk.Combobox(val_box, textvariable=self.var_validation_vendor_profile, values=list(VALIDATION_VENDOR_OPTIONS), state="readonly", width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        ttk.Label(val_box, text="Comparator Label").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_comparator_label, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="Timestamp Master Clock").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        ttk.Combobox(val_box, textvariable=self.var_validation_master_clock, values=list(VALIDATION_MASTER_CLOCK_OPTIONS), state="readonly", width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        ttk.Label(val_box, text="Planned Sets").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_planned_sets, width=12).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="Run Minutes").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_run_minutes, width=12).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        ttk.Label(val_box, text="Purge Minutes").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_purge_minutes, width=12).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="Lead Scientist").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_lead_scientist, width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        ttk.Label(val_box, text="Peer Reviewer").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_peer_reviewer, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="Final Approver").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_final_approver, width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        ttk.Label(val_box, text="Approver Role").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_final_approver_role, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ttk.Label(val_box, text="Notes").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        tk.Entry(val_box, textvariable=self.var_validation_notes, width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        r += 1
+
+        chk_row = tk.Frame(val_box, bg=self.BG)
+        chk_row.grid(row=r, column=0, columnspan=4, sticky="w", padx=10, pady=(2, 2))
+        tk.Checkbutton(chk_row, text="Require purge after each set", variable=self.var_validation_require_purge,
+                       bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
+                       command=self._apply_validation_plan_policy).pack(side="left", padx=(0, 16))
+        tk.Checkbutton(chk_row, text="Require bias after each set", variable=self.var_validation_require_bias,
+                       bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
+                       command=self._apply_validation_plan_policy).pack(side="left")
+        r += 1
+
+        tk.Label(
+            val_box,
+            textvariable=self.var_validation_status,
+            fg=self.MUTED,
+            bg=self.BG,
+            justify="left",
+            wraplength=760,
+            font=("Consolas", 9),
+        ).grid(row=r, column=0, columnspan=4, sticky="w", padx=10, pady=(2, 8))
+        self._apply_validation_plan_policy()
+
         fuel_box = tk.LabelFrame(outer, text="Fuel Category", bg=self.BG, fg=self.FG)
         fuel_box.pack(anchor="nw", pady=(14, 6), fill="x")
 
@@ -5895,6 +6120,149 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                   bg="#2b3a4b", fg=self.BTN_FG, relief="flat").pack(anchor="w", pady=12)
 
         self._refresh_fuel_button_styles()
+
+
+    def _validation_plan_section(self) -> Dict[str, Any]:
+        plan = _normalize_validation_plan_cfg(
+            self.session.get("validation_plan"),
+            ftir_cfg=(self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}),
+        )
+        self.session["validation_plan"] = plan
+        return plan
+
+    def _validation_plan_summary(self, plan: Optional[Dict[str, Any]] = None) -> str:
+        plan_use = dict(plan or self._validation_plan_section())
+        if not bool(plan_use.get("enabled")):
+            return "Validation plan inactive. Session remains a standard test configuration."
+        mode = str(plan_use.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
+        planned_sets = plan_use.get("planned_set_count")
+        run_minutes = plan_use.get("planned_run_minutes")
+        purge_minutes = plan_use.get("planned_purge_minutes")
+        reviewer = str(plan_use.get("peer_reviewer") or "").strip() or "(unassigned)"
+        vendor = str(plan_use.get("comparator_vendor_profile") or "AUTO").strip().upper() or "AUTO"
+        return " | ".join([
+            f"FTIR validation: {mode}",
+            f"planned sets={planned_sets if planned_sets not in (None, '') else '(unset)'}",
+            f"run min={run_minutes if run_minutes not in (None, '') else '(unset)'}",
+            f"purge min={purge_minutes if purge_minutes not in (None, '') else '(unset)'}",
+            f"vendor={vendor}",
+            f"peer reviewer={reviewer}",
+        ])
+
+    def _apply_validation_plan_policy(self) -> None:
+        session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"
+        if session_type not in VALIDATION_SESSION_TYPES:
+            session_type = "STANDARD_TEST"
+        mode = str(self.var_validation_mode.get() or "NONE").strip().upper() or "NONE"
+        if mode not in VALIDATION_PLAN_MODES:
+            mode = "NONE"
+        if session_type != "FTIR_VALIDATION":
+            mode = "NONE"
+        elif mode == "NONE":
+            mode = "METHOD_301_INFORMED_COMPARISON"
+        self.var_validation_session_type.set(session_type)
+        self.var_validation_mode.set(mode)
+        plan = {
+            "enabled": session_type == "FTIR_VALIDATION" and mode != "NONE",
+            "session_type": session_type,
+            "validation_mode": mode,
+            "comparator_vendor_profile": str(self.var_validation_vendor_profile.get() or "AUTO").strip().upper() or "AUTO",
+            "planned_set_count": int_or_none(self.var_validation_planned_sets.get(), default=None),
+            "planned_run_minutes": float_or_none(self.var_validation_run_minutes.get()),
+            "planned_purge_minutes": float_or_none(self.var_validation_purge_minutes.get()) or 5.0,
+            "peer_reviewer": str(self.var_validation_peer_reviewer.get() or "").strip(),
+        }
+        self.var_validation_status.set(self._validation_plan_summary(plan))
+
+    def _seed_ftir_validation_from_plan(self, plan: Optional[Dict[str, Any]] = None) -> None:
+        plan_use = _normalize_validation_plan_cfg(
+            plan or self.session.get("validation_plan"),
+            ftir_cfg=(self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}),
+        )
+        analytes_default = [
+            str(code or "").strip().upper()
+            for code in list(((self.session.get("pollutants") or {}).get("selected") or []))
+            if str(code or "").strip()
+        ]
+        ftir_cfg = self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}
+        if mole_ftir_validation is not None:
+            ftir_cfg = mole_ftir_validation.normalize_config(ftir_cfg, analytes_default=analytes_default)
+        else:
+            ftir_cfg = dict(ftir_cfg or {})
+            ftir_cfg.setdefault("execution", {})
+        execution = ftir_cfg.get("execution") if isinstance(ftir_cfg.get("execution"), dict) else {}
+        if bool(plan_use.get("enabled")):
+            ftir_cfg["enabled"] = True
+            ftir_cfg["validation_mode"] = str(plan_use.get("validation_mode") or "METHOD_301_INFORMED_COMPARISON").strip().upper()
+            ftir_cfg["comparator_method"] = str(plan_use.get("comparator_method") or "FTIR_VALIDATED_METHOD").strip() or "FTIR_VALIDATED_METHOD"
+            ftir_cfg["timestamp_master_clock"] = str(plan_use.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK").strip().upper() or "SESSION_MASTER_CLOCK"
+            ftir_cfg["ftir_vendor_profile"] = str(plan_use.get("comparator_vendor_profile") or "AUTO").strip().upper() or "AUTO"
+            if str(plan_use.get("peer_reviewer") or "").strip():
+                ftir_cfg["reviewer"] = str(plan_use.get("peer_reviewer") or "").strip()
+            if str(plan_use.get("notes") or "").strip() and not str(ftir_cfg.get("notes") or "").strip():
+                ftir_cfg["notes"] = str(plan_use.get("notes") or "").strip()
+            execution["enabled"] = True
+            execution["profile"] = "SESSION_RUNS"
+            execution["comparison_set_policy"] = "RUN_EQUALS_SET"
+            execution["purge_minutes_required"] = float(plan_use.get("planned_purge_minutes") or 5.0)
+            execution["require_purge_event"] = bool(plan_use.get("require_purge_each_set", True))
+            execution["require_bias_event"] = bool(plan_use.get("require_bias_each_set", True))
+            execution["planned_run_count_override"] = plan_use.get("planned_set_count")
+            execution["planned_run_minutes_override"] = plan_use.get("planned_run_minutes")
+        else:
+            ftir_cfg["enabled"] = False
+            execution["enabled"] = False
+        ftir_cfg["execution"] = execution
+        self.session["ftir_validation"] = ftir_cfg
+
+    def _validation_plan_commit_ui_to_session(self) -> None:
+        self._apply_validation_plan_policy()
+        plan = self._validation_plan_section()
+        plan.update({
+            "enabled": str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() == "FTIR_VALIDATION",
+            "session_type": str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST",
+            "validation_mode": str(self.var_validation_mode.get() or "NONE").strip().upper() or "NONE",
+            "comparator_method": str(self.var_validation_comparator_method.get() or "FTIR_VALIDATED_METHOD").strip() or "FTIR_VALIDATED_METHOD",
+            "comparator_vendor_profile": str(self.var_validation_vendor_profile.get() or "AUTO").strip().upper() or "AUTO",
+            "comparator_label": str(self.var_validation_comparator_label.get() or "").strip(),
+            "timestamp_master_clock": str(self.var_validation_master_clock.get() or "SESSION_MASTER_CLOCK").strip().upper() or "SESSION_MASTER_CLOCK",
+            "planned_set_count": int_or_none(self.var_validation_planned_sets.get(), default=None),
+            "planned_run_minutes": float_or_none(self.var_validation_run_minutes.get()),
+            "planned_purge_minutes": float_or_none(self.var_validation_purge_minutes.get()) or 5.0,
+            "require_purge_each_set": bool(self.var_validation_require_purge.get()),
+            "require_bias_each_set": bool(self.var_validation_require_bias.get()),
+            "lead_scientist": str(self.var_validation_lead_scientist.get() or "").strip(),
+            "peer_reviewer": str(self.var_validation_peer_reviewer.get() or "").strip(),
+            "final_approver": str(self.var_validation_final_approver.get() or "").strip(),
+            "final_approver_role": str(self.var_validation_final_approver_role.get() or "").strip(),
+            "notes": str(self.var_validation_notes.get() or "").strip(),
+            "updated_by": str((self.session.get("project") or {}).get("operator") or "").strip(),
+            "updated_iso": now_iso(),
+        })
+        plan = _normalize_validation_plan_cfg(plan, ftir_cfg=(self.session.get("ftir_validation") if isinstance(self.session.get("ftir_validation"), dict) else {}))
+        self.session["validation_plan"] = plan
+        self.var_validation_status.set(self._validation_plan_summary(plan))
+        self._seed_ftir_validation_from_plan(plan)
+
+    def _validation_plan_load_vars_from_session(self) -> None:
+        plan = self._validation_plan_section()
+        self.var_validation_session_type.set(str(plan.get("session_type") or "STANDARD_TEST"))
+        self.var_validation_mode.set(str(plan.get("validation_mode") or "NONE"))
+        self.var_validation_comparator_method.set(str(plan.get("comparator_method") or "FTIR_VALIDATED_METHOD"))
+        self.var_validation_vendor_profile.set(str(plan.get("comparator_vendor_profile") or "AUTO"))
+        self.var_validation_comparator_label.set(str(plan.get("comparator_label") or ""))
+        self.var_validation_master_clock.set(str(plan.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK"))
+        self.var_validation_planned_sets.set("" if plan.get("planned_set_count") is None else str(plan.get("planned_set_count")))
+        self.var_validation_run_minutes.set("" if plan.get("planned_run_minutes") is None else str(plan.get("planned_run_minutes")))
+        self.var_validation_purge_minutes.set("" if plan.get("planned_purge_minutes") is None else str(plan.get("planned_purge_minutes")))
+        self.var_validation_require_purge.set(bool(plan.get("require_purge_each_set", True)))
+        self.var_validation_require_bias.set(bool(plan.get("require_bias_each_set", True)))
+        self.var_validation_lead_scientist.set(str(plan.get("lead_scientist") or ""))
+        self.var_validation_peer_reviewer.set(str(plan.get("peer_reviewer") or ""))
+        self.var_validation_final_approver.set(str(plan.get("final_approver") or ""))
+        self.var_validation_final_approver_role.set(str(plan.get("final_approver_role") or ""))
+        self.var_validation_notes.set(str(plan.get("notes") or ""))
+        self.var_validation_status.set(self._validation_plan_summary(plan))
 
 
 # ------------------------- Job Intake (QA Routing Sheet) -------------------------
@@ -17580,6 +17948,10 @@ def _build_intake(self) -> None:
         self.var_diagnostic_only.set(bool(sm.get("diagnostic_only", False)))
         self.var_may_support_compliance.set(bool(sm.get("may_support_compliance", False)))
         self._apply_session_intent_policy(announce=False)
+        try:
+            self._validation_plan_load_vars_from_session()
+        except Exception:
+            pass
 
         # ---------------- job intake (QA routing) ----------------
         try:

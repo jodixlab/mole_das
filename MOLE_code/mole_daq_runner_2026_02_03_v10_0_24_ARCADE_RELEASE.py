@@ -269,6 +269,113 @@ def _coerce_int(value: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
+def _coerce_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+VALIDATION_SESSION_TYPES = ("STANDARD_TEST", "FTIR_VALIDATION")
+VALIDATION_PLAN_MODES = ("NONE",) + tuple(
+    getattr(mole_ftir_validation, "VALIDATION_MODES", ("METHOD_301_FORMAL", "METHOD_301_INFORMED_COMPARISON"))
+)
+VALIDATION_VENDOR_OPTIONS = tuple(
+    getattr(mole_ftir_validation, "FTIR_VENDOR_PROFILES", ("AUTO", "THERMOFISHER_MAX_CSV"))
+)
+VALIDATION_MASTER_CLOCK_OPTIONS = ("SESSION_MASTER_CLOCK", "SITE_NTP", "EXTERNAL_REFERENCE")
+
+
+def _normalize_validation_plan_cfg(value: Any, *, ftir_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    plan = dict(value or {}) if isinstance(value, dict) else {}
+    ftir = dict(ftir_cfg or {}) if isinstance(ftir_cfg, dict) else {}
+    ftir_exec = ftir.get("execution") if isinstance(ftir.get("execution"), dict) else {}
+    ftir_signoff = ftir.get("signoff") if isinstance(ftir.get("signoff"), dict) else {}
+
+    enabled = bool(plan.get("enabled"))
+    if not plan and bool(ftir.get("enabled")):
+        enabled = True
+
+    session_type = str(plan.get("session_type") or "").strip().upper()
+    if not session_type:
+        session_type = "FTIR_VALIDATION" if enabled else "STANDARD_TEST"
+    if session_type not in VALIDATION_SESSION_TYPES:
+        session_type = "STANDARD_TEST"
+
+    mode = str(plan.get("validation_mode") or (ftir.get("validation_mode") if not plan.get("validation_mode") else "") or "NONE").strip().upper()
+    if mode not in VALIDATION_PLAN_MODES:
+        mode = "NONE"
+    if session_type == "FTIR_VALIDATION" and mode == "NONE":
+        mode = "METHOD_301_INFORMED_COMPARISON"
+    if session_type != "FTIR_VALIDATION":
+        enabled = False
+        mode = "NONE"
+    else:
+        enabled = True
+
+    vendor = str(plan.get("comparator_vendor_profile") or ftir.get("ftir_vendor_profile") or "AUTO").strip().upper() or "AUTO"
+    if vendor not in VALIDATION_VENDOR_OPTIONS:
+        vendor = "AUTO"
+
+    planned_set_count = _coerce_int(
+        plan.get("planned_set_count"),
+        _coerce_int(ftir_exec.get("planned_run_count_override"), _coerce_int(ftir_exec.get("planned_run_count"))),
+    )
+    if planned_set_count is not None and planned_set_count <= 0:
+        planned_set_count = None
+
+    planned_run_minutes = _coerce_float(
+        plan.get("planned_run_minutes"),
+        _coerce_float(ftir_exec.get("planned_run_minutes_override"), _coerce_float(ftir_exec.get("planned_run_minutes"))),
+    )
+    if planned_run_minutes is not None and planned_run_minutes <= 0:
+        planned_run_minutes = None
+
+    planned_purge_minutes = _coerce_float(
+        plan.get("planned_purge_minutes"),
+        _coerce_float(ftir_exec.get("purge_minutes_required"), 5.0),
+    )
+    if planned_purge_minutes is None or planned_purge_minutes <= 0:
+        planned_purge_minutes = 5.0
+
+    require_purge_each_set = bool(
+        plan.get("require_purge_each_set")
+        if "require_purge_each_set" in plan
+        else ftir_exec.get("require_purge_event", True)
+    )
+    require_bias_each_set = bool(
+        plan.get("require_bias_each_set")
+        if "require_bias_each_set" in plan
+        else ftir_exec.get("require_bias_event", True)
+    )
+
+    clock = str(plan.get("timestamp_master_clock") or ftir.get("timestamp_master_clock") or "SESSION_MASTER_CLOCK").strip().upper() or "SESSION_MASTER_CLOCK"
+    if clock not in VALIDATION_MASTER_CLOCK_OPTIONS:
+        clock = "SESSION_MASTER_CLOCK"
+
+    return {
+        "enabled": enabled,
+        "session_type": session_type,
+        "validation_mode": mode,
+        "comparator_method": str(plan.get("comparator_method") or ftir.get("comparator_method") or "FTIR_VALIDATED_METHOD").strip() or "FTIR_VALIDATED_METHOD",
+        "comparator_vendor_profile": vendor,
+        "comparator_label": str(plan.get("comparator_label") or "").strip(),
+        "timestamp_master_clock": clock,
+        "planned_set_count": planned_set_count,
+        "planned_run_minutes": planned_run_minutes,
+        "planned_purge_minutes": planned_purge_minutes,
+        "require_purge_each_set": require_purge_each_set,
+        "require_bias_each_set": require_bias_each_set,
+        "lead_scientist": str(plan.get("lead_scientist") or "").strip(),
+        "peer_reviewer": str(plan.get("peer_reviewer") or ftir.get("reviewer") or "").strip(),
+        "final_approver": str(plan.get("final_approver") or ftir_signoff.get("by") or "").strip(),
+        "final_approver_role": str(plan.get("final_approver_role") or ftir_signoff.get("role") or "").strip(),
+        "notes": str(plan.get("notes") or "").strip(),
+        "updated_by": str(plan.get("updated_by") or "").strip(),
+        "updated_iso": str(plan.get("updated_iso") or "").strip(),
+    }
+
+
 def ensure_session_schema(session: Dict[str, Any], *, actor: str = "runner", tool_version: str = VERSION) -> Dict[str, Any]:
     if not isinstance(session, dict):
         session = {}
@@ -366,6 +473,19 @@ def ensure_session_schema(session: Dict[str, Any], *, actor: str = "runner", too
             sel_meta.pop(stale_placeholder, None)
         migrated = True
         notes.append("Removed stale placeholder regulatory rule id STATE_PERMIT_GENERAL.")
+
+    validation_plan_in = session.get("validation_plan")
+    validation_plan = _normalize_validation_plan_cfg(validation_plan_in, ftir_cfg=(session.get("ftir_validation") if isinstance(session.get("ftir_validation"), dict) else {}))
+    if not isinstance(validation_plan_in, dict):
+        migrated = True
+        notes.append("Validation test plan block was initialized.")
+    elif validation_plan_in != validation_plan:
+        migrated = True
+        notes.append("Validation test plan block was normalized.")
+    if (not validation_plan_in) and bool(((session.get("ftir_validation") or {}) if isinstance(session.get("ftir_validation"), dict) else {}).get("enabled")):
+        migrated = True
+        notes.append("Validation test plan was backfilled from FTIR validation settings.")
+    session["validation_plan"] = validation_plan
 
     session["schema_version"] = SESSION_SCHEMA_VERSION
     meta["session_schema_version"] = SESSION_SCHEMA_VERSION
