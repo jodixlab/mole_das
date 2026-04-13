@@ -14668,6 +14668,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "ftir_validation_locked_json": pack_dir / "ftir_validation_locked_snapshot.json",
             "ftir_validation_locked_windows_csv": pack_dir / "ftir_validation_locked_window_alignment.csv",
             "ftir_validation_locked_method301_csv": pack_dir / "ftir_validation_locked_method301.csv",
+            "ftir_validation_locked_delta_trace_json": pack_dir / "ftir_validation_locked_delta_trace.json",
+            "ftir_validation_locked_delta_trace_csv": pack_dir / "ftir_validation_locked_delta_trace.csv",
             "final_report_md": final_dir / "final_test_report_v1.md",
             "final_report_docx": final_dir / "final_test_report_v1.docx",
             "final_report_pdf": final_dir / "final_test_report_v1.pdf",
@@ -14852,6 +14854,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "json_path": str(pths["ftir_validation_locked_json"]),
             "windows_csv_path": str(pths["ftir_validation_locked_windows_csv"]),
             "method301_csv_path": str(pths["ftir_validation_locked_method301_csv"]),
+            "delta_trace_json_path": str(pths["ftir_validation_locked_delta_trace_json"]),
+            "delta_trace_csv_path": str(pths["ftir_validation_locked_delta_trace_csv"]),
             "snapshot_iso": snap_iso,
             "snapshot_by": snap_by,
             "source": "LOCK_REVIEW",
@@ -14861,6 +14865,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             json_path=pths["ftir_validation_locked_json"],
             windows_csv_path=pths["ftir_validation_locked_windows_csv"],
             method301_csv_path=pths["ftir_validation_locked_method301_csv"],
+            delta_trace_json_path=pths["ftir_validation_locked_delta_trace_json"],
+            delta_trace_csv_path=pths["ftir_validation_locked_delta_trace_csv"],
         )
         return dict(payload_out.get("review_snapshot") or {})
 
@@ -15135,6 +15141,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     status_lines.append("Warnings: " + " ; ".join(qa_warnings))
             if acceptance_note:
                 status_lines.append("Acceptance basis note: " + acceptance_note)
+            if str(snap.get("delta_trace_json_path") or "").strip():
+                status_lines.append("Frozen delta trace: " + str(snap.get("delta_trace_json_path") or "").strip())
             if str(preview.get("coverage_note") or "").strip():
                 status_lines.append(str(preview.get("coverage_note") or "").strip())
             var_ftir_validation_review_status.set("\n".join([line for line in status_lines if line]))

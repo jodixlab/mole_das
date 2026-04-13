@@ -1367,6 +1367,163 @@ def compute_method301_stats(cfg: Dict[str, Any], comparison_sets: Iterable[Dict[
     return out
 
 
+def _build_delta_trace_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    obj = dict(payload or {}) if isinstance(payload, dict) else {}
+    config = obj.get("config") if isinstance(obj.get("config"), dict) else {}
+    ftir_source = obj.get("ftir_source") if isinstance(obj.get("ftir_source"), dict) else {}
+    mole_source = obj.get("mole_source") if isinstance(obj.get("mole_source"), dict) else {}
+    windows = obj.get("windows") if isinstance(obj.get("windows"), dict) else {}
+    aligned_rows = [row for row in list(obj.get("aligned_rows") or []) if isinstance(row, dict)]
+    excluded_rows = [row for row in list(obj.get("excluded_rows") or []) if isinstance(row, dict)]
+    comparison_sets = [row for row in list(obj.get("comparison_sets") or []) if isinstance(row, dict)]
+    method301_rows = [row for row in list(obj.get("method301") or []) if isinstance(row, dict)]
+    review_snapshot = obj.get("review_snapshot") if isinstance(obj.get("review_snapshot"), dict) else {}
+    signoff = obj.get("signoff") if isinstance(obj.get("signoff"), dict) else {}
+    qa = obj.get("qa") if isinstance(obj.get("qa"), dict) else {}
+
+    aligned_paired = [row for row in aligned_rows if bool(row.get("paired"))]
+    included_rows = [row for row in aligned_rows if not bool(row.get("excluded"))]
+    unpaired_rows = [row for row in aligned_rows if not bool(row.get("paired"))]
+    included_comparison_sets = [
+        row for row in comparison_sets
+        if str(row.get("inclusion_status") or "").strip().upper() in ("INCLUDED", "MIXED")
+    ]
+    excluded_comparison_sets = [
+        row for row in comparison_sets
+        if str(row.get("inclusion_status") or "").strip().upper() == "EXCLUDED"
+    ]
+
+    exclusion_reason_counts: Dict[str, int] = {}
+    for row in excluded_rows:
+        reason = str(row.get("reason") or row.get("exclusion_reason") or "").strip() or "(UNSPECIFIED)"
+        exclusion_reason_counts[reason] = exclusion_reason_counts.get(reason, 0) + 1
+
+    row_status_counts = qa.get("row_status_counts") if isinstance(qa.get("row_status_counts"), dict) else {}
+    signoff_decision = str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED"
+    signoff_present = signoff_decision != "UNSIGNED"
+    review_locked = bool(obj.get("review_locked"))
+    snapshot_present = bool(str(review_snapshot.get("json_path") or "").strip())
+
+    counts = {
+        "ftir_record_count": int(ftir_source.get("record_count") or 0),
+        "mole_record_count": int(mole_source.get("record_count") or 0),
+        "configured_window_count": len(list(windows.get("rows") or [])),
+        "aligned_row_count": len(aligned_rows),
+        "paired_row_count": len(aligned_paired),
+        "unpaired_row_count": len(unpaired_rows),
+        "included_row_count": len(included_rows),
+        "excluded_row_count": len(excluded_rows),
+        "comparison_set_count": len(comparison_sets),
+        "included_comparison_set_count": len(included_comparison_sets),
+        "excluded_comparison_set_count": len(excluded_comparison_sets),
+        "method301_analyte_count": len(method301_rows),
+    }
+
+    stages = [
+        {
+            "order": 1,
+            "stage": "IMPORTED",
+            "ftir_record_count": counts["ftir_record_count"],
+            "mole_record_count": counts["mole_record_count"],
+            "configured_window_count": counts["configured_window_count"],
+            "vendor_profile_requested": str(config.get("ftir_vendor_profile") or "AUTO").strip().upper() or "AUTO",
+            "vendor_profile_used": str(ftir_source.get("vendor_profile_used") or "").strip(),
+            "timestamp_column": str(ftir_source.get("timestamp_column") or config.get("ftir_timestamp_column") or "").strip(),
+            "analytes_requested": list(config.get("analytes") or []),
+            "analytes_found_ftir": list(ftir_source.get("analytes_found") or []),
+            "analytes_found_mole": list(mole_source.get("analytes_found") or []),
+            "note": "Imported FTIR and MOLE evidence before alignment and review filtering.",
+        },
+        {
+            "order": 2,
+            "stage": "ALIGNED",
+            "aligned_row_count": counts["aligned_row_count"],
+            "paired_row_count": counts["paired_row_count"],
+            "unpaired_row_count": counts["unpaired_row_count"],
+            "comparison_set_count": counts["comparison_set_count"],
+            "included_comparison_set_count": counts["included_comparison_set_count"],
+            "excluded_comparison_set_count": counts["excluded_comparison_set_count"],
+            "qa_pass_count": int(row_status_counts.get("PASS") or 0),
+            "qa_warn_count": int(row_status_counts.get("WARN") or 0),
+            "qa_error_count": int(row_status_counts.get("ERROR") or 0),
+            "note": "Aligned imported evidence into analyte/window comparison rows and comparison sets.",
+        },
+        {
+            "order": 3,
+            "stage": "EXCLUDED",
+            "aligned_row_count": counts["aligned_row_count"],
+            "included_row_count": counts["included_row_count"],
+            "excluded_row_count": counts["excluded_row_count"],
+            "included_comparison_set_count": counts["included_comparison_set_count"],
+            "excluded_comparison_set_count": counts["excluded_comparison_set_count"],
+            "excluded_row_keys": [str(row.get("row_key") or "").strip() for row in excluded_rows if str(row.get("row_key") or "").strip()],
+            "exclusion_reason_counts": exclusion_reason_counts,
+            "note": "Applied reviewer exclusions to the aligned comparison dataset.",
+        },
+        {
+            "order": 4,
+            "stage": "FROZEN",
+            "review_locked": review_locked,
+            "review_snapshot_present": snapshot_present,
+            "snapshot_by": str(review_snapshot.get("snapshot_by") or "").strip(),
+            "snapshot_iso": str(review_snapshot.get("snapshot_iso") or "").strip(),
+            "signoff_present": signoff_present,
+            "signoff_decision": signoff_decision,
+            "signoff_basis": str(signoff.get("basis") or "").strip(),
+            "signoff_by": str(signoff.get("by") or "").strip(),
+            "signoff_iso": str(signoff.get("iso") or "").strip(),
+            "note": "Captured reviewer lock and signoff state used for the frozen validation package.",
+        },
+    ]
+
+    transitions = [
+        {
+            "order": 1,
+            "transition": "IMPORTED_TO_ALIGNED",
+            "from_stage": "IMPORTED",
+            "to_stage": "ALIGNED",
+            "configured_window_count": counts["configured_window_count"],
+            "aligned_row_count": counts["aligned_row_count"],
+            "paired_row_count": counts["paired_row_count"],
+            "unpaired_row_count": counts["unpaired_row_count"],
+            "comparison_set_count": counts["comparison_set_count"],
+            "note": "Mapped imported records into aligned analyte/window rows and comparison sets.",
+        },
+        {
+            "order": 2,
+            "transition": "ALIGNED_TO_EXCLUDED",
+            "from_stage": "ALIGNED",
+            "to_stage": "EXCLUDED",
+            "aligned_row_count": counts["aligned_row_count"],
+            "included_row_count": counts["included_row_count"],
+            "excluded_row_count": counts["excluded_row_count"],
+            "included_comparison_set_count": counts["included_comparison_set_count"],
+            "excluded_comparison_set_count": counts["excluded_comparison_set_count"],
+            "exclusion_reason_counts": exclusion_reason_counts,
+            "note": "Applied reviewer exclusions before frozen statistics and signoff.",
+        },
+        {
+            "order": 3,
+            "transition": "EXCLUDED_TO_FROZEN",
+            "from_stage": "EXCLUDED",
+            "to_stage": "FROZEN",
+            "review_locked": review_locked,
+            "review_snapshot_present": snapshot_present,
+            "signoff_present": signoff_present,
+            "signoff_decision": signoff_decision,
+            "signoff_basis": str(signoff.get("basis") or "").strip(),
+            "note": "Recorded whether the reviewed dataset was frozen and signed before export.",
+        },
+    ]
+
+    return {
+        "contract_version": "ftir_delta_trace_v1",
+        "counts": counts,
+        "stages": stages,
+        "transitions": transitions,
+    }
+
+
 def build_validation_package(
     cfg: Dict[str, Any],
     *,
@@ -1445,7 +1602,7 @@ def build_validation_package(
     coverage_note.append(str(windows.get("note") or "").strip())
     coverage_note = " | ".join([part for part in coverage_note if part])
 
-    return {
+    payload = {
         "status": "Available" if aligned_rows else "Gap",
         "config": normalized,
         "ftir_source": ftir.get("summary") or {},
@@ -1483,6 +1640,8 @@ def build_validation_package(
         "review_snapshot": dict(normalized.get("review_snapshot") or {}) if isinstance(normalized.get("review_snapshot"), dict) else {},
         "signoff": dict(normalized.get("signoff") or {}) if isinstance(normalized.get("signoff"), dict) else _normalize_signoff(None),
     }
+    payload["delta_trace"] = _build_delta_trace_from_payload(payload)
+    return payload
 
 
 def write_validation_exports(
@@ -1491,14 +1650,23 @@ def write_validation_exports(
     json_path: Any,
     windows_csv_path: Any,
     method301_csv_path: Any,
+    delta_trace_json_path: Any = None,
+    delta_trace_csv_path: Any = None,
 ) -> Dict[str, str]:
     json_p = Path(str(json_path)).expanduser()
     windows_p = Path(str(windows_csv_path)).expanduser()
     method_p = Path(str(method301_csv_path)).expanduser()
-    for path in (json_p, windows_p, method_p):
+    delta_json_p = Path(str(delta_trace_json_path)).expanduser() if delta_trace_json_path else None
+    delta_csv_p = Path(str(delta_trace_csv_path)).expanduser() if delta_trace_csv_path else None
+    payload_out = dict(payload or {}) if isinstance(payload, dict) else {}
+    payload_out["delta_trace"] = _build_delta_trace_from_payload(payload_out)
+
+    for path in [json_p, windows_p, method_p, delta_json_p, delta_csv_p]:
+        if path is None:
+            continue
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    json_p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    json_p.write_text(json.dumps(payload_out, indent=2), encoding="utf-8")
 
     with open(windows_p, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -1531,7 +1699,7 @@ def write_validation_exports(
             "reviewer",
             "updated_iso",
         ])
-        for row in list(payload.get("aligned_rows") or []):
+        for row in list(payload_out.get("aligned_rows") or []):
             if not isinstance(row, dict):
                 continue
             w.writerow([
@@ -1591,7 +1759,7 @@ def write_validation_exports(
             "overall_status",
             "note",
         ])
-        for row in list(payload.get("method301") or []):
+        for row in list(payload_out.get("method301") or []):
             if not isinstance(row, dict):
                 continue
             w.writerow([
@@ -1620,8 +1788,117 @@ def write_validation_exports(
                 row.get("note"),
             ])
 
-    return {
+    if delta_json_p is not None:
+        delta_json_p.write_text(json.dumps(payload_out.get("delta_trace") or {}, indent=2), encoding="utf-8")
+
+    if delta_csv_p is not None:
+        delta = payload_out.get("delta_trace") if isinstance(payload_out.get("delta_trace"), dict) else {}
+        with open(delta_csv_p, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow([
+                "record_type",
+                "order",
+                "name",
+                "from_stage",
+                "to_stage",
+                "note",
+                "ftir_record_count",
+                "mole_record_count",
+                "configured_window_count",
+                "aligned_row_count",
+                "paired_row_count",
+                "unpaired_row_count",
+                "included_row_count",
+                "excluded_row_count",
+                "comparison_set_count",
+                "included_comparison_set_count",
+                "excluded_comparison_set_count",
+                "method301_analyte_count",
+                "review_locked",
+                "review_snapshot_present",
+                "snapshot_by",
+                "snapshot_iso",
+                "signoff_present",
+                "signoff_decision",
+                "signoff_basis",
+                "signoff_by",
+                "signoff_iso",
+                "exclusion_reason_counts_json",
+            ])
+            for row in list(delta.get("stages") or []):
+                if not isinstance(row, dict):
+                    continue
+                w.writerow([
+                    "STAGE",
+                    row.get("order"),
+                    row.get("stage"),
+                    "",
+                    "",
+                    row.get("note"),
+                    row.get("ftir_record_count"),
+                    row.get("mole_record_count"),
+                    row.get("configured_window_count"),
+                    row.get("aligned_row_count"),
+                    row.get("paired_row_count"),
+                    row.get("unpaired_row_count"),
+                    row.get("included_row_count"),
+                    row.get("excluded_row_count"),
+                    row.get("comparison_set_count"),
+                    row.get("included_comparison_set_count"),
+                    row.get("excluded_comparison_set_count"),
+                    row.get("method301_analyte_count"),
+                    row.get("review_locked"),
+                    row.get("review_snapshot_present"),
+                    row.get("snapshot_by"),
+                    row.get("snapshot_iso"),
+                    row.get("signoff_present"),
+                    row.get("signoff_decision"),
+                    row.get("signoff_basis"),
+                    row.get("signoff_by"),
+                    row.get("signoff_iso"),
+                    json.dumps(row.get("exclusion_reason_counts") or {}, ensure_ascii=True),
+                ])
+            for row in list(delta.get("transitions") or []):
+                if not isinstance(row, dict):
+                    continue
+                w.writerow([
+                    "TRANSITION",
+                    row.get("order"),
+                    row.get("transition"),
+                    row.get("from_stage"),
+                    row.get("to_stage"),
+                    row.get("note"),
+                    row.get("ftir_record_count"),
+                    row.get("mole_record_count"),
+                    row.get("configured_window_count"),
+                    row.get("aligned_row_count"),
+                    row.get("paired_row_count"),
+                    row.get("unpaired_row_count"),
+                    row.get("included_row_count"),
+                    row.get("excluded_row_count"),
+                    row.get("comparison_set_count"),
+                    row.get("included_comparison_set_count"),
+                    row.get("excluded_comparison_set_count"),
+                    row.get("method301_analyte_count"),
+                    row.get("review_locked"),
+                    row.get("review_snapshot_present"),
+                    row.get("snapshot_by"),
+                    row.get("snapshot_iso"),
+                    row.get("signoff_present"),
+                    row.get("signoff_decision"),
+                    row.get("signoff_basis"),
+                    row.get("signoff_by"),
+                    row.get("signoff_iso"),
+                    json.dumps(row.get("exclusion_reason_counts") or {}, ensure_ascii=True),
+                ])
+
+    out = {
         "json_path": str(json_p),
         "windows_csv_path": str(windows_p),
         "method301_csv_path": str(method_p),
     }
+    if delta_json_p is not None:
+        out["delta_trace_json_path"] = str(delta_json_p)
+    if delta_csv_p is not None:
+        out["delta_trace_csv_path"] = str(delta_csv_p)
+    return out

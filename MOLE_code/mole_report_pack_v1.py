@@ -3142,10 +3142,14 @@ def _report_appendix_manifest(
         ("F", "FTIR validation summary", "json", paths.ftir_validation_json, "ftir_validation_v1", "Session-scoped FTIR side-by-side validation summary"),
         ("F", "FTIR validation window alignment", "csv", paths.ftir_validation_windows_csv, "ftir_validation_v1", "Aligned MOLE / FTIR comparison windows"),
         ("F", "FTIR validation Method 301 stats", "csv", paths.ftir_validation_method301_csv, "ftir_validation_v1", "Method 301 bias / precision comparison statistics"),
+        ("F", "FTIR validation delta trace", "json", paths.ftir_validation_delta_trace_json, "ftir_validation_v1", "Reviewer delta trace describing import, alignment, exclusion, and frozen-signoff stages."),
+        ("F", "FTIR validation delta trace", "csv", paths.ftir_validation_delta_trace_csv, "ftir_validation_v1", "Flattened reviewer delta trace export for import, alignment, exclusion, and frozen-signoff stages."),
         ("F", "FTIR validation signoff cover", "md", paths.ftir_validation_appendix_cover_md, "ftir_validation_appendix_v1", "Reviewer-facing FTIR validation signoff cover sheet."),
         ("F", "FTIR validation signed comparison ledger", "csv", paths.ftir_validation_appendix_ledger_csv, "ftir_validation_appendix_v1", "Signed aligned-window ledger bound to the frozen FTIR validation snapshot."),
         ("F", "FTIR validation signed Method 301 stats", "csv", paths.ftir_validation_appendix_method301_csv, "ftir_validation_appendix_v1", "Signed Method 301 bias / precision statistics bound to the frozen FTIR validation snapshot."),
         ("F", "FTIR validation signed exclusion register", "csv", paths.ftir_validation_appendix_exclusions_csv, "ftir_validation_appendix_v1", "Signed exclusion register for FTIR validation windows."),
+        ("F", "FTIR validation delta trace", "json", paths.ftir_validation_appendix_delta_trace_json, "ftir_validation_appendix_v1", "Signed delta trace JSON showing what changed between import, alignment, exclusion, and frozen signoff."),
+        ("F", "FTIR validation delta trace", "csv", paths.ftir_validation_appendix_delta_trace_csv, "ftir_validation_appendix_v1", "Signed delta trace CSV showing what changed between import, alignment, exclusion, and frozen signoff."),
         ("F", "FTIR validation reviewer workbook", "xlsx", paths.ftir_validation_appendix_workbook_xlsx, "ftir_validation_appendix_v1", "Reviewer workbook containing signoff summary, comparison sets, aligned rows, Method 301 stats, and exclusions."),
         ("F", "FTIR validation appendix index", "json", paths.ftir_validation_appendix_index_json, "ftir_validation_appendix_v1", "Index of reviewer-facing FTIR validation appendix artifacts."),
         ("E", "Workstep log", "jsonl", ((sources.get("worksteps") or {}).get("path") if isinstance(sources.get("worksteps"), dict) else ""), "evidence_bundle.sources.worksteps", "Field and activity log"),
@@ -4341,6 +4345,9 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
     aligned_rows = list(ftir.get("aligned_rows") or [])
     method301_rows = list(ftir.get("method301") or [])
     excluded_rows = list(ftir.get("excluded_rows") or [])
+    delta_trace = ftir.get("delta_trace") if isinstance(ftir.get("delta_trace"), dict) else {}
+    delta_stages = list(delta_trace.get("stages") or [])
+    delta_transitions = list(delta_trace.get("transitions") or [])
 
     cover_lines = [
         "# FTIR Validation Appendix Package",
@@ -4367,6 +4374,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         f"- Signoff note: {signoff.get('note') or '(n/a)'}",
         f"- Frozen snapshot JSON: {snap.get('json_path') or '(n/a)'}",
         f"- Frozen snapshot created by / at: {snap.get('snapshot_by') or '(n/a)'} / {snap.get('snapshot_iso') or '(n/a)'}",
+        f"- Frozen delta trace JSON: {snap.get('delta_trace_json_path') or '(n/a)'}",
+        f"- Frozen delta trace CSV: {snap.get('delta_trace_csv_path') or '(n/a)'}",
         f"- Coverage note: {ftir.get('coverage_note') or '(n/a)'}",
         "",
         "## Appendix Artifacts",
@@ -4374,6 +4383,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         f"- Comparison ledger CSV: {paths.ftir_validation_appendix_ledger_csv}",
         f"- Method 301 stats CSV: {paths.ftir_validation_appendix_method301_csv}",
         f"- Exclusion register CSV: {paths.ftir_validation_appendix_exclusions_csv}",
+        f"- Delta trace JSON: {paths.ftir_validation_appendix_delta_trace_json}",
+        f"- Delta trace CSV: {paths.ftir_validation_appendix_delta_trace_csv}",
         f"- Reviewer workbook XLSX: {paths.ftir_validation_appendix_workbook_xlsx}",
     ]
     paths.ftir_validation_appendix_cover_md.write_text("\n".join(cover_lines).strip() + "\n", encoding="utf-8")
@@ -4427,6 +4438,107 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
             w.writerow([
                 row.get("row_key"), row.get("run_no"), row.get("label"), row.get("analyte"),
                 row.get("reason"), row.get("reviewer"), row.get("updated_iso"),
+            ])
+
+    paths.ftir_validation_appendix_delta_trace_json.write_text(json.dumps(delta_trace, indent=2), encoding="utf-8")
+
+    with open(paths.ftir_validation_appendix_delta_trace_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "record_type",
+            "order",
+            "name",
+            "from_stage",
+            "to_stage",
+            "note",
+            "ftir_record_count",
+            "mole_record_count",
+            "configured_window_count",
+            "aligned_row_count",
+            "paired_row_count",
+            "unpaired_row_count",
+            "included_row_count",
+            "excluded_row_count",
+            "comparison_set_count",
+            "included_comparison_set_count",
+            "excluded_comparison_set_count",
+            "method301_analyte_count",
+            "review_locked",
+            "review_snapshot_present",
+            "snapshot_by",
+            "snapshot_iso",
+            "signoff_present",
+            "signoff_decision",
+            "signoff_basis",
+            "signoff_by",
+            "signoff_iso",
+            "exclusion_reason_counts_json",
+        ])
+        for row in delta_stages:
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                "STAGE",
+                row.get("order"),
+                row.get("stage"),
+                "",
+                "",
+                row.get("note"),
+                row.get("ftir_record_count"),
+                row.get("mole_record_count"),
+                row.get("configured_window_count"),
+                row.get("aligned_row_count"),
+                row.get("paired_row_count"),
+                row.get("unpaired_row_count"),
+                row.get("included_row_count"),
+                row.get("excluded_row_count"),
+                row.get("comparison_set_count"),
+                row.get("included_comparison_set_count"),
+                row.get("excluded_comparison_set_count"),
+                row.get("method301_analyte_count"),
+                row.get("review_locked"),
+                row.get("review_snapshot_present"),
+                row.get("snapshot_by"),
+                row.get("snapshot_iso"),
+                row.get("signoff_present"),
+                row.get("signoff_decision"),
+                row.get("signoff_basis"),
+                row.get("signoff_by"),
+                row.get("signoff_iso"),
+                json.dumps(row.get("exclusion_reason_counts") or {}, ensure_ascii=True),
+            ])
+        for row in delta_transitions:
+            if not isinstance(row, dict):
+                continue
+            w.writerow([
+                "TRANSITION",
+                row.get("order"),
+                row.get("transition"),
+                row.get("from_stage"),
+                row.get("to_stage"),
+                row.get("note"),
+                row.get("ftir_record_count"),
+                row.get("mole_record_count"),
+                row.get("configured_window_count"),
+                row.get("aligned_row_count"),
+                row.get("paired_row_count"),
+                row.get("unpaired_row_count"),
+                row.get("included_row_count"),
+                row.get("excluded_row_count"),
+                row.get("comparison_set_count"),
+                row.get("included_comparison_set_count"),
+                row.get("excluded_comparison_set_count"),
+                row.get("method301_analyte_count"),
+                row.get("review_locked"),
+                row.get("review_snapshot_present"),
+                row.get("snapshot_by"),
+                row.get("snapshot_iso"),
+                row.get("signoff_present"),
+                row.get("signoff_decision"),
+                row.get("signoff_basis"),
+                row.get("signoff_by"),
+                row.get("signoff_iso"),
+                json.dumps(row.get("exclusion_reason_counts") or {}, ensure_ascii=True),
             ])
 
     try:
@@ -4501,6 +4613,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
             ("Frozen snapshot JSON", snap.get("json_path")),
             ("Frozen snapshot by", snap.get("snapshot_by")),
             ("Frozen snapshot at", snap.get("snapshot_iso")),
+            ("Frozen delta trace JSON", snap.get("delta_trace_json_path")),
+            ("Frozen delta trace CSV", snap.get("delta_trace_csv_path")),
             ("Coverage note", ftir.get("coverage_note")),
         ]
         for key, value in summary_rows:
@@ -4602,6 +4716,60 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
             ],
         )
 
+        _add_sheet(
+            wb,
+            "Delta Trace Stages",
+            [
+                "order", "stage", "note", "ftir_record_count", "mole_record_count", "configured_window_count",
+                "aligned_row_count", "paired_row_count", "unpaired_row_count", "included_row_count",
+                "excluded_row_count", "comparison_set_count", "included_comparison_set_count",
+                "excluded_comparison_set_count", "method301_analyte_count", "review_locked",
+                "review_snapshot_present", "snapshot_by", "snapshot_iso", "signoff_present",
+                "signoff_decision", "signoff_basis", "signoff_by", "signoff_iso",
+                "exclusion_reason_counts",
+            ],
+            [
+                [
+                    row.get("order"), row.get("stage"), row.get("note"),
+                    row.get("ftir_record_count"), row.get("mole_record_count"), row.get("configured_window_count"),
+                    row.get("aligned_row_count"), row.get("paired_row_count"), row.get("unpaired_row_count"),
+                    row.get("included_row_count"), row.get("excluded_row_count"), row.get("comparison_set_count"),
+                    row.get("included_comparison_set_count"), row.get("excluded_comparison_set_count"),
+                    row.get("method301_analyte_count"), row.get("review_locked"),
+                    row.get("review_snapshot_present"), row.get("snapshot_by"), row.get("snapshot_iso"),
+                    row.get("signoff_present"), row.get("signoff_decision"), row.get("signoff_basis"),
+                    row.get("signoff_by"), row.get("signoff_iso"), row.get("exclusion_reason_counts"),
+                ]
+                for row in delta_stages
+                if isinstance(row, dict)
+            ],
+        )
+
+        _add_sheet(
+            wb,
+            "Delta Trace Transitions",
+            [
+                "order", "transition", "from_stage", "to_stage", "note", "configured_window_count",
+                "aligned_row_count", "paired_row_count", "unpaired_row_count", "included_row_count",
+                "excluded_row_count", "comparison_set_count", "included_comparison_set_count",
+                "excluded_comparison_set_count", "review_locked", "review_snapshot_present",
+                "signoff_present", "signoff_decision", "signoff_basis", "exclusion_reason_counts",
+            ],
+            [
+                [
+                    row.get("order"), row.get("transition"), row.get("from_stage"), row.get("to_stage"),
+                    row.get("note"), row.get("configured_window_count"), row.get("aligned_row_count"),
+                    row.get("paired_row_count"), row.get("unpaired_row_count"), row.get("included_row_count"),
+                    row.get("excluded_row_count"), row.get("comparison_set_count"),
+                    row.get("included_comparison_set_count"), row.get("excluded_comparison_set_count"),
+                    row.get("review_locked"), row.get("review_snapshot_present"), row.get("signoff_present"),
+                    row.get("signoff_decision"), row.get("signoff_basis"), row.get("exclusion_reason_counts"),
+                ]
+                for row in delta_transitions
+                if isinstance(row, dict)
+            ],
+        )
+
         wb.save(str(paths.ftir_validation_appendix_workbook_xlsx))
     except Exception:
         _remove_if_exists(paths.ftir_validation_appendix_workbook_xlsx)
@@ -4612,6 +4780,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         paths.ftir_validation_appendix_ledger_csv,
         paths.ftir_validation_appendix_method301_csv,
         paths.ftir_validation_appendix_exclusions_csv,
+        paths.ftir_validation_appendix_delta_trace_json,
+        paths.ftir_validation_appendix_delta_trace_csv,
         paths.ftir_validation_appendix_workbook_xlsx,
     ]:
         try:
@@ -4638,6 +4808,8 @@ def _write_ftir_validation_appendix(paths: "ReportPackPaths", ftir_validation_su
         "ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
         "method301_csv": str(paths.ftir_validation_appendix_method301_csv),
         "exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+        "delta_trace_json": str(paths.ftir_validation_appendix_delta_trace_json),
+        "delta_trace_csv": str(paths.ftir_validation_appendix_delta_trace_csv),
         "workbook_xlsx": str(paths.ftir_validation_appendix_workbook_xlsx),
         "index_json": str(paths.ftir_validation_appendix_index_json),
     }
@@ -4658,10 +4830,14 @@ class ReportPackPaths:
     ftir_validation_json: Path
     ftir_validation_windows_csv: Path
     ftir_validation_method301_csv: Path
+    ftir_validation_delta_trace_json: Path
+    ftir_validation_delta_trace_csv: Path
     ftir_validation_appendix_cover_md: Path
     ftir_validation_appendix_ledger_csv: Path
     ftir_validation_appendix_method301_csv: Path
     ftir_validation_appendix_exclusions_csv: Path
+    ftir_validation_appendix_delta_trace_json: Path
+    ftir_validation_appendix_delta_trace_csv: Path
     ftir_validation_appendix_workbook_xlsx: Path
     ftir_validation_appendix_index_json: Path
     final_report_md: Path
@@ -4743,10 +4919,14 @@ def generate_report_pack_v1(
         ftir_validation_json=out_dir / "ftir_validation_summary.json",
         ftir_validation_windows_csv=out_dir / "ftir_validation_window_alignment.csv",
         ftir_validation_method301_csv=out_dir / "ftir_validation_method301.csv",
+        ftir_validation_delta_trace_json=out_dir / "ftir_validation_delta_trace.json",
+        ftir_validation_delta_trace_csv=out_dir / "ftir_validation_delta_trace.csv",
         ftir_validation_appendix_cover_md=ftir_validation_appendix_dir / "ftir_validation_signoff_cover_v1.md",
         ftir_validation_appendix_ledger_csv=ftir_validation_appendix_dir / "ftir_validation_signed_comparison_ledger.csv",
         ftir_validation_appendix_method301_csv=ftir_validation_appendix_dir / "ftir_validation_signed_method301_stats.csv",
         ftir_validation_appendix_exclusions_csv=ftir_validation_appendix_dir / "ftir_validation_signed_exclusion_register.csv",
+        ftir_validation_appendix_delta_trace_json=ftir_validation_appendix_dir / "ftir_validation_delta_trace_v1.json",
+        ftir_validation_appendix_delta_trace_csv=ftir_validation_appendix_dir / "ftir_validation_delta_trace_v1.csv",
         ftir_validation_appendix_workbook_xlsx=ftir_validation_appendix_dir / "ftir_validation_reviewer_workbook_v1.xlsx",
         ftir_validation_appendix_index_json=ftir_validation_appendix_dir / "index.json",
         final_report_md=final_report_dir / "final_test_report_v1.md",
@@ -5122,9 +5302,12 @@ def generate_report_pack_v1(
                 "note": ((ftir_validation_summary.get("windows") or {}).get("note") if isinstance(ftir_validation_summary.get("windows"), dict) else None),
             },
             "excluded_rows": ftir_validation_summary.get("excluded_rows"),
+            "delta_trace": ftir_validation_summary.get("delta_trace"),
             "summary_json": str(paths.ftir_validation_json),
             "window_alignment_csv": str(paths.ftir_validation_windows_csv),
             "method301_csv": str(paths.ftir_validation_method301_csv),
+            "delta_trace_json": str(paths.ftir_validation_delta_trace_json),
+            "delta_trace_csv": str(paths.ftir_validation_delta_trace_csv),
             "appendix": ftir_validation_appendix,
         },
         "analyzer_validity": analyzer_validity_summary,
@@ -5143,10 +5326,14 @@ def generate_report_pack_v1(
             "ftir_validation_json": str(paths.ftir_validation_json),
             "ftir_validation_windows_csv": str(paths.ftir_validation_windows_csv),
             "ftir_validation_method301_csv": str(paths.ftir_validation_method301_csv),
+            "ftir_validation_delta_trace_json": str(paths.ftir_validation_delta_trace_json),
+            "ftir_validation_delta_trace_csv": str(paths.ftir_validation_delta_trace_csv),
             "ftir_validation_appendix_cover_md": str(paths.ftir_validation_appendix_cover_md),
             "ftir_validation_appendix_ledger_csv": str(paths.ftir_validation_appendix_ledger_csv),
             "ftir_validation_appendix_method301_csv": str(paths.ftir_validation_appendix_method301_csv),
             "ftir_validation_appendix_exclusions_csv": str(paths.ftir_validation_appendix_exclusions_csv),
+            "ftir_validation_appendix_delta_trace_json": str(paths.ftir_validation_appendix_delta_trace_json),
+            "ftir_validation_appendix_delta_trace_csv": str(paths.ftir_validation_appendix_delta_trace_csv),
             "ftir_validation_appendix_workbook_xlsx": str(paths.ftir_validation_appendix_workbook_xlsx),
             "ftir_validation_appendix_index_json": str(paths.ftir_validation_appendix_index_json),
             "spec_engine_shadow": evidence_bundle.get("spec_engine_shadow"),
@@ -5641,6 +5828,8 @@ def generate_report_pack_v1(
             json_path=paths.ftir_validation_json,
             windows_csv_path=paths.ftir_validation_windows_csv,
             method301_csv_path=paths.ftir_validation_method301_csv,
+            delta_trace_json_path=paths.ftir_validation_delta_trace_json,
+            delta_trace_csv_path=paths.ftir_validation_delta_trace_csv,
         )
     else:
         paths.ftir_validation_json.write_text(json.dumps(ftir_validation_summary, indent=2), encoding="utf-8")

@@ -70,6 +70,12 @@ class FtirValidationTests(unittest.TestCase):
             self.assertEqual(payload.get("excluded_comparison_set_count"), 0)
             self.assertEqual(payload.get("acceptance_basis"), "FORMAL_METHOD_301")
             self.assertEqual(payload.get("acceptance_recommended_decision"), "ACCEPTED")
+            delta_trace = payload.get("delta_trace") or {}
+            self.assertEqual((delta_trace.get("counts") or {}).get("comparison_set_count"), 6)
+            self.assertEqual(
+                [row.get("stage") for row in (delta_trace.get("stages") or []) if isinstance(row, dict)],
+                ["IMPORTED", "ALIGNED", "EXCLUDED", "FROZEN"],
+            )
             first_set = (payload.get("comparison_sets") or [])[0]
             self.assertEqual(first_set.get("inclusion_status"), "INCLUDED")
             self.assertEqual(first_set.get("formal_basis"), "FORMAL_COMPARISON_SET")
@@ -202,10 +208,12 @@ class FtirValidationTests(unittest.TestCase):
                     "json_path": str(root / "locked.json"),
                     "windows_csv_path": str(root / "locked_windows.csv"),
                     "method301_csv_path": str(root / "locked_method301.csv"),
-                    "snapshot_iso": "2026-04-10T18:05:00Z",
-                    "snapshot_by": "peer_scientist",
-                    "source": "LOCK_REVIEW",
-                },
+                        "snapshot_iso": "2026-04-10T18:05:00Z",
+                        "snapshot_by": "peer_scientist",
+                        "source": "LOCK_REVIEW",
+                        "delta_trace_json_path": str(root / "locked_delta_trace.json"),
+                        "delta_trace_csv_path": str(root / "locked_delta_trace.csv"),
+                    },
                 "signoff": {
                     "decision": "ACCEPTED",
                     "basis": "FORMAL_METHOD_301",
@@ -299,23 +307,34 @@ class FtirValidationTests(unittest.TestCase):
                 json_path=root / "locked.json",
                 windows_csv_path=root / "locked_windows.csv",
                 method301_csv_path=root / "locked_method301.csv",
+                delta_trace_json_path=root / "locked_delta_trace.json",
+                delta_trace_csv_path=root / "locked_delta_trace.csv",
             )
 
             self.assertTrue(Path(out["json_path"]).exists())
             self.assertTrue(Path(out["windows_csv_path"]).exists())
             self.assertTrue(Path(out["method301_csv_path"]).exists())
+            self.assertTrue(Path(out["delta_trace_json_path"]).exists())
+            self.assertTrue(Path(out["delta_trace_csv_path"]).exists())
             snapshot = json.loads((root / "locked.json").read_text(encoding="utf-8"))
             self.assertEqual(snapshot.get("source"), "LOCKED_REVIEW_SNAPSHOT")
             self.assertTrue(snapshot.get("review_locked"))
             self.assertEqual((snapshot.get("review_snapshot") or {}).get("snapshot_by"), "peer_scientist")
+            self.assertEqual((snapshot.get("review_snapshot") or {}).get("delta_trace_json_path"), str(root / "locked_delta_trace.json"))
             self.assertEqual((snapshot.get("signoff") or {}).get("decision"), "ACCEPTED")
             self.assertEqual((snapshot.get("signoff") or {}).get("basis"), "FORMAL_METHOD_301")
+            self.assertEqual((snapshot.get("delta_trace") or {}).get("contract_version"), "ftir_delta_trace_v1")
             windows_csv = (root / "locked_windows.csv").read_text(encoding="utf-8")
             self.assertIn("comparison_set_status", windows_csv)
             self.assertIn("startup stabilization", windows_csv)
             method_csv = (root / "locked_method301.csv").read_text(encoding="utf-8")
             self.assertIn("comparison_set_count", method_csv)
             self.assertIn("excluded_window_count", method_csv)
+            delta_json = json.loads((root / "locked_delta_trace.json").read_text(encoding="utf-8"))
+            self.assertEqual(delta_json.get("contract_version"), "ftir_delta_trace_v1")
+            delta_csv = (root / "locked_delta_trace.csv").read_text(encoding="utf-8")
+            self.assertIn("IMPORTED_TO_ALIGNED", delta_csv)
+            self.assertIn("ALIGNED_TO_EXCLUDED", delta_csv)
 
     def test_legacy_signoff_basis_normalizes_to_new_acceptance_basis(self) -> None:
         cfg = normalize_config({
