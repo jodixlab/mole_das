@@ -61,6 +61,138 @@ Tab-to-Audience Matrix
 		- Report Builder -> FTIR Side-by-Side Validation
 		- Report Builder -> Session Review / Approval
 
+Required Tabs by Scenario Matrix
+
+- Diagnostics-only Test
+	- Required:
+		- Project Configs (Hub)
+		- Source Details
+		- Pollutants
+		- Site Conditions
+		- Fuel Analysis
+		- Save + Apply Config
+		- DAQ Runner (Test)
+	- Common optional:
+		- Sample System
+		- Regulatory
+
+- Diagnostics-only SIM
+	- Required:
+		- Project Configs (Hub)
+		- Source Details
+		- Pollutants
+		- Save + Apply Config
+		- DAQ Runner (SIM)
+	- Common optional:
+		- Site Conditions
+		- Sample System
+		- Fuel Analysis
+
+- Standard Recorded Test - No FTIR
+	- Required:
+		- Project Configs (Hub)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Fuel Analysis
+		- Save + Apply Config
+		- DAQ Runner (Test)
+	- Common optional:
+		- Job Intake (QA Routing)
+		- Sample System
+		- Regulatory
+		- Inventory Registry
+
+- Standard SIM / Training Test - No FTIR
+	- Required:
+		- Project Configs (Hub)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Save + Apply Config
+		- DAQ Runner (SIM)
+	- Common optional:
+		- Site Conditions
+		- Fuel Analysis
+		- Sample System
+
+- Compliance-support Recorded Test
+	- Required:
+		- Project Configs (Hub)
+		- Job Intake (QA Routing)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Fuel Analysis
+		- Regulatory
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- Report Builder
+	- Common optional:
+		- Sample System
+		- Reference / Audit FTIR
+		- Inventory Registry
+
+- FTIR Reference / Audit Companion Workflow
+	- Required:
+		- Project Configs (Hub)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Reference / Audit FTIR
+		- Fuel Analysis
+		- Save + Apply Config
+		- DAQ Runner (Test)
+	- Common optional:
+		- Regulatory
+		- Sample System
+		- Report Builder
+
+- FTIR Side-by-Side Informed Comparison
+	- Required:
+		- Project Configs (Hub)
+		- Validation Test Plan
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Fuel Analysis
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- Report Builder -> FTIR Side-by-Side Validation
+	- Common optional:
+		- Sample System
+		- Regulatory
+		- Reference / Audit FTIR
+
+- FTIR Formal Method 301 Comparison
+	- Required:
+		- Project Configs (Hub)
+		- Validation Test Plan
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Fuel Analysis
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- Report Builder -> FTIR Side-by-Side Validation
+		- Report Builder -> Session Review / Approval
+	- Common optional:
+		- Job Intake (QA Routing)
+		- Sample System
+		- Regulatory
+		- Reference / Audit FTIR
+
 New Project
 
 - From the Welcome Screen, navigate to "Project Configs (Hub)"
