@@ -1,0 +1,398 @@
+MOLE-DAS FTIR VALIDATION EXECUTION AND REVIEW APPENDIX
+Audience: lead scientist, peer reviewer, operator running FTIR side-by-side projects
+Scope: FTIR validation planning, import, alignment, review, lock/signoff, and formal/informed comparison flows
+
+Step 1.0 - Validation Project Setup
+
+		Begin in "Project Configs (Hub)".
+
+Step 1.1 - Validation Test Plan
+
+		For FTIR comparison projects, complete:
+
+			1. Session Type = FTIR_VALIDATION
+			2. Validation Mode
+				- METHOD_301_INFORMED_COMPARISON
+				- METHOD_301_FORMAL
+			3. Comparator Method
+			4. FTIR Vendor Profile
+			5. Comparator Label
+			6. Timestamp Master Clock
+			7. Planned Set Count
+			8. Planned Run Minutes
+			9. Planned Purge Minutes
+			10. Purge Required
+			11. Bias Required
+			12. Lead Scientist
+			13. Peer Reviewer
+			14. Final Approver
+			15. Plan Notes
+
+Step 1.2 - Supporting Wizard Tabs
+
+		Complete the normal project tabs before Save + Apply:
+
+			1. Source Details
+			2. Pollutants
+			3. QA/QC
+			4. Test Matrix
+			5. Site Conditions
+			6. Sample System
+			7. Fuel Analysis
+			8. Regulatory, if needed
+
+Step 1.3 - Save + Apply Config
+
+		Use Save + Apply to seed the downstream FTIR validation configuration in the runner.
+
+Step 2.0 - FTIR Validation Runner Entry Point
+
+		Open:
+
+			1. DAQ Runner (Test)
+			2. Report Builder (Formal Deliverables)
+			3. FTIR Side-by-Side Validation
+
+Step 2.1 - FTIR Validation Inputs
+
+		Configure:
+
+			1. Enable FTIR validation
+			2. Validation Mode
+			3. FTIR Vendor Profile
+			4. FTIR file path
+			5. FTIR timestamp column
+			6. FTIR delimiter
+			7. time offset (seconds)
+			8. analytes
+			9. timestamp master clock
+
+Step 2.2 - FTIR Template Resources
+
+		Available tools:
+
+			1. Open Template Folder
+			2. Open Import Template
+			3. Open Alignment Worksheet
+
+		Template artifacts include:
+
+			1. FTIR import template CSV
+			2. manual windows template CSV
+			3. column map template CSV
+			4. alignment worksheet XLSX
+
+Step 2.3 - Vendor Profiles
+
+		Supported vendor profiles include:
+
+			1. AUTO
+			2. GENERIC
+			3. GASMET_CSV
+			4. MKS_MULTIGAS_CSV
+			5. OPSIS_CSV
+			6. THERMOFISHER_MAX_CSV
+
+Step 3.0 - FTIR Preview and Alignment
+
+		Use "Refresh FTIR Validation Preview" after configuring the FTIR source.
+
+Step 3.1 - Preview Surfaces
+
+		The FTIR review surface shows:
+
+			1. per-analyte validation stats preview
+			2. aligned comparison windows
+			3. exclusions table
+			4. preview status summary
+			5. QA summary
+			6. planner status
+
+Step 3.2 - Column Map and Alignment QA
+
+		The payload and preview track:
+
+			1. vendor profile requested
+			2. vendor profile used
+			3. detected timestamp column
+			4. detected analyte columns
+			5. offset
+			6. drift
+			7. coverage
+			8. completeness checks
+
+Step 3.3 - Offset Sweep Review
+
+		The runner provides:
+
+			1. sweep min
+			2. sweep max
+			3. sweep step
+			4. offset sweep preview table
+			5. Apply Selected Sweep Offset
+
+		Use this to compare before/after alignment quality and choose the best offset candidate.
+
+Step 4.0 - Comparison Sets
+
+		The FTIR validation engine now uses explicit comparison sets rather than only raw aligned rows.
+
+Step 4.1 - Comparison-Set Content
+
+		Each set carries:
+
+			1. set number
+			2. run number
+			3. set key
+			4. start / end
+			5. analytes included
+			6. inclusion status
+			7. basis
+			8. reviewer state
+
+Step 4.2 - Comparison-Set Review
+
+		The runner provides:
+
+			1. comparison-set review table
+			2. Accept Selected Set
+			3. Reject Selected Set
+			4. Clear All Set Decisions
+
+		Every comparison set must have an explicit reviewer disposition before lock/signoff.
+
+Step 5.0 - Exclusions and Reviewer Notes
+
+		Use exclusions when aligned rows or comparison windows must be removed from the package.
+
+Step 5.1 - Exclusion Controls
+
+		The runner provides:
+
+			1. Selected-row exclusion reason
+			2. Exclude Selected
+			3. Include Selected
+			4. Clear All Exclusions
+			5. FTIR Validation Reviewer Notes
+
+Step 5.2 - Exclusion Metadata
+
+		Each exclusion records:
+
+			1. reason
+			2. reviewer
+			3. updated timestamp
+
+Step 6.0 - QA Gating
+
+		FTIR validation includes QA hard gates before lock/signoff.
+
+Step 6.1 - QA Summary
+
+		The FTIR QA payload includes:
+
+			1. warnings
+			2. blocking issues
+			3. hard blocking issues
+			4. lock_ready
+			5. signoff_ready
+			6. accepted / rejected / unreviewed set counts
+
+Step 6.2 - Lock / Signoff Gates
+
+		Lock or signoff is blocked when:
+
+			1. any comparison set is unreviewed
+			2. any QA hard block remains unresolved
+			3. any required disposition is missing
+
+Step 7.0 - Review Lock
+
+		Use review lock when the FTIR review package is finalized for signoff.
+
+Step 7.1 - Lock Review
+
+		Action:
+
+			1. Lock Review
+
+		Effect:
+
+			1. freezes FTIR config
+			2. freezes exclusions
+			3. freezes reviewer notes
+			4. writes a locked snapshot
+
+Step 7.2 - Unlock Review
+
+		Action:
+
+			1. Unlock Review
+
+		Effect:
+
+			1. clears frozen snapshot
+			2. clears FTIR signoff
+			3. reopens the review package for changes
+
+Step 8.0 - Locked Snapshot Package
+
+		Locking the FTIR review writes frozen artifacts, including:
+
+			1. ftir_validation_locked_snapshot.json
+			2. ftir_validation_locked_window_alignment.csv
+			3. ftir_validation_locked_method301.csv
+
+		These frozen artifacts are the preferred source for signed report generation.
+
+Step 9.0 - FTIR Signoff
+
+		Signoff records the formal reviewer/approver decision on the frozen FTIR package.
+
+Step 9.1 - Signoff Fields
+
+		Enter:
+
+			1. approver name
+			2. approver role
+			3. decision
+			4. acceptance basis
+			5. signoff note
+
+Step 9.2 - Acceptance Basis States
+
+		The package-level FTIR basis is hardened to:
+
+			1. FORMAL_METHOD_301
+			2. METHOD_301_INFORMED_COMPARISON
+			3. NOT_ACCEPTED
+
+		Signoff enforcement:
+
+			1. formal accepted signoff cannot be used unless the frozen package supports formal acceptance
+			2. rejected signoff requires NOT_ACCEPTED
+
+Step 10.0 - FTIR Reviewer Workbook and Appendix Package
+
+		The FTIR report path produces a reviewer-facing workbook and signed appendix set.
+
+Step 10.1 - Reviewer Workbook
+
+		The workbook includes:
+
+			1. Signoff Summary
+			2. Comparison Sets
+			3. Aligned Rows
+			4. Method301 Stats
+			5. Exclusions
+			6. Delta Trace Stages
+			7. Delta Trace Transitions
+
+Step 10.2 - Signed Appendix Package
+
+		The signed appendix package includes:
+
+			1. signoff cover
+			2. signed comparison ledger
+			3. signed Method 301 stats
+			4. signed exclusion register
+			5. delta trace JSON/CSV
+			6. appendix index
+
+Step 11.0 - Delta Trace
+
+		The FTIR package records what changed between:
+
+			1. imported dataset
+			2. aligned dataset
+			3. excluded dataset
+			4. frozen signed dataset
+
+Step 12.0 - Live Execution Workflow
+
+		The FTIR module supports a live execution mode tied to run cadence.
+
+Step 12.1 - Execution Planner
+
+		The planner tracks:
+
+			1. planned comparison-set count
+			2. planned run duration override
+			3. planned total minutes
+			4. remaining set count
+			5. completion percent
+			6. expected purge checkpoints
+			7. expected bias checkpoints
+			8. remaining purge/bias checkpoints
+
+Step 12.2 - Live Cadence Controls
+
+		The runner uses:
+
+			1. actual runs
+			2. purge events
+			3. bias events
+			4. comparison-set numbering
+
+		The next run may be blocked when required purge/bias cadence is still due.
+
+Step 13.0 - FTIR Flow Paths
+
+Step 13.1 - FTIR Reference / Audit Companion Workflow
+
+		Use this when FTIR is reference/audit evidence only.
+
+		Recommended path:
+
+			1. configure the standard recorded or compliance-support workflow
+			2. complete Reference / Audit FTIR
+			3. Save + Apply Config
+			4. DAQ Runner (Test)
+			5. review FTIR reference/audit sections as needed
+
+Step 13.2 - FTIR Side-by-Side Informed Comparison
+
+		Use this when the comparison does not satisfy the full formal Method 301 structure.
+
+		Recommended path:
+
+			1. Validation Test Plan -> METHOD_301_INFORMED_COMPARISON
+			2. complete normal project setup
+			3. Save + Apply Config
+			4. DAQ Runner (Test)
+			5. configure FTIR input
+			6. refresh preview
+			7. review alignment QA
+			8. accept/reject comparison sets
+			9. resolve exclusions
+			10. lock FTIR review
+			11. sign off FTIR validation
+			12. build report
+
+Step 13.3 - FTIR Formal Method 301 Comparison
+
+		Use this when the project is intended to follow the formal Method 301 structure.
+
+		Required path:
+
+			1. Validation Test Plan -> METHOD_301_FORMAL
+			2. complete the full project setup
+			3. Save + Apply Config
+			4. DAQ Runner (Test)
+			5. execute planned runs with purge/bias cadence
+			6. configure/import FTIR data
+			7. confirm alignment
+			8. review every comparison set
+			9. resolve QA hard blocks
+			10. lock FTIR review
+			11. sign off FTIR validation
+			12. lock session review
+			13. sign off session review
+			14. build report
+
+FTIR Notes
+
+		1. Use the Validation Test Plan upstream instead of improvising the FTIR package after testing.
+		2. Use the vendor adapter that matches the actual FTIR export source.
+		3. Do not lock or sign off until every comparison set has an explicit reviewer disposition.
+		4. The frozen snapshot is the authoritative basis for the signed FTIR report package.

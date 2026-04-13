@@ -4,17 +4,21 @@ This folder contains the current task-oriented work-instruction set for MOLE-DAS
 
 ## Primary Entry Points
 
-- `mole_das_operator_workflow_2026_04_06_001.txt`
-  - Primary field operator workflow.
-  - Use this for standard Wizard setup, formal runner launch, and common reference tabs.
+- `mole_das_operator_workflow_2026_04_13_002.txt`
+  - Current field operator workflow.
+  - Use this for standard Wizard setup, diagnostics-only setup, compliance-support setup, and common runner/report flow.
 
-- `mole_das_admin_engineering_tabs_2026_04_06_001.txt`
-  - Admin and engineering support reference.
-  - Use this for governance, DB paths, registry, hardware profile maintenance, and non-routine support tabs.
+- `mole_das_admin_engineering_tabs_2026_04_13_002.txt`
+  - Current admin and engineering support reference.
+  - Use this for governance, DB paths, commissioning/profile maintenance, registry, packages, and non-routine support tabs.
 
 - `mole_das_diagnostics_only_appendix_2026_04_06_001.txt`
   - Diagnostics-only workflow appendix.
   - Use this for diagnostics-only setup, diagnostics-only runner behavior, verification expectations, and export boundaries.
+
+- `mole_das_ftir_validation_execution_and_review_appendix_2026_04_13_002.txt`
+  - Current FTIR validation execution and review appendix.
+  - Use this for FTIR planning, import, alignment, comparison-set review, lock/signoff, and formal/informed comparison flows.
 
 ## Baseline Drafts
 
@@ -27,6 +31,12 @@ This folder contains the current task-oriented work-instruction set for MOLE-DAS
 - `mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt`
   - Completed all-tabs workstep revision using the original bullet/outline format.
   - Includes testing flow paths from diagnostics-only through formal FTIR Method 301 comparison.
+
+- `mole_das_operator_workflow_2026_04_06_001.txt`
+  - Earlier operator split revision retained for history.
+
+- `mole_das_admin_engineering_tabs_2026_04_06_001.txt`
+  - Earlier admin/engineering split revision retained for history.
 
 ## Usage Notes
 

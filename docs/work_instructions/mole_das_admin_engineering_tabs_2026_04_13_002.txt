@@ -1,0 +1,318 @@
+MOLE-DAS ADMIN / ENGINEERING TABS
+Audience: system administrator, implementation lead, catalog steward, engineering support
+Scope: non-routine tabs, remapping, governance, profile maintenance, inventory, and package management
+
+Step 1.0 - DB Paths
+
+		Use this tab when the runtime must be pointed to the correct folders, databases, and asset libraries.
+
+		The tab includes:
+
+			1. Global Config
+			2. Core Folders
+			3. Databases
+			4. Asset DBs (JSON)
+
+		Actions:
+
+			1. Browse
+			2. Open
+			3. Validate
+			4. Reset Defaults
+			5. Apply Paths
+
+Step 2.0 - Empirical Conditions
+
+		Use this tab for controlled edits to the empirical formula registry.
+
+		The tab includes:
+
+			1. registry path display
+			2. category selector
+			3. JSON editor
+			4. Save action
+
+Step 3.0 - Catalog Governance
+
+		Use this tab for catalog review, merges, synonym handling, and auditability.
+
+Step 3.1 - Reviewer Identity
+
+		Enter the reviewer identity before performing governance actions.
+
+Step 3.2 - Pending Queue
+
+		Use the queue to:
+
+			1. filter
+			2. search
+			3. refresh
+			4. review counts
+			5. approve canonical items
+			6. merge to canonical
+			7. reject with reason
+
+Step 3.3 - Synonyms / Merge / Audit
+
+		Use the additional areas to:
+
+			1. manage synonyms
+			2. merge manufacturers
+			3. merge models
+			4. review recent governance events
+
+Step 4.0 - Connectivity / Commissioning
+
+		This tab is conditional on the shipped helper/runtime contents.
+
+		Use it only when the commissioning helper is included.
+
+Step 5.0 - Hardware Profiles
+
+		Use this tab to define and maintain communication profiles and channel maps.
+
+Step 5.1 - Profile-Level Actions
+
+		Available actions:
+
+			1. Set Default
+			2. Save Config
+			3. New
+			4. Duplicate
+			5. Delete
+			6. Build / Update from cfg.hardware
+			7. Validate
+			8. Export channels.json
+			9. Probe (Commissioning), if present
+
+Step 5.2 - Profile Meta
+
+		Profile meta fields include:
+
+			1. profile_key
+			2. protocol
+			3. timeout_s
+			4. endpoint_role
+			5. host
+			6. port
+			7. description
+			8. serial_port
+			9. baud
+			10. parity
+			11. stopbits
+
+Step 5.3 - Channel Editing
+
+		Per-channel fields include:
+
+			1. channel_id
+			2. unit_id
+			3. register
+			4. function code
+			5. dtype
+			6. qty
+			7. units
+			8. scale
+			9. offset
+			10. host override
+			11. port
+			12. description
+
+		Available actions:
+
+			1. Apply Channel
+			2. Add Channel
+			3. Delete Channel
+			4. Poll Selected Channel
+			5. List COM Ports
+			6. Probe Matrix
+
+Step 5.4 - Diagnostics Support
+
+		Additional utilities include:
+
+			1. Raw RTU Diagnostics
+			2. active profile sensor/channel review
+
+Step 6.0 - Inventory Registry
+
+		Use this tab to create, search, store, and bind source instances to the session.
+
+Step 6.1 - Instance Builder
+
+		Builder fields include:
+
+			1. instance_id
+			2. site_id
+			3. location_id
+			4. category
+			5. manufacturer
+			6. model
+			7. variant
+			8. serial number
+			9. asset tag
+			10. manufacture date
+			11. install date
+			12. engine cycle
+			13. cylinders
+			14. duty
+			15. notes
+
+Step 6.2 - Registry Search / Binding
+
+		Use search fields to locate an instance, then:
+
+			1. Save Instance
+			2. Save + Bind Session
+			3. Bind Loaded -> Session
+			4. Clear
+			5. Refresh Search
+
+Step 7.0 - Session Browser
+
+		Use this tab to manage completed or in-progress session folders.
+
+		The tab provides:
+
+			1. sessions root review
+			2. filter/search
+			3. helper availability line
+			4. session list
+			5. selected session detail
+			6. approval state
+			7. deliverable readiness
+
+Step 7.1 - Helper-Dependent Session Actions
+
+		Depending on the runtime package, the following may be enabled or N/A:
+
+			1. Run RAW->Processed
+			2. Export Session ZIP
+			3. Sync to
+			4. Import Session ZIP
+
+Step 8.0 - Packages Inbox
+
+		Use this tab to manage incoming package artifacts.
+
+		The tab provides:
+
+			1. inbox folder reference
+			2. filter and status controls
+			3. indexed package list
+			4. selected package detail
+			5. inbox actions output
+
+		Available actions:
+
+			1. Scan / Rescan
+			2. Refresh
+			3. Export CSV
+			4. Open ZIP
+			5. Open Folder
+			6. Ingest to Sessions
+			7. Open Ingested Session
+			8. Go to Session Browser
+
+Step 9.0 - Event Console
+
+		Use this tab to create structured session events and inspect the raw event tail.
+
+Step 9.1 - Event Console Inputs
+
+		Enter:
+
+			1. Event type
+			2. Scope
+			3. channel list or ALL
+			4. Note
+
+		Available actions:
+
+			1. Send Event
+			2. Refresh Tail
+			3. Run Layout Audit
+			4. Run Text Audit
+
+Step 10.0 - Documents Library
+
+		Use this tab to validate that the packaged operator/reference documents are current and accessible.
+
+		Available actions:
+
+			1. Open Selected Document
+			2. Open Selected Folder
+			3. Open Docs Folder
+			4. Refresh Library
+
+Step 11.0 - Sample System (Engineering Support Use)
+
+		Engineering/support use cases include:
+
+			1. active session selection
+			2. connectivity map review
+			3. flow-channel mapping
+			4. gas-cell bus mapping
+			5. sample-system export verification
+
+Step 12.0 - Reference / Audit FTIR (Engineering / Method Support Use)
+
+		Use this tab for:
+
+			1. parser mapping validation
+			2. units-override testing
+			3. offset carry-forward review
+			4. FTIR method workstep governance
+
+Step 13.0 - Regulatory (Support / Configuration Use)
+
+		Use this tab for:
+
+			1. loading state packs
+			2. exporting state templates
+			3. checking federal feeds
+			4. loading custom rules
+			5. auditing basis-aware limit entries
+
+Step 14.0 - Validation Test Plan (Project Configs Hub)
+
+		For validation projects, use this section to pre-plan:
+
+			1. session type
+			2. validation mode
+			3. comparator metadata
+			4. FTIR vendor profile
+			5. timestamp master clock
+			6. planned set count
+			7. cadence defaults
+			8. purge/bias requirements
+			9. lead scientist / peer reviewer / final approver assignments
+
+Step 15.0 - Save + Apply Config
+
+		Use Save + Apply after admin/engineering edits that affect:
+
+			1. runner configuration
+			2. hardware mapping
+			3. pathing
+			4. validation planning
+			5. project metadata
+
+Step 16.0 - Conditional / Runtime-Limited Features
+
+		Expect conditional availability for:
+
+			1. Commissioning
+			2. Probe helpers
+			3. RAW->Processed
+			4. Session Sync
+			5. Import/Export ZIP helpers
+
+Step 17.0 - Change Control Recommendation
+
+		For admin/engineering changes:
+
+			1. update the Wizard configuration deliberately
+			2. Save + Apply
+			3. verify affected runner behavior
+			4. capture notes in session/project records where relevant
