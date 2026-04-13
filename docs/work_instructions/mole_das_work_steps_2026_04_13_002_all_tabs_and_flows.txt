@@ -10,6 +10,57 @@ Purpose
 	- the main operator and support workflows
 	- testing flow paths from Diagnostics-only through formal FTIR Method 301 comparison
 
+Tab-to-Audience Matrix
+
+- Use this master file when:
+	- a reviewer needs the full tab inventory and all scenario flows in one document
+	- a lead scientist or project manager needs to understand how the pieces connect end-to-end
+- Use `mole_das_operator_workflow_2026_04_13_002.txt` when:
+	- the user is a routine operator / emissions technician
+	- the task is normal setup, acquisition, diagnostics-only use, or standard report closeout
+- Use `mole_das_admin_engineering_tabs_2026_04_13_002.txt` when:
+	- the user is system admin, implementation lead, or engineering support
+	- the task is pathing, governance, hardware profiles, inventory, packages, or helper-backed maintenance
+- Use `mole_das_ftir_validation_execution_and_review_appendix_2026_04_13_002.txt` when:
+	- the project is an FTIR side-by-side comparison or Method 301 validation package
+	- the task is FTIR import, alignment, comparison-set review, lock/signoff, or FTIR appendix generation
+
+- Primary audience by tab:
+	- Operator / routine setup tabs:
+		- Welcome
+		- Project Configs (Hub)
+		- Job Intake (QA Routing)
+		- Source Details
+		- Pollutants
+		- QA/QC
+		- Test Matrix
+		- Site Conditions
+		- Sample System
+		- Fuel Analysis
+		- Regulatory
+		- Save + Apply Config
+		- DAQ Runner (Test)
+		- DAQ Runner (SIM)
+	- Engineering / support tabs:
+		- Empirical Conditions
+		- DB Paths
+		- Catalog Governance
+		- Connectivity / Commissioning
+		- Hardware Profiles
+		- Inventory Registry
+		- Session Browser
+		- Packages Inbox
+		- Event Console
+		- Documents Library
+	- FTIR / validation-specific tabs and sections:
+		- Validation Test Plan
+		- Reference / Audit FTIR
+		- Runner Reference / Audit FTIR
+		- Side-by-Side Alignment
+		- FTIR Method Worksteps
+		- Report Builder -> FTIR Side-by-Side Validation
+		- Report Builder -> Session Review / Approval
+
 New Project
 
 - From the Welcome Screen, navigate to "Project Configs (Hub)"
