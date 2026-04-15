@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, record_health_journal, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
@@ -100,6 +100,9 @@ class RuntimeDurabilityTests(unittest.TestCase):
             history_lines = paths["history"].read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(history_lines), 2)
             self.assertEqual(json.loads(history_lines[-1])["event"], "STOP")
+            latest = load_latest_health_summary(root / "journal", label="runner")
+            self.assertEqual(latest["state"], "STOPPED")
+            self.assertEqual(latest["last_event"], "STOP")
 
 
 if __name__ == "__main__":

@@ -112,11 +112,12 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
     latest_matching_path = None
+    load_latest_health_summary = None
     record_health_journal = None
     write_recovery_snapshot = None
 
@@ -4465,11 +4466,26 @@ def main() -> None:
                         _r = _tk.Tk()
                         _r.withdraw()
                         updated = datetime.fromtimestamp(recovery_path.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                        try:
+                            live_updated = datetime.fromtimestamp(cfg_path.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            live_updated = "(time unavailable)"
+                        latest_event = ""
+                        if load_latest_health_summary is not None:
+                            health = load_latest_health_summary(session_dir_for_recovery / "meta" / "health_journal", label="runner_health")
+                            if health:
+                                latest_event = (
+                                    f"Last journal event: {str(health.get('last_event') or '(n/a)')}\n"
+                                    f"Journal updated: {str(health.get('updated_utc') or '(time unavailable)')}\n\n"
+                                )
                         restore = _mb.askyesno(
                             "DAQ Runner Recovery",
                             "A Runner recovery snapshot is available.\n\n"
+                            f"Current live config: {cfg_path.name}\n"
+                            f"Current live updated: {live_updated}\n\n"
                             f"Snapshot: {recovery_path.name}\n"
                             f"Updated: {updated}\n\n"
+                            f"{latest_event}"
                             "Restore this snapshot before opening the UI?",
                             default="no",
                         )

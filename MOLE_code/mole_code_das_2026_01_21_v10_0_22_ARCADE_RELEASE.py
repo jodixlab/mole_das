@@ -99,12 +99,13 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
     create_support_bundle = None
     latest_matching_path = None
+    load_latest_health_summary = None
     record_health_journal = None
     write_recovery_snapshot = None
 
@@ -18424,14 +18425,35 @@ def _build_intake(self) -> None:
             created = datetime.fromtimestamp(snap.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
             created = snap.name
+        live_cfg = mole_cfg_path(self.base_dir)
+        try:
+            live_updated = datetime.fromtimestamp(live_cfg.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S") if live_cfg.exists() else "(none)"
+        except Exception:
+            live_updated = "(time unavailable)"
+        latest_event = ""
+        try:
+            if load_latest_health_summary is not None:
+                health = load_latest_health_summary(Path(self.logs_dir) / "health_journal", label="wizard_health")
+                if health:
+                    latest_event = (
+                        f"Last journal event: {str(health.get('last_event') or '(n/a)')}"
+                        f" @ {str(health.get('updated_utc') or '(time unavailable)')}"
+                    )
+        except Exception:
+            latest_event = ""
         restore = False
         try:
             restore = messagebox.askyesno(
                 "Session Recovery",
-                "A Wizard recovery snapshot is available.\n\n"
-                f"Snapshot: {snap.name}\n"
-                f"Updated: {created}\n\n"
-                "Restore this snapshot into the Wizard now?",
+                (
+                    "A Wizard recovery snapshot is available.\n\n"
+                    f"Current live config: {live_cfg.name}\n"
+                    f"Current live updated: {live_updated}\n\n"
+                    f"Snapshot: {snap.name}\n"
+                    f"Updated: {created}\n\n"
+                    + (latest_event + "\n\n" if latest_event else "")
+                    + "Restore this snapshot into the Wizard now?"
+                ),
                 default="no",
             )
         except Exception:

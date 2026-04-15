@@ -205,3 +205,15 @@ def record_health_journal(
         pass
 
     return {"latest": latest_path, "history": history_path}
+
+
+def load_latest_health_summary(journal_dir: Path, *, label: str) -> Dict[str, Any]:
+    journal_dir = Path(journal_dir)
+    latest_path = journal_dir / f"{_slug(label, default='health_journal')}__latest.json"
+    if not latest_path.exists():
+        return {}
+    try:
+        payload = json.loads(latest_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
