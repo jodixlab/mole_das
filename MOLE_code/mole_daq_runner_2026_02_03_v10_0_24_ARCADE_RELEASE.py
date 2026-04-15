@@ -10310,6 +10310,21 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_diag_verify_mark_post.pack(side="left", padx=(8, 0))
     btn_diag_verify_clear_post = tk.Button(diag_verify_btns, text="Clear Post-Test", bg=BTN_BG, fg=FG, relief="flat")
     btn_diag_verify_clear_post.pack(side="left", padx=(8, 0))
+    if help_mgr is not None:
+        for widget in (ent_diag_verify_tech,):
+            help_mgr.bind(widget, "runner.diagnostics_verification.technician_operator")
+        for widget in (ent_diag_verify_ref,):
+            help_mgr.bind(widget, "runner.diagnostics_verification.worksheet_ref")
+        for widget in (ent_diag_verify_gas_ids,):
+            help_mgr.bind(widget, "runner.diagnostics_verification.calibration_gas_ids")
+        for widget in (ent_diag_verify_attachment, btn_diag_verify_browse, btn_diag_verify_open):
+            help_mgr.bind(widget, "runner.diagnostics_verification.attachment_path")
+        help_mgr.bind(txt_diag_verify_notes, "runner.diagnostics_verification.notes")
+        help_mgr.bind(btn_diag_verify_save, "runner.diagnostics_verification.save_details")
+        help_mgr.bind(btn_diag_verify_mark_pre, "runner.diagnostics_verification.mark_pretest")
+        help_mgr.bind(btn_diag_verify_clear_pre, "runner.diagnostics_verification.clear_pretest")
+        help_mgr.bind(btn_diag_verify_mark_post, "runner.diagnostics_verification.mark_posttest")
+        help_mgr.bind(btn_diag_verify_clear_post, "runner.diagnostics_verification.clear_posttest")
 
     # Calculation audit / provenance
     sec_calc_audit = _section(scroll, "Calculation Audit / Provenance")
@@ -14629,6 +14644,23 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _build_method_inputs(sess: Dict[str, Any], run: Dict[str, Any]) -> None:
         _clear_method_frame()
+        method_help_ids = {
+            "fuel_flow_value": "runner.method_input.fuel_flow_value",
+            "fuel_flow_units": "runner.method_input.fuel_flow_units",
+            "o2_dry_pct": "runner.method_input.o2_dry_pct",
+            "qd_dscfh": "runner.method_input.qd_dscfh",
+            "stack_flow_acfm": "runner.method_input.stack_flow_acfm",
+            "stack_velocity_fps": "runner.method_input.stack_velocity_fps",
+            "pitot_dp_inh2o": "runner.method_input.pitot_dp_inh2o",
+            "pitot_cp": "runner.method_input.pitot_cp",
+            "stack_temp_F": "runner.method_input.stack_temp_f",
+            "stack_static_inh2o": "runner.method_input.stack_static_inh2o",
+            "baro_psia": "runner.method_input.baro_psia",
+            "co_dry_pct": "runner.method_input.co_dry_pct",
+            "co2_dry_pct": "runner.method_input.co2_dry_pct",
+            "h2o_wet_pct": "runner.method_input.h2o_wet_pct",
+            "swirl_alpha_deg": "runner.method_input.swirl_alpha_deg",
+        }
 
         src = sess.get("source") or {}
         ex = src.get("exhaust_flow") or {}
@@ -14738,16 +14770,22 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 width=14,
             )
             hp_mode_menu.grid(row=1, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(hp_mode_menu, "runner.method_input.hp_mode")
 
             # Load fraction
             tk.Label(hp_frame, text="Load Fraction (0-1):", bg=BG, fg=FG).grid(row=2, column=0, sticky="w", pady=(4, 0))
             ent_lf = tk.Entry(hp_frame, textvariable=method_vars["load_fraction"], width=12)
             ent_lf.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_lf, "runner.method_input.load_fraction")
 
             # Direct HP
             tk.Label(hp_frame, text="Actual HP (bhp):", bg=BG, fg=FG).grid(row=3, column=0, sticky="w", pady=(4, 0))
             ent_hp = tk.Entry(hp_frame, textvariable=method_vars["actual_hp"], width=12)
             ent_hp.grid(row=3, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_hp, "runner.method_input.actual_hp")
 
             # IMAP
             tk.Label(hp_frame, text="IMAP:", bg=BG, fg=FG).grid(row=4, column=0, sticky="w", pady=(4, 0))
@@ -14755,6 +14793,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             imap_row.grid(row=4, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
             ent_imap = tk.Entry(imap_row, textvariable=method_vars["imap_value"], width=10)
             ent_imap.pack(side="left")
+            if help_mgr is not None:
+                help_mgr.bind(ent_imap, "runner.method_input.imap_value")
             im_units = ttk.Combobox(
                 imap_row,
                 textvariable=method_vars["imap_units"],
@@ -14763,22 +14803,32 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 width=7,
             )
             im_units.pack(side="left", padx=(6, 0))
+            if help_mgr is not None:
+                help_mgr.bind(im_units, "runner.method_input.imap_units")
 
             tk.Label(hp_frame, text="IMAP Idle (min):", bg=BG, fg=FG).grid(row=5, column=0, sticky="w", pady=(4, 0))
             ent_imap_idle = tk.Entry(hp_frame, textvariable=method_vars["imap_idle"], width=12)
             ent_imap_idle.grid(row=5, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_imap_idle, "runner.method_input.imap_idle")
 
             tk.Label(hp_frame, text="IMAP Full (max):", bg=BG, fg=FG).grid(row=6, column=0, sticky="w", pady=(4, 0))
             ent_imap_full = tk.Entry(hp_frame, textvariable=method_vars["imap_full"], width=12)
             ent_imap_full.grid(row=6, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_imap_full, "runner.method_input.imap_full")
 
             tk.Label(hp_frame, text="IMAP Mid (opt):", bg=BG, fg=FG).grid(row=7, column=0, sticky="w", pady=(4, 0))
             ent_imap_mid = tk.Entry(hp_frame, textvariable=method_vars["imap_mid"], width=12)
             ent_imap_mid.grid(row=7, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_imap_mid, "runner.method_input.imap_mid")
 
             tk.Label(hp_frame, text="Mid Util (0-1 or %):", bg=BG, fg=FG).grid(row=8, column=0, sticky="w", pady=(4, 0))
             ent_imap_mid_util = tk.Entry(hp_frame, textvariable=method_vars["imap_mid_util"], width=12)
             ent_imap_mid_util.grid(row=8, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            if help_mgr is not None:
+                help_mgr.bind(ent_imap_mid_util, "runner.method_input.imap_mid_util")
 
             # Computed outputs (from crosswalk solver)
             tk.Label(hp_frame, text="Computed HP Used:", bg=BG, fg=FG).grid(row=0, column=2, sticky="w", padx=(18, 0))
@@ -14813,10 +14863,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         def row(r: int, label: str, key: str, width: int = 20):
             sv = tk.StringVar(value="")
             method_vars[key] = sv
-            tk.Label(grid, text=label, fg=FG, bg=BG, font=("Consolas", 9)).grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
+            lbl = tk.Label(grid, text=label, fg=FG, bg=BG, font=("Consolas", 9))
+            lbl.grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
             e = tk.Entry(grid, textvariable=sv, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", width=width, font=("Consolas", 9))
             e.grid(row=r, column=1, sticky="w", pady=2)
             method_entries[key] = e
+            if help_mgr is not None and key in method_help_ids:
+                help_mgr.bind(lbl, method_help_ids[key])
+                help_mgr.bind(e, method_help_ids[key])
             return sv
 
         mi = run.get("method_inputs") or {}

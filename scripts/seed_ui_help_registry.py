@@ -836,6 +836,315 @@ SEED_ENTRIES = {
             ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
         ),
     },
+    "runner.method_input.hp_mode": {
+        "label": "HP Input Mode",
+        "short_description": "Declares which horsepower/load input basis the run is using.",
+        "definition": "HP Input Mode selects whether horsepower is carried as direct horsepower, load fraction, or IMAP-derived load context.",
+        "process_note": "Choose the strongest actual run basis available so the Method 19 crosswalk and load context remain defensible.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.load_fraction": {
+        "label": "Load Fraction",
+        "short_description": "Stores the run load fraction when load-based horsepower input is used.",
+        "definition": "Load Fraction is the fractional engine load basis used to estimate horsepower for the current run.",
+        "process_note": "Use a 0 to 1 fractional value that matches the run-specific operating load basis.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.actual_hp": {
+        "label": "Actual HP",
+        "short_description": "Stores direct measured or declared brake horsepower for the current run.",
+        "definition": "Actual HP is the direct horsepower input used when the run has a known horsepower value instead of a derived load basis.",
+        "process_note": "Use this only when a direct run horsepower basis exists.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_value": {
+        "label": "IMAP",
+        "short_description": "Stores intake manifold pressure for IMAP-based horsepower estimation.",
+        "definition": "IMAP is the intake manifold absolute or gauge pressure input used for IMAP-based load interpretation.",
+        "process_note": "Use this only when the run is using IMAP mode and ensure the units field matches the entered value.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_units": {
+        "label": "IMAP Units",
+        "short_description": "Defines the engineering units used for the IMAP input.",
+        "definition": "IMAP Units sets the pressure-unit basis for the run IMAP value and related idle/full calibration points.",
+        "process_note": "Keep this aligned with the instrumentation or source record basis used for the run.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_idle": {
+        "label": "IMAP Idle",
+        "short_description": "Stores the idle or minimum IMAP reference point used in IMAP mode.",
+        "definition": "IMAP Idle is the low-end reference point for interpreting current IMAP relative to the run’s operating envelope.",
+        "process_note": "Populate this when IMAP mode is used and the idle reference is known.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_full": {
+        "label": "IMAP Full",
+        "short_description": "Stores the full-load or maximum IMAP reference point used in IMAP mode.",
+        "definition": "IMAP Full is the high-end reference point for interpreting current IMAP relative to the run’s operating envelope.",
+        "process_note": "Populate this when IMAP mode is used and the full-load reference is known.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_mid": {
+        "label": "IMAP Mid",
+        "short_description": "Stores an optional midpoint IMAP reference for non-linear IMAP interpretation.",
+        "definition": "IMAP Mid is an optional reference point between idle and full load used to improve IMAP-based load interpretation.",
+        "process_note": "Use this only when a midpoint reference belongs in the IMAP load model for the source.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.imap_mid_util": {
+        "label": "Mid Util",
+        "short_description": "Stores the utilization associated with the optional IMAP midpoint.",
+        "definition": "Mid Util is the load/utilization value paired with the optional IMAP midpoint reference.",
+        "process_note": "Enter this only when IMAP Mid is being used and the midpoint utilization is known.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.fuel_flow_value": {
+        "label": "Fuel Flow (this run)",
+        "short_description": "Stores the run-specific fuel-flow value used for Method 19 stoichiometric handling.",
+        "definition": "Fuel Flow is the current run fuel-flow basis used when exhaust flow is being determined stoichiometrically from fuel input.",
+        "process_note": "Use the run-specific fuel-flow value that matches the declared units and fuel-flow basis.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.fuel_flow_units": {
+        "label": "Fuel Flow Units",
+        "short_description": "Defines the engineering units for the run-specific fuel-flow value.",
+        "definition": "Fuel Flow Units sets the engineering basis for the run fuel-flow value used in Method 19 stoichiometric handling.",
+        "process_note": "Keep this aligned with the actual field or record basis for the run fuel-flow value.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.o2_dry_pct": {
+        "label": "O2 dry %",
+        "short_description": "Stores dry-basis oxygen used in the Method 19 crosswalk or stack-measured helper path.",
+        "definition": "O2 dry percent is the oxygen input used in oxygen-correction and Method 19 crosswalk logic when the operator provides an override.",
+        "process_note": "Enter this only when the run needs an explicit operator-provided O2 value rather than the live analyzer feed.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Oxygen correction"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.qd_dscfh": {
+        "label": "Qd dry dscfh",
+        "short_description": "Stores direct-entry dry standard exhaust flow for the current run.",
+        "definition": "Qd dry dscfh is the dry standard exhaust flow basis used when the operator provides direct stack-flow entry instead of deriving it from pitot inputs.",
+        "process_note": "Use this as the single direct-entry dry standard flow basis when it is known for the run.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.stack_flow_acfm": {
+        "label": "Stack flow (acfm)",
+        "short_description": "Stores direct-entry actual stack flow for the current run.",
+        "definition": "Stack flow ACFM is the actual cubic-feet-per-minute run flow used only when a direct actual-flow basis is being carried.",
+        "process_note": "Use this only when direct-entry stack flow is the chosen run basis and avoid mixing it with conflicting direct Qd values.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.stack_velocity_fps": {
+        "label": "Stack velocity (ft/s)",
+        "short_description": "Stores direct-entry stack velocity for the current run.",
+        "definition": "Stack velocity is the run-specific actual velocity basis carried only when the operator is using direct-entry measured velocity context.",
+        "process_note": "Use this only when the run has a defensible direct velocity basis and avoid duplicating conflicting direct-entry values.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.pitot_dp_inh2o": {
+        "label": "Pitot ΔP",
+        "short_description": "Stores average pitot differential pressure for the Method 2 helper path.",
+        "definition": "Pitot differential pressure is the Method 2 traverse pressure input used to calculate stack velocity and flow.",
+        "process_note": "Use the average traverse differential pressure for the current run when Method 2 helper calculations are being used.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.pitot_cp": {
+        "label": "Pitot Cp",
+        "short_description": "Stores the pitot coefficient used in the Method 2 helper calculation path.",
+        "definition": "Pitot Cp is the pitot calibration coefficient applied in Method 2 helper calculations.",
+        "process_note": "Use the coefficient associated with the pitot setup used for the run.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.stack_temp_f": {
+        "label": "Stack temp (F)",
+        "short_description": "Stores stack temperature for the Method 2 helper path.",
+        "definition": "Stack temperature is the run stack-gas temperature input used in Method 2 helper calculations.",
+        "process_note": "Use the run-average stack temperature basis that matches the current Method 2 traverse inputs.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.stack_static_inh2o": {
+        "label": "Stack static (inH2O)",
+        "short_description": "Stores stack static pressure for the Method 2 helper path.",
+        "definition": "Stack static pressure is the run stack static input used in Method 2 helper calculations.",
+        "process_note": "Use the run static-pressure basis that matches the current Method 2 traverse inputs.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.baro_psia": {
+        "label": "Baro override (psia)",
+        "short_description": "Stores an explicit barometric-pressure override for the run.",
+        "definition": "Barometric pressure override is the operator-provided barometric basis used instead of a derived site-condition value when needed.",
+        "process_note": "Use this only when the run requires an explicit barometric override.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Site Conditions"),
+        ),
+    },
+    "runner.method_input.co_dry_pct": {
+        "label": "CO dry %",
+        "short_description": "Stores dry-basis carbon monoxide used in stack-measured helper calculations.",
+        "definition": "CO dry percent is the carbon monoxide input used in the combustion/moisture approximation path for the current run.",
+        "process_note": "Use this only when the stack-measured helper path requires an explicit operator-provided CO value.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.co2_dry_pct": {
+        "label": "CO2 dry %",
+        "short_description": "Stores dry-basis carbon dioxide used in stack-measured helper calculations.",
+        "definition": "CO2 dry percent is the carbon dioxide input used in the combustion/moisture approximation path for the current run.",
+        "process_note": "Use this only when the run needs an explicit operator-provided CO2 value rather than a live feed.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.h2o_wet_pct": {
+        "label": "H2O wet %",
+        "short_description": "Stores wet-basis moisture used for wet-to-dry handling.",
+        "definition": "H2O wet percent is the moisture input used in wet-to-dry conversion and crosswalk handling for the current run.",
+        "process_note": "Use this only when the run has an explicit wet-basis moisture value that should override estimated moisture.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.method_input.swirl_alpha_deg": {
+        "label": "Avg swirl α",
+        "short_description": "Stores average swirl angle for stack-measured flow interpretation.",
+        "definition": "Average swirl alpha is the run swirl-angle input used to interpret stack-measured flow when applicable.",
+        "process_note": "Enter this only when the run has a defensible average swirl-angle basis.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.diagnostics_verification.technician_operator": {
+        "label": "Technician / Operator",
+        "short_description": "Identifies the person documenting diagnostics verification details.",
+        "definition": "Technician / Operator is the named person responsible for the diagnostics verification record captured in the Runner.",
+        "process_note": "Enter the person actually responsible for the recorded diagnostics verification entry.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Diagnostics-only Test"),
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.worksheet_ref": {
+        "label": "Worksheet / Form Ref",
+        "short_description": "Stores the supporting worksheet or form reference for the diagnostics verification record.",
+        "definition": "Worksheet / Form Ref is the external document or record reference tied to the diagnostics verification evidence.",
+        "process_note": "Use a stable worksheet, form, or log reference that can be audited later.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.calibration_gas_ids": {
+        "label": "Calibration Gas IDs",
+        "short_description": "Stores the calibration-gas identifiers associated with diagnostics verification.",
+        "definition": "Calibration Gas IDs are the gas-cylinder or standard identifiers used to support diagnostics verification documentation.",
+        "process_note": "Record the actual gas IDs used for the documented verification event.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.attachment_path": {
+        "label": "Attachment Path",
+        "short_description": "Stores or opens the supporting attachment for the diagnostics verification record.",
+        "definition": "Attachment Path is the file reference to supporting evidence such as a worksheet, photo, or supporting record.",
+        "process_note": "Point this at the specific supporting evidence file for the diagnostics verification record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.notes": {
+        "label": "Verification Notes",
+        "short_description": "Stores freeform notes supporting the diagnostics verification record.",
+        "definition": "Verification Notes are the operator-entered narrative comments that explain the diagnostics verification record.",
+        "process_note": "Use this for concise verification evidence context, not general run notes.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.save_details": {
+        "label": "Save Verification Details",
+        "short_description": "Saves the current diagnostics verification details into session state.",
+        "definition": "This action preserves the current diagnostics verification form values without marking pre-test or post-test completion.",
+        "process_note": "Use this after updating diagnostics verification details so the evidence record is preserved.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.mark_pretest": {
+        "label": "Mark Pre-Test Verified",
+        "short_description": "Marks the diagnostics pre-test verification stage as complete.",
+        "definition": "This action records explicit completion of the pre-test diagnostics verification stage in the session evidence.",
+        "process_note": "Use this only after the pre-test diagnostics verification evidence is actually complete and documented.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.clear_pretest": {
+        "label": "Clear Pre-Test",
+        "short_description": "Clears the explicit pre-test verification mark from the diagnostics verification record.",
+        "definition": "This action removes the explicit completed state for the pre-test diagnostics verification stage.",
+        "process_note": "Use this when the pre-test verification state needs correction or was marked in error.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.mark_posttest": {
+        "label": "Mark Post-Test Verified",
+        "short_description": "Marks the diagnostics post-test verification stage as complete.",
+        "definition": "This action records explicit completion of the post-test diagnostics verification stage in the session evidence.",
+        "process_note": "Use this only after the post-test diagnostics verification evidence is actually complete and documented.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
+    "runner.diagnostics_verification.clear_posttest": {
+        "label": "Clear Post-Test",
+        "short_description": "Clears the explicit post-test verification mark from the diagnostics verification record.",
+        "definition": "This action removes the explicit completed state for the post-test diagnostics verification stage.",
+        "process_note": "Use this when the post-test verification state needs correction or was marked in error.",
+        "doc_refs": _refs(
+            ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+        ),
+    },
     "runner.side_by_side.note": {
         "label": "Operator note",
         "short_description": "Stores the current side-by-side operator note used to annotate alignment and cadence events.",

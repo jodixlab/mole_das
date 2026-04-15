@@ -121,7 +121,33 @@ try {
     }
 
     Invoke-Step "Run UI help registry audit" {
-        Invoke-Native -FilePath $python -ArgumentList @("scripts\audit_ui_help_registry.py") -WorkingDirectory $workspace
+        $releaseOutDir = Join-Path $workspace "RELEASES\clean_release_workflow"
+        New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
+        $uiHelpAuditJson = Join-Path $releaseOutDir "ui_help_audit.json"
+        $uiHelpAuditTxt = Join-Path $releaseOutDir "ui_help_audit.txt"
+        $auditRaw = & $python "scripts\audit_ui_help_registry.py"
+        if ($LASTEXITCODE -ne 0) {
+            throw "scripts\\audit_ui_help_registry.py failed with exit code $LASTEXITCODE"
+        }
+        $auditText = ($auditRaw | Out-String).Trim()
+        Set-Content -LiteralPath $uiHelpAuditJson -Value $auditText -Encoding UTF8
+        try {
+            $auditObj = $auditText | ConvertFrom-Json
+            $auditLines = @(
+                "MOLE-DAS UI Help Audit"
+                "Status: $($auditObj.status)"
+                "Bound IDs: $($auditObj.bound_id_count)"
+                "Registry IDs: $($auditObj.registry_id_count)"
+                "Target IDs: $($auditObj.target_id_count)"
+                "Missing registry entries: $([int]($auditObj.missing_registry_entries | Measure-Object).Count)"
+                "Target missing bound entries: $([int]($auditObj.target_missing_bound_entries | Measure-Object).Count)"
+                "Entries missing doc refs: $([int]($auditObj.entries_missing_doc_refs | Measure-Object).Count)"
+            )
+            Set-Content -LiteralPath $uiHelpAuditTxt -Value ($auditLines -join [Environment]::NewLine) -Encoding UTF8
+        }
+        catch {
+            Set-Content -LiteralPath $uiHelpAuditTxt -Value $auditText -Encoding UTF8
+        }
         Add-StepResult -Name "ui_help_audit" -Status "PASS" -Detail "UI help registry audit passed."
     }
 

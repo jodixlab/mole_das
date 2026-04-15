@@ -51,6 +51,20 @@
       "description": "Human-readable clean-workspace workflow summary."
     },
     {
+      "id": "ui_help_audit_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "ui_help_audit.json",
+      "description": "Structured UI help coverage audit emitted by the clean release workflow."
+    },
+    {
+      "id": "ui_help_audit_txt",
+      "required": true,
+      "match": "exact",
+      "pattern": "ui_help_audit.txt",
+      "description": "Human-readable UI help coverage audit emitted by the clean release workflow."
+    },
+    {
       "id": "production_acceptance_matrix_md",
       "required": true,
       "match": "exact",

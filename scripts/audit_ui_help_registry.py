@@ -13,6 +13,7 @@ CODE_PATHS = [
     ROOT / "MOLE_code" / "mole_daq_runner_2026_02_03_v10_0_24_ARCADE_RELEASE.py",
 ]
 HELP_ID_RE = re.compile(r'help_mgr\.bind\([^,\n]+,\s*"([^"]+)"\)')
+HELP_ID_LITERAL_RE = re.compile(r'"((?:wizard|runner)\.[a-z0-9_\.]+)"')
 
 
 def _load_registry() -> dict[str, dict]:
@@ -26,6 +27,8 @@ def _collect_bound_ids() -> set[str]:
     for path in CODE_PATHS:
         text = path.read_text(encoding="utf-8")
         for match in HELP_ID_RE.finditer(text):
+            bound.add(match.group(1).strip())
+        for match in HELP_ID_LITERAL_RE.finditer(text):
             bound.add(match.group(1).strip())
     return bound
 
