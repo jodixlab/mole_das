@@ -99,13 +99,14 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
     create_support_bundle = None
     latest_matching_path = None
     load_latest_health_summary = None
+    load_recent_health_history = None
     record_health_journal = None
     write_recovery_snapshot = None
 
@@ -3112,6 +3113,14 @@ class MoleDASWizard(tk.Tk):
             recovery_actions,
             text="Export Support Bundle",
             command=self._export_wizard_support_bundle,
+            bg="#14202d",
+            fg=self.BTN_FG,
+            relief="flat",
+        ).pack(fill="x", pady=(0, 4))
+        tk.Button(
+            recovery_actions,
+            text="View Recovery History",
+            command=self._show_wizard_recovery_history,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
@@ -6486,6 +6495,34 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "latest": latest if latest.exists() else None,
             "history": history if history.exists() else None,
         }
+
+    def _show_wizard_recovery_history(self) -> None:
+        rows = []
+        if load_recent_health_history is not None:
+            rows = load_recent_health_history(Path(self.logs_dir) / "health_journal", label="wizard_health", limit=12)
+        win = tk.Toplevel(self)
+        win.title("Wizard Recovery History")
+        win.configure(bg=self.BG)
+        win.geometry("860x420")
+        body = tk.Frame(win, bg=self.BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        txt = tk.Text(body, bg="#0a0f16", fg="#c7d0d9", insertbackground="#c7d0d9", font=("Consolas", 9), wrap="word")
+        txt.pack(fill="both", expand=True)
+        if rows:
+            lines = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+                lines.append(
+                    f"{row.get('ts_utc') or '(time unavailable)'} | {row.get('event') or '(event)'}\n"
+                    f"  session_config_path={payload.get('session_config_path') or '(n/a)'}\n"
+                    f"  review_decision={payload.get('review_decision') or '(n/a)'} | deliverable={payload.get('deliverable_status') or '(n/a)'}\n"
+                )
+            txt.insert("1.0", "\n".join(lines).strip() + "\n")
+        else:
+            txt.insert("1.0", "No Wizard recovery history is available yet.\n")
+        txt.configure(state="disabled")
 
     def _record_wizard_health_event(self, event: str, extra: Optional[Dict[str, Any]] = None) -> None:
         if record_health_journal is None:

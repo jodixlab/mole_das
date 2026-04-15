@@ -217,3 +217,25 @@ def load_latest_health_summary(journal_dir: Path, *, label: str) -> Dict[str, An
         return payload if isinstance(payload, dict) else {}
     except Exception:
         return {}
+
+
+def load_recent_health_history(journal_dir: Path, *, label: str, limit: int = 10) -> list[Dict[str, Any]]:
+    journal_dir = Path(journal_dir)
+    history_path = journal_dir / f"{_slug(label, default='health_journal')}__history.jsonl"
+    if not history_path.exists():
+        return []
+    try:
+        rows = []
+        for line in history_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(payload, dict):
+                rows.append(payload)
+        return rows[-max(int(limit), 1):]
+    except Exception:
+        return []

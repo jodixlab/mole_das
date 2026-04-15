@@ -112,12 +112,13 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
     latest_matching_path = None
     load_latest_health_summary = None
+    load_recent_health_history = None
     record_health_journal = None
     write_recovery_snapshot = None
 
@@ -8199,6 +8200,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         bg=BTN_BG,
         fg=FG,
         relief="flat",
+    ).pack(fill="x", pady=(0, 4))
+    tk.Button(
+        recovery_btns,
+        text="View Recovery History",
+        command=lambda: _show_runner_recovery_history(_load_session()),
+        bg=BTN_BG,
+        fg=FG,
+        relief="flat",
     ).pack(fill="x")
 
     btns = tk.Frame(left_inner, bg=BG)
@@ -15604,6 +15613,34 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "latest": latest if latest.exists() else None,
             "history": history if history.exists() else None,
         }
+
+    def _show_runner_recovery_history(sess_local: Dict[str, Any]) -> None:
+        rows = []
+        if load_recent_health_history is not None:
+            rows = load_recent_health_history(_runner_recovery_dir(sess_local).parent / "health_journal", label="runner_health", limit=12)
+        w = tk.Toplevel(root)
+        w.title("Runner Recovery History")
+        w.configure(bg=BG)
+        w.geometry("920x440")
+        body = tk.Frame(w, bg=BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        txt = tk.Text(body, bg=PANEL_BG, fg=FG, insertbackground=FG, font=("Consolas", 9), wrap="word")
+        txt.pack(fill="both", expand=True)
+        if rows:
+            lines = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+                lines.append(
+                    f"{row.get('ts_utc') or '(time unavailable)'} | {row.get('event') or '(event)'}\n"
+                    f"  acquisition={payload.get('acquisition_state') or '(n/a)'} | active_run={payload.get('active_run_no') or '(n/a)'} | run_status={payload.get('active_run_status') or '(n/a)'}\n"
+                    f"  session_review={payload.get('session_review_decision') or '(n/a)'} | ftir_review={payload.get('ftir_signoff_decision') or '(n/a)'}\n"
+                )
+            txt.insert("1.0", "\n".join(lines).strip() + "\n")
+        else:
+            txt.insert("1.0", "No Runner recovery history is available yet.\n")
+        txt.configure(state="disabled")
 
     def _record_runner_health_event(sess_local: Dict[str, Any], event: str, extra: Optional[Dict[str, Any]] = None) -> None:
         if record_health_journal is None:
