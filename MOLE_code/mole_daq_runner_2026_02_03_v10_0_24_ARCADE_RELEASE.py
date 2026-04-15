@@ -122,6 +122,11 @@ except Exception:
     record_health_journal = None
     write_recovery_snapshot = None
 
+try:
+    from mole_ui_help_tooltips_v1 import get_ui_help_tooltip_manager
+except Exception:
+    get_ui_help_tooltip_manager = None
+
 
 
 
@@ -7951,6 +7956,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     root.title("MOLE CONTROL DAS - DAQ Runner v7.7.4" + (" - TRAINING MODE" if _mole_env_mode() == "TRAINING" else ""))
     root.geometry("1600x900")
     root.configure(bg=BG)
+    help_mgr = get_ui_help_tooltip_manager(root) if get_ui_help_tooltip_manager is not None else None
 
     # ttk styling (dark)
     try:
@@ -10643,7 +10649,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     chk_ftir_validation_enabled.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Validation mode:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_validation_mode = tk.Label(report_builder_ftir_form, text="Validation mode:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_validation_mode.grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     cbo_ftir_validation_mode = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_mode,
@@ -10653,7 +10660,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     cbo_ftir_validation_mode.grid(row=0, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Vendor profile:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_vendor = tk.Label(report_builder_ftir_form, text="Vendor profile:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_vendor.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     cbo_ftir_validation_vendor = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_vendor,
@@ -10662,14 +10670,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     cbo_ftir_validation_vendor.grid(row=1, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="FTIR data file:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_file = tk.Label(report_builder_ftir_form, text="FTIR data file:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_file.grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_file = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_file, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_file.grid(row=2, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Timestamp column:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_timestamp = tk.Label(report_builder_ftir_form, text="Timestamp column:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_timestamp.grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_timestamp_col = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_timestamp_col, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_timestamp_col.grid(row=2, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Delimiter:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_delimiter = tk.Label(report_builder_ftir_form, text="Delimiter:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_delimiter.grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     cbo_ftir_validation_delimiter = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_delimiter,
@@ -10678,14 +10689,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     cbo_ftir_validation_delimiter.grid(row=3, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Time offset (s):", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_offset = tk.Label(report_builder_ftir_form, text="Time offset (s):", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_offset.grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_offset_s = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_offset_s, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_offset_s.grid(row=3, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Analytes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_analytes = tk.Label(report_builder_ftir_form, text="Analytes:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_analytes.grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_analytes = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_analytes, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_analytes.grid(row=4, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Master clock:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_master_clock = tk.Label(report_builder_ftir_form, text="Master clock:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_master_clock.grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     cbo_ftir_validation_master_clock = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_master_clock,
@@ -10707,7 +10721,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         font=("Consolas", 9),
     )
     chk_ftir_validation_execution_enabled.grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Execution profile:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_execution_profile = tk.Label(report_builder_ftir_form, text="Execution profile:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_execution_profile.grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     cbo_ftir_validation_execution_profile = ttk.Combobox(
         report_builder_ftir_form,
         textvariable=var_ftir_validation_execution_profile,
@@ -10717,7 +10732,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     cbo_ftir_validation_execution_profile.grid(row=5, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Purge minutes:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=6, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_purge = tk.Label(report_builder_ftir_form, text="Purge minutes:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_purge.grid(row=6, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_purge_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_purge_min, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_purge_min.grid(row=6, column=1, sticky="ew", pady=(0, 6))
     chk_ftir_validation_require_purge = tk.Checkbutton(
@@ -10745,12 +10761,44 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     chk_ftir_validation_require_bias.grid(row=6, column=3, sticky="w", pady=(0, 6))
 
-    tk.Label(report_builder_ftir_form, text="Planned sets override:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_ftir_planned_sets = tk.Label(report_builder_ftir_form, text="Planned sets override:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_planned_sets.grid(row=7, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_ftir_validation_planned_sets = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_planned_sets, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_planned_sets.grid(row=7, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_ftir_form, text="Planned run min override:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=7, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_ftir_planned_run = tk.Label(report_builder_ftir_form, text="Planned run min override:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_ftir_planned_run.grid(row=7, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_ftir_validation_planned_run_min = tk.Entry(report_builder_ftir_form, textvariable=var_ftir_validation_planned_run_min, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_ftir_validation_planned_run_min.grid(row=7, column=3, sticky="ew", pady=(0, 6))
+
+    if help_mgr is not None:
+        help_mgr.bind(chk_ftir_validation_enabled, "runner.ftir.enable_package")
+        for widget in (lbl_ftir_validation_mode, cbo_ftir_validation_mode):
+            help_mgr.bind(widget, "runner.ftir.validation_mode")
+        for widget in (lbl_ftir_vendor, cbo_ftir_validation_vendor):
+            help_mgr.bind(widget, "runner.ftir.vendor_profile")
+        for widget in (lbl_ftir_file, ent_ftir_validation_file):
+            help_mgr.bind(widget, "runner.ftir.data_file")
+        for widget in (lbl_ftir_timestamp, ent_ftir_validation_timestamp_col):
+            help_mgr.bind(widget, "runner.ftir.timestamp_column")
+        for widget in (lbl_ftir_delimiter, cbo_ftir_validation_delimiter):
+            help_mgr.bind(widget, "runner.ftir.delimiter")
+        for widget in (lbl_ftir_offset, ent_ftir_validation_offset_s):
+            help_mgr.bind(widget, "runner.ftir.offset_seconds")
+        for widget in (lbl_ftir_analytes, ent_ftir_validation_analytes):
+            help_mgr.bind(widget, "runner.ftir.analytes")
+        for widget in (lbl_ftir_master_clock, cbo_ftir_validation_master_clock):
+            help_mgr.bind(widget, "runner.ftir.master_clock")
+        help_mgr.bind(chk_ftir_validation_execution_enabled, "runner.ftir.use_live_session_runs")
+        for widget in (lbl_ftir_execution_profile, cbo_ftir_validation_execution_profile):
+            help_mgr.bind(widget, "runner.ftir.execution_profile")
+        for widget in (lbl_ftir_purge, ent_ftir_validation_purge_min):
+            help_mgr.bind(widget, "runner.ftir.purge_minutes")
+        help_mgr.bind(chk_ftir_validation_require_purge, "runner.ftir.require_purge")
+        help_mgr.bind(chk_ftir_validation_require_bias, "runner.ftir.require_bias")
+        for widget in (lbl_ftir_planned_sets, ent_ftir_validation_planned_sets):
+            help_mgr.bind(widget, "runner.ftir.planned_sets_override")
+        for widget in (lbl_ftir_planned_run, ent_ftir_validation_planned_run_min):
+            help_mgr.bind(widget, "runner.ftir.planned_run_min_override")
 
     tk.Label(report_builder_ftir_form, textvariable=var_ftir_validation_execution_plan_status, fg=FG_DIM, bg=BG, font=("Consolas", 9), justify="left", wraplength=900).grid(row=8, column=0, columnspan=4, sticky="w", padx=(0, 8), pady=(0, 6))
 

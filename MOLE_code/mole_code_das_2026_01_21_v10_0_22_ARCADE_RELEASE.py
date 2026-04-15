@@ -110,6 +110,11 @@ except Exception:
     record_health_journal = None
     write_recovery_snapshot = None
 
+try:
+    from mole_ui_help_tooltips_v1 import get_ui_help_tooltip_manager
+except Exception:
+    get_ui_help_tooltip_manager = None
+
 from mole_ui_text_registry import (
     audit_ui_text_entries,
     format_ui_text_audit_report,
@@ -6197,19 +6202,29 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         intent = tk.LabelFrame(outer, text="Session Intent", bg=self.BG, fg=self.FG)
         intent.pack(anchor="nw", pady=(14, 6), fill="x")
         self._configure_form_grid(intent, minspec="wizard_toggle_pair")
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
 
-        tk.Checkbutton(intent, text="Record Data", variable=self.var_record_data,
+        chk_record_data = tk.Checkbutton(intent, text="Record Data", variable=self.var_record_data,
                        bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
-                       command=lambda: self._on_session_intent_toggle("RECORD")).grid(row=0, column=0, sticky="w", padx=10, pady=6)
-        tk.Checkbutton(intent, text="Tokenize", variable=self.var_tokenize,
+                       command=lambda: self._on_session_intent_toggle("RECORD"))
+        chk_record_data.grid(row=0, column=0, sticky="w", padx=10, pady=6)
+        chk_tokenize = tk.Checkbutton(intent, text="Tokenize", variable=self.var_tokenize,
                        bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
-                       command=lambda: self._on_session_intent_toggle("TOKEN")).grid(row=0, column=1, sticky="w", padx=10, pady=6)
-        tk.Checkbutton(intent, text=TEXT_DIAGNOSTICS_ONLY, variable=self.var_diagnostic_only,
+                       command=lambda: self._on_session_intent_toggle("TOKEN"))
+        chk_tokenize.grid(row=0, column=1, sticky="w", padx=10, pady=6)
+        chk_diagnostics_only = tk.Checkbutton(intent, text=TEXT_DIAGNOSTICS_ONLY, variable=self.var_diagnostic_only,
                        bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
-                       command=lambda: self._on_session_intent_toggle("DIAG")).grid(row=1, column=0, sticky="w", padx=10, pady=6)
-        tk.Checkbutton(intent, text="May Support Compliance", variable=self.var_may_support_compliance,
+                       command=lambda: self._on_session_intent_toggle("DIAG"))
+        chk_diagnostics_only.grid(row=1, column=0, sticky="w", padx=10, pady=6)
+        chk_may_support_compliance = tk.Checkbutton(intent, text="May Support Compliance", variable=self.var_may_support_compliance,
                        bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG,
-                       command=lambda: self._on_session_intent_toggle("COMPLIANCE")).grid(row=1, column=1, sticky="w", padx=10, pady=6)
+                       command=lambda: self._on_session_intent_toggle("COMPLIANCE"))
+        chk_may_support_compliance.grid(row=1, column=1, sticky="w", padx=10, pady=6)
+        if help_mgr is not None:
+            help_mgr.bind(chk_record_data, "wizard.session_intent.record_data")
+            help_mgr.bind(chk_tokenize, "wizard.session_intent.tokenize")
+            help_mgr.bind(chk_diagnostics_only, "wizard.session_intent.diagnostics_only")
+            help_mgr.bind(chk_may_support_compliance, "wizard.session_intent.may_support_compliance")
         tk.Label(
             intent,
             textvariable=self.var_session_intent_status,
@@ -6229,36 +6244,50 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             self._apply_validation_plan_policy()
 
         r = 0
-        ttk.Label(val_box, text="Session Type").grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        lbl_session_type = ttk.Label(val_box, text="Session Type")
+        lbl_session_type.grid(row=r, column=0, sticky="w", padx=10, pady=6)
         cb_session_type = ttk.Combobox(val_box, textvariable=self.var_validation_session_type, values=list(VALIDATION_SESSION_TYPES), state="readonly", width=24)
         cb_session_type.grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
         cb_session_type.bind("<<ComboboxSelected>>", _on_validation_change)
-        ttk.Label(val_box, text="Validation Mode").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        lbl_validation_mode = ttk.Label(val_box, text="Validation Mode")
+        lbl_validation_mode.grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
         cb_mode = ttk.Combobox(val_box, textvariable=self.var_validation_mode, values=list(VALIDATION_PLAN_MODES), state="readonly", width=28)
         cb_mode.grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
         cb_mode.bind("<<ComboboxSelected>>", _on_validation_change)
         r += 1
 
-        ttk.Label(val_box, text="Comparator Method").grid(row=r, column=0, sticky="w", padx=10, pady=6)
-        tk.Entry(val_box, textvariable=self.var_validation_comparator_method, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
-        ttk.Label(val_box, text="FTIR Vendor Profile").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
-        ttk.Combobox(val_box, textvariable=self.var_validation_vendor_profile, values=list(VALIDATION_VENDOR_OPTIONS), state="readonly", width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        lbl_comparator_method = ttk.Label(val_box, text="Comparator Method")
+        lbl_comparator_method.grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        ent_comparator_method = tk.Entry(val_box, textvariable=self.var_validation_comparator_method, width=28)
+        ent_comparator_method.grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        lbl_vendor_profile = ttk.Label(val_box, text="FTIR Vendor Profile")
+        lbl_vendor_profile.grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        cbo_vendor_profile = ttk.Combobox(val_box, textvariable=self.var_validation_vendor_profile, values=list(VALIDATION_VENDOR_OPTIONS), state="readonly", width=28)
+        cbo_vendor_profile.grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
         r += 1
 
         ttk.Label(val_box, text="Comparator Label").grid(row=r, column=0, sticky="w", padx=10, pady=6)
         tk.Entry(val_box, textvariable=self.var_validation_comparator_label, width=28).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
-        ttk.Label(val_box, text="Timestamp Master Clock").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
-        ttk.Combobox(val_box, textvariable=self.var_validation_master_clock, values=list(VALIDATION_MASTER_CLOCK_OPTIONS), state="readonly", width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        lbl_master_clock = ttk.Label(val_box, text="Timestamp Master Clock")
+        lbl_master_clock.grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        cbo_master_clock = ttk.Combobox(val_box, textvariable=self.var_validation_master_clock, values=list(VALIDATION_MASTER_CLOCK_OPTIONS), state="readonly", width=28)
+        cbo_master_clock.grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
         r += 1
 
-        ttk.Label(val_box, text="Planned Sets").grid(row=r, column=0, sticky="w", padx=10, pady=6)
-        tk.Entry(val_box, textvariable=self.var_validation_planned_sets, width=12).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
-        ttk.Label(val_box, text="Run Minutes").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
-        tk.Entry(val_box, textvariable=self.var_validation_run_minutes, width=12).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
+        lbl_planned_sets = ttk.Label(val_box, text="Planned Sets")
+        lbl_planned_sets.grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        ent_planned_sets = tk.Entry(val_box, textvariable=self.var_validation_planned_sets, width=12)
+        ent_planned_sets.grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        lbl_run_minutes = ttk.Label(val_box, text="Run Minutes")
+        lbl_run_minutes.grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
+        ent_run_minutes = tk.Entry(val_box, textvariable=self.var_validation_run_minutes, width=12)
+        ent_run_minutes.grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
         r += 1
 
-        ttk.Label(val_box, text="Purge Minutes").grid(row=r, column=0, sticky="w", padx=10, pady=6)
-        tk.Entry(val_box, textvariable=self.var_validation_purge_minutes, width=12).grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
+        lbl_purge_minutes = ttk.Label(val_box, text="Purge Minutes")
+        lbl_purge_minutes.grid(row=r, column=0, sticky="w", padx=10, pady=6)
+        ent_purge_minutes = tk.Entry(val_box, textvariable=self.var_validation_purge_minutes, width=12)
+        ent_purge_minutes.grid(row=r, column=1, sticky="ew", padx=(0, 10), pady=6)
         ttk.Label(val_box, text="Lead Scientist").grid(row=r, column=2, sticky="w", padx=(12, 6), pady=6)
         tk.Entry(val_box, textvariable=self.var_validation_lead_scientist, width=28).grid(row=r, column=3, sticky="ew", padx=(0, 10), pady=6)
         r += 1
@@ -6294,6 +6323,23 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             wraplength=760,
             font=("Consolas", 9),
         ).grid(row=r, column=0, columnspan=4, sticky="w", padx=10, pady=(2, 8))
+        if help_mgr is not None:
+            for widget in (lbl_session_type, cb_session_type):
+                help_mgr.bind(widget, "wizard.validation.session_type")
+            for widget in (lbl_validation_mode, cb_mode):
+                help_mgr.bind(widget, "wizard.validation.mode")
+            for widget in (lbl_comparator_method, ent_comparator_method):
+                help_mgr.bind(widget, "wizard.validation.comparator_method")
+            for widget in (lbl_vendor_profile, cbo_vendor_profile):
+                help_mgr.bind(widget, "wizard.validation.vendor_profile")
+            for widget in (lbl_master_clock, cbo_master_clock):
+                help_mgr.bind(widget, "wizard.validation.master_clock")
+            for widget in (lbl_planned_sets, ent_planned_sets):
+                help_mgr.bind(widget, "wizard.validation.planned_sets")
+            for widget in (lbl_run_minutes, ent_run_minutes):
+                help_mgr.bind(widget, "wizard.validation.run_minutes")
+            for widget in (lbl_purge_minutes, ent_purge_minutes):
+                help_mgr.bind(widget, "wizard.validation.purge_minutes")
         self._apply_validation_plan_policy()
 
         fuel_box = tk.LabelFrame(outer, text="Fuel Category", bg=self.BG, fg=self.FG)
@@ -6308,6 +6354,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                           bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat")
             b.pack(side="left", padx=4)
             self._fuel_buttons[code] = b
+            if help_mgr is not None:
+                help_mgr.bind(b, "wizard.fuel.category")
 
         dd_row = tk.Frame(fuel_box, bg=self.BG)
         dd_row.grid(row=1, column=0, sticky="w", padx=10, pady=(4, 8))
@@ -9238,9 +9286,15 @@ def _build_intake(self) -> None:
         box.pack(fill="x", anchor="nw", pady=(12, 0))
         self._configure_form_grid(box, minspec="wizard_qaqc")
 
-        ttk.Label(box, text="Resolved Profile (from Pollutants):").grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ttk.Combobox(box, textvariable=self.var_qaqc_method, state="disabled",
-                     values=self._qaqc_method_options, width=28).grid(row=0, column=1, sticky="w", pady=8)
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
+        lbl_qaqc_method = ttk.Label(box, text="Resolved Profile (from Pollutants):")
+        lbl_qaqc_method.grid(row=0, column=0, sticky="w", padx=10, pady=8)
+        cbo_qaqc_method = ttk.Combobox(box, textvariable=self.var_qaqc_method, state="disabled",
+                     values=self._qaqc_method_options, width=28)
+        cbo_qaqc_method.grid(row=0, column=1, sticky="w", pady=8)
+        if help_mgr is not None:
+            help_mgr.bind(lbl_qaqc_method, "wizard.qaqc.method")
+            help_mgr.bind(cbo_qaqc_method, "wizard.qaqc.method")
 
         ttk.Label(box, text="Sig digits (display):").grid(row=0, column=2, sticky="w", padx=(18, 6), pady=8)
         ttk.Combobox(box, textvariable=self.var_qaqc_sig_digits, state="readonly",
@@ -25329,6 +25383,7 @@ def _build_reference_audit(self: 'MoleDASWizard') -> None:
     cfg_box = tk.LabelFrame(outer, text="FTIR Config", bg=self.BG, fg=self.FG)
     cfg_box.pack(fill="x", pady=(0, 10))
     self._configure_form_grid(cfg_box, minspec="ftir_config_grid")
+    help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
     chk_ref_enabled = tk.Checkbutton(
         cfg_box,
         text="Enable MG2000 FTIR ingest",
@@ -25342,9 +25397,12 @@ def _build_reference_audit(self: 'MoleDASWizard') -> None:
         activeforeground=self.FG,
     )
     chk_ref_enabled.grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(8, 4))
-    tk.Label(cfg_box, text="Provider:", bg=self.BG, fg=self.MUTED).grid(row=0, column=2, sticky="w", padx=(18, 6), pady=(8, 4))
-    ttk.Combobox(cfg_box, textvariable=self.var_ref_provider, values=("MG2000_FTIR_PRN",), state="readonly", width=20).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=(8, 4))
-    tk.Label(cfg_box, text="Role:", bg=self.BG, fg=self.MUTED).grid(row=0, column=4, sticky="w", padx=(18, 6), pady=(8, 4))
+    lbl_ref_provider = tk.Label(cfg_box, text="Provider:", bg=self.BG, fg=self.MUTED)
+    lbl_ref_provider.grid(row=0, column=2, sticky="w", padx=(18, 6), pady=(8, 4))
+    cbo_ref_provider = ttk.Combobox(cfg_box, textvariable=self.var_ref_provider, values=("MG2000_FTIR_PRN",), state="readonly", width=20)
+    cbo_ref_provider.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=(8, 4))
+    lbl_ref_role = tk.Label(cfg_box, text="Role:", bg=self.BG, fg=self.MUTED)
+    lbl_ref_role.grid(row=0, column=4, sticky="w", padx=(18, 6), pady=(8, 4))
     cb_ref_role = ttk.Combobox(cfg_box, textvariable=self.var_ref_role, values=("AUDIT", "REFERENCE"), state="readonly", width=12)
     cb_ref_role.grid(row=0, column=5, sticky="ew", padx=(0, 10), pady=(8, 4))
     tk.Label(cfg_box, text="Method:", bg=self.BG, fg=self.MUTED).grid(row=1, column=0, sticky="w", padx=10, pady=4)
@@ -25357,7 +25415,8 @@ def _build_reference_audit(self: 'MoleDASWizard') -> None:
     )
     cb_ref_method.grid(row=1, column=1, columnspan=5, sticky="ew", padx=(0, 10), pady=4)
 
-    tk.Label(cfg_box, text="PRN path or folder:", bg=self.BG, fg=self.FG).grid(row=2, column=0, sticky="w", padx=10, pady=4)
+    lbl_ref_path = tk.Label(cfg_box, text="PRN path or folder:", bg=self.BG, fg=self.FG)
+    lbl_ref_path.grid(row=2, column=0, sticky="w", padx=10, pady=4)
     ent_path = ttk.Entry(cfg_box, textvariable=self.var_ref_prn_path)
     ent_path.grid(row=2, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=4)
 
@@ -25388,8 +25447,10 @@ def _build_reference_audit(self: 'MoleDASWizard') -> None:
     tk.Button(cfg_box, text="Browse File", command=_browse_ref_file, bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").grid(row=2, column=4, sticky="ew", padx=(0, 6), pady=4)
     tk.Button(cfg_box, text="Browse Folder", command=_browse_ref_dir, bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").grid(row=2, column=5, sticky="ew", padx=(0, 10), pady=4)
 
-    tk.Label(cfg_box, text="Pattern:", bg=self.BG, fg=self.FG).grid(row=3, column=0, sticky="w", padx=10, pady=(4, 8))
-    ttk.Entry(cfg_box, textvariable=self.var_ref_file_pattern, width=16).grid(row=3, column=1, sticky="ew", padx=(0, 10), pady=(4, 8))
+    lbl_ref_pattern = tk.Label(cfg_box, text="Pattern:", bg=self.BG, fg=self.FG)
+    lbl_ref_pattern.grid(row=3, column=0, sticky="w", padx=10, pady=(4, 8))
+    ent_ref_pattern = ttk.Entry(cfg_box, textvariable=self.var_ref_file_pattern, width=16)
+    ent_ref_pattern.grid(row=3, column=1, sticky="ew", padx=(0, 10), pady=(4, 8))
     tk.Checkbutton(
         cfg_box,
         text="Recursive folder scan",
@@ -25402,8 +25463,22 @@ def _build_reference_audit(self: 'MoleDASWizard') -> None:
         activebackground=self.BG,
         activeforeground=self.FG,
     ).grid(row=3, column=2, columnspan=2, sticky="w", padx=(18, 6), pady=(4, 8))
-    tk.Label(cfg_box, text="Freshness (s):", bg=self.BG, fg=self.FG).grid(row=3, column=4, sticky="w", padx=(18, 6), pady=(4, 8))
-    ttk.Entry(cfg_box, textvariable=self.var_ref_freshness_s, width=8).grid(row=3, column=5, sticky="ew", padx=(0, 10), pady=(4, 8))
+    lbl_ref_freshness = tk.Label(cfg_box, text="Freshness (s):", bg=self.BG, fg=self.FG)
+    lbl_ref_freshness.grid(row=3, column=4, sticky="w", padx=(18, 6), pady=(4, 8))
+    ent_ref_freshness = ttk.Entry(cfg_box, textvariable=self.var_ref_freshness_s, width=8)
+    ent_ref_freshness.grid(row=3, column=5, sticky="ew", padx=(0, 10), pady=(4, 8))
+    if help_mgr is not None:
+        help_mgr.bind(chk_ref_enabled, "wizard.reference_ftir.enable_ingest")
+        for widget in (lbl_ref_provider, cbo_ref_provider):
+            help_mgr.bind(widget, "wizard.reference_ftir.provider")
+        for widget in (lbl_ref_role, cb_ref_role):
+            help_mgr.bind(widget, "wizard.reference_ftir.role")
+        for widget in (lbl_ref_path, ent_path):
+            help_mgr.bind(widget, "wizard.reference_ftir.prn_path")
+        for widget in (lbl_ref_pattern, ent_ref_pattern):
+            help_mgr.bind(widget, "wizard.reference_ftir.file_pattern")
+        for widget in (lbl_ref_freshness, ent_ref_freshness):
+            help_mgr.bind(widget, "wizard.reference_ftir.freshness_s")
 
     map_box = tk.LabelFrame(outer, text="Column Mapping", bg=self.BG, fg=self.FG)
     map_box.pack(fill="x", pady=(0, 10))
