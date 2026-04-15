@@ -111,6 +111,12 @@ try:
 except Exception:
     mole_spec_engine = None
 
+try:
+    from mole_runtime_durability_v1 import atomic_write_json, write_recovery_snapshot
+except Exception:
+    atomic_write_json = None
+    write_recovery_snapshot = None
+
 
 
 
@@ -3585,7 +3591,10 @@ def init_outputs(session: Dict[str, Any], cfg_path: Path, outdir_arg: Optional[s
 def _safe_write_json(path: Path, obj: dict) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding='utf-8')
+        if atomic_write_json is not None:
+            atomic_write_json(path, obj)
+        else:
+            path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding='utf-8')
     except Exception:
         # never fail acquisition due to metadata writes
         return
@@ -5218,7 +5227,21 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _save_session(sess: Dict[str, Any]) -> None:
         try:
-            cfg_path.write_text(json.dumps(ensure_session_schema(sess, actor="runner_save"), indent=2), encoding="utf-8")
+            normalized = ensure_session_schema(sess, actor="runner_save")
+            if atomic_write_json is not None:
+                atomic_write_json(cfg_path, normalized)
+            else:
+                cfg_path.write_text(json.dumps(normalized, indent=2), encoding="utf-8")
+            try:
+                if write_recovery_snapshot is not None:
+                    write_recovery_snapshot(
+                        normalized,
+                        outputs.meta_dir / "recovery",
+                        label="runner_session_config",
+                        keep=20,
+                    )
+            except Exception:
+                pass
         except Exception as e:
             raise ConfigError(f"Failed to write config JSON: {e}")
 

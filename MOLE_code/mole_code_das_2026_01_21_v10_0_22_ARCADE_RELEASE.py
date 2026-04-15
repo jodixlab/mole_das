@@ -98,6 +98,13 @@ try:
 except Exception:
     mole_spike_recovery = None
 
+try:
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, write_recovery_snapshot
+except Exception:
+    atomic_write_json = None
+    backup_sqlite_database = None
+    write_recovery_snapshot = None
+
 from mole_ui_text_registry import (
     audit_ui_text_entries,
     format_ui_text_audit_report,
@@ -469,6 +476,9 @@ def safe_mkdir(p: Path) -> None:
 
 
 def write_json(p: Path, data: Dict[str, Any]) -> None:
+    if atomic_write_json is not None:
+        atomic_write_json(p, data)
+        return
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -18171,6 +18181,26 @@ def _build_intake(self) -> None:
         self.session = ensure_session_schema(self.session, actor="wizard_save_apply")
         self.session["paths"]["session_config_path"] = str(out_path)
         write_json(out_path, self.session)
+        try:
+            if write_recovery_snapshot is not None:
+                write_recovery_snapshot(
+                    self.session,
+                    Path(self.backups_dir) / "session_recovery",
+                    label=f"wizard_session_{job}",
+                    keep=20,
+                )
+        except Exception:
+            pass
+        try:
+            if backup_sqlite_database is not None:
+                backup_sqlite_database(
+                    Path(self.master_db_path),
+                    Path(self.backups_dir) / "sqlite_master",
+                    label="mole_master",
+                    keep=10,
+                )
+        except Exception:
+            pass
 
         self.nav_enabled = True
         self._refresh_nav()
