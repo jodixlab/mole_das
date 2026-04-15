@@ -5288,6 +5288,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     )
             except Exception:
                 pass
+            try:
+                _refresh_runner_recovery_banner(normalized)
+            except Exception:
+                pass
         except Exception as e:
             raise ConfigError(f"Failed to write config JSON: {e}")
 
@@ -8033,6 +8037,28 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     deliverable_status_lbl = tk.Label(left_inner, textvariable=deliverable_status_var, fg=FG_DIM, bg=BG, font=("Consolas", 9, "bold"), anchor="w", justify="left")
     deliverable_status_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     _bind_safe_wrap(deliverable_status_lbl, left, pad_px=32, min_wrap=180)
+    recovery_status_var = tk.StringVar(value="Recoverable state: (not evaluated)")
+    recovery_status_lbl = tk.Label(left_inner, textvariable=recovery_status_var, fg=FG_DIM, bg=BG, font=("Consolas", 9), anchor="w", justify="left")
+    recovery_status_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 6))
+    _bind_safe_wrap(recovery_status_lbl, left, pad_px=32, min_wrap=180)
+    recovery_btns = tk.Frame(left_inner, bg=BG)
+    recovery_btns.pack(fill="x", padx=12, pady=(0, 8))
+    tk.Button(
+        recovery_btns,
+        text="Open Recovery Snapshot",
+        command=lambda: _open_fs_target(_runner_recovery_snapshot_path(_load_session()), title="Open Recovery Snapshot Failed"),
+        bg=BTN_BG,
+        fg=FG,
+        relief="flat",
+    ).pack(fill="x", pady=(0, 4))
+    tk.Button(
+        recovery_btns,
+        text="Open Recovery Folder",
+        command=lambda: _open_fs_target(_runner_recovery_dir(_load_session()), title="Open Recovery Folder Failed"),
+        bg=BTN_BG,
+        fg=FG,
+        relief="flat",
+    ).pack(fill="x")
 
     btns = tk.Frame(left_inner, bg=BG)
     btns.pack(fill="x", padx=12, pady=(8, 10))
@@ -14873,6 +14899,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         status_var.set("Status: READY")
         _refresh_session_review_banner(sess)
         _refresh_deliverable_status_banner(sess)
+        _refresh_runner_recovery_banner(sess)
         _populate_pollutants(sess)
         _load_reference_config(sess)
         _populate_reference_table(sess)
@@ -15366,6 +15393,46 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             try:
                 deliverable_status_var.set("Deliverable readiness: (unavailable)")
+            except Exception:
+                pass
+
+    def _runner_recovery_dir(sess_local: Dict[str, Any]) -> Path:
+        try:
+            ui_outputs = init_outputs(sess_local, cfg_path, None)
+            return ui_outputs.meta_dir / "recovery"
+        except Exception:
+            return cfg_path.parent / "meta" / "recovery"
+
+    def _runner_recovery_snapshot_path(sess_local: Dict[str, Any]) -> Optional[Path]:
+        recovery_dir = _runner_recovery_dir(sess_local)
+        if latest_matching_path is not None:
+            try:
+                return latest_matching_path(recovery_dir, "runner_session_config__*.json")
+            except Exception:
+                pass
+        try:
+            snaps = sorted(recovery_dir.glob("runner_session_config__*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            return snaps[0] if snaps else None
+        except Exception:
+            return None
+
+    def _runner_recovery_status_text(sess_local: Dict[str, Any]) -> str:
+        snapshot = _runner_recovery_snapshot_path(sess_local)
+        live_name = cfg_path.name if cfg_path is not None else "(unknown)"
+        if snapshot is None:
+            return f"Recoverable state: live={live_name} | snapshot=(none yet)"
+        try:
+            updated = datetime.fromtimestamp(snapshot.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            updated = "(time unavailable)"
+        return f"Recoverable state: live={live_name} | snapshot={snapshot.name} @ {updated}"
+
+    def _refresh_runner_recovery_banner(sess_local: Dict[str, Any]) -> None:
+        try:
+            recovery_status_var.set(_runner_recovery_status_text(sess_local))
+        except Exception:
+            try:
+                recovery_status_var.set("Recoverable state: (unavailable)")
             except Exception:
                 pass
 

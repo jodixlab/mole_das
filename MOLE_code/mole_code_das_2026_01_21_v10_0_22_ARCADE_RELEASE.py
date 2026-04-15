@@ -3066,6 +3066,18 @@ class MoleDASWizard(tk.Tk):
             font=("Consolas", 9, "bold"),
         )
         self.lbl_review_notice.pack(fill="x", padx=12, pady=(0, 10))
+        self.var_recovery_notice = tk.StringVar(value="")
+        self.lbl_recovery_notice = tk.Label(
+            self.left_header,
+            textvariable=self.var_recovery_notice,
+            fg="#9fb0c0",
+            bg=self.BG,
+            justify="left",
+            anchor="w",
+            wraplength=280,
+            font=("Consolas", 9),
+        )
+        self.lbl_recovery_notice.pack(fill="x", padx=12, pady=(0, 10))
 
         # Footer (always visible)
         self.left_footer = tk.Frame(self.left, bg=self.BG)
@@ -3075,6 +3087,24 @@ class MoleDASWizard(tk.Tk):
                   bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=(12, 4))
         tk.Button(self.left_footer, text="Load Existing Config...", command=self.load_existing,
                   bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=4)
+        recovery_actions = tk.Frame(self.left_footer, bg=self.BG)
+        recovery_actions.pack(fill="x", padx=12, pady=(8, 4))
+        tk.Button(
+            recovery_actions,
+            text="Open Recovery Snapshot",
+            command=self._open_latest_wizard_recovery_snapshot,
+            bg="#14202d",
+            fg=self.BTN_FG,
+            relief="flat",
+        ).pack(fill="x", pady=(0, 4))
+        tk.Button(
+            recovery_actions,
+            text="Open Last DB Backup",
+            command=self._open_latest_wizard_db_backup,
+            bg="#14202d",
+            fg=self.BTN_FG,
+            relief="flat",
+        ).pack(fill="x")
 
         # CSV export (tab + full package)
         tk.Button(self.left_footer, text="Export Tab CSV...", command=self.export_current_tab_csv,
@@ -3297,6 +3327,13 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         except Exception:
             try:
                 self.var_review_notice.set("")
+            except Exception:
+                pass
+        try:
+            self.var_recovery_notice.set(self._wizard_recovery_notice_text())
+        except Exception:
+            try:
+                self.var_recovery_notice.set("")
             except Exception:
                 pass
         self.lbl_status.configure(text="\n".join(lines))
@@ -6350,6 +6387,64 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         if basis and decision != "UNSIGNED":
             msg += f" | basis={basis}"
         return msg
+
+    def _latest_wizard_recovery_snapshot_path(self) -> Optional[Path]:
+        snap_dir = Path(self.backups_dir) / "session_recovery"
+        if latest_matching_path is not None:
+            try:
+                return latest_matching_path(snap_dir, "wizard_session_*.json")
+            except Exception:
+                pass
+        try:
+            snaps = sorted(snap_dir.glob("wizard_session_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+            return snaps[0] if snaps else None
+        except Exception:
+            return None
+
+    def _latest_wizard_db_backup_path(self) -> Optional[Path]:
+        backup_dir = Path(self.backups_dir) / "sqlite_master"
+        if latest_matching_path is not None:
+            try:
+                return latest_matching_path(backup_dir, "mole_master__*.sqlite")
+            except Exception:
+                pass
+        try:
+            backups = sorted(backup_dir.glob("mole_master__*.sqlite"), key=lambda p: p.stat().st_mtime, reverse=True)
+            return backups[0] if backups else None
+        except Exception:
+            return None
+
+    def _durability_path_stamp(self, path_obj: Optional[Path]) -> str:
+        if path_obj is None:
+            return "(none)"
+        try:
+            updated = datetime.fromtimestamp(path_obj.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            updated = "(time unavailable)"
+        return f"{path_obj.name} @ {updated}"
+
+    def _wizard_recovery_notice_text(self) -> str:
+        snap = self._latest_wizard_recovery_snapshot_path()
+        db_backup = self._latest_wizard_db_backup_path()
+        return " | ".join([
+            "Live state: in-memory wizard draft",
+            f"Recoverable snapshot: {self._durability_path_stamp(snap)}",
+            f"SQLite backup: {self._durability_path_stamp(db_backup)}",
+        ])
+
+    def _open_latest_wizard_recovery_snapshot(self) -> None:
+        snap = self._latest_wizard_recovery_snapshot_path()
+        if snap is None:
+            messagebox.showwarning("Recovery Snapshot", "No Wizard recovery snapshot is available yet.")
+            return
+        self._dbpaths_open_path(str(snap))
+
+    def _open_latest_wizard_db_backup(self) -> None:
+        backup = self._latest_wizard_db_backup_path()
+        if backup is None:
+            messagebox.showwarning("SQLite Backup", "No SQLite backup is available yet.")
+            return
+        self._dbpaths_open_path(str(backup))
 
     def _apply_validation_plan_policy(self) -> None:
         session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"
