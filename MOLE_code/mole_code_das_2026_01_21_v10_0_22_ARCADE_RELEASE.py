@@ -26061,7 +26061,19 @@ def _bind_detached_wizard_methods(cls) -> List[str]:
             try:
                 if c.co_argcount >= 1 and c.co_varnames and c.co_varnames[0] == "self":
                     if not hasattr(cls, c.co_name):
-                        fn = types.FunctionType(c, mod_dict)
+                        # Preserve defaults when rebinding detached nested methods.
+                        defaults = None
+                        kwdefaults = None
+                        for maybe_fn in list(mod_dict.values()):
+                            if not inspect.isfunction(maybe_fn):
+                                continue
+                            if maybe_fn.__code__ is c:
+                                defaults = getattr(maybe_fn, "__defaults__", None)
+                                kwdefaults = getattr(maybe_fn, "__kwdefaults__", None)
+                                break
+                        fn = types.FunctionType(c, mod_dict, c.co_name, defaults)
+                        if kwdefaults:
+                            fn.__kwdefaults__ = dict(kwdefaults)
                         setattr(cls, c.co_name, fn)
                         patched.append(c.co_name)
             except Exception:
@@ -26105,6 +26117,14 @@ try:
     _DETACHED_WIZARD_METHODS = _bind_detached_wizard_methods(MoleDASWizard)
 except Exception:
     _DETACHED_WIZARD_METHODS = []
+
+try:
+    if hasattr(MoleDASWizard, "load_existing"):
+        _fn = getattr(MoleDASWizard, "load_existing")
+        if inspect.isfunction(_fn) and not getattr(_fn, "__defaults__", None):
+            _fn.__defaults__ = (None, None)
+except Exception:
+    pass
 
 if __name__ == "__main__":
 
