@@ -95,6 +95,11 @@ Practical note:
 
 - If `MOLE_code\.venv` points to a removed Python install, rebuild the venv and rerun the installer.
 
+## 3.1 Recovery and Support Capture
+
+<!-- HELP_ID: runner.recovery.export_support_bundle -->
+The current build preserves recovery snapshots, database backups, and support-bundle export actions so recoverable state and field-support evidence can be captured before or after a runtime failure.
+
 ## 4. Current Operator Workflow
 
 ## 4.1 Wizard-first workflow
@@ -104,10 +109,12 @@ The Wizard is the authoritative operating front end.
 Current sequence:
 
 1. Launch the Wizard.
+<!-- HELP_ID: wizard.actions.load_existing_config -->
 2. Create or load the session.
 3. Complete source details.
 4. Complete pollutants, QA/QC, site, fuel, regulatory, and FTIR settings as applicable.
 5. Set session intent.
+<!-- HELP_ID: wizard.actions.save_apply -->
 6. Save + Apply Config.
 7. Launch the runner from the Wizard.
 

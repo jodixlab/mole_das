@@ -21,6 +21,7 @@ The diagnostics-only shell that opens when `Diagnostics-only` is enabled and the
 
 The diagnostics-only technician attestation workflow that records pre-test and post-test verification status, operator identity, worksheet reference, gas IDs, and notes.
 
+<!-- HELP_ID: wizard.session_intent.diagnostics_only -->
 ### Diagnostics-only
 
 Wizard session-intent flag that routes the runner launch buttons into the diagnostics-only shell and disables compliance support.
@@ -71,6 +72,7 @@ Read-only combustion advisory panel fed from current runner state, site conditio
 
 ## 2. Current Policy Definitions
 
+<!-- HELP_ID: wizard.session_intent.may_support_compliance -->
 ### Compliance support
 
 A session posture in which the formal runner and downstream QA/QC/report features are intended to support formal project execution.

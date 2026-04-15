@@ -22,6 +22,7 @@ This protocol is structured to follow the comparison framework in EPA Method 301
 
 ## 1. Scope and Objectives
 
+<!-- HELP_ID: wizard.validation.mode -->
 ### 1.1 Scope
 
 This experiment evaluates the performance of the MOLE hardware against an FTIR operated at the same source, at the same sampling location, and over the same operating period. The comparison is limited to analytes measured by both systems on the same reporting basis and unit system.
@@ -101,6 +102,7 @@ The Peer Scientist shall:
 | t-test | The statistical comparison used to determine whether the mean difference between methods is significant. |
 | Correction factor | A source-specific factor used to correct future candidate-method data when relative bias is greater than 10 percent but less than or equal to 30 percent. |
 | Valid data window | A comparison interval meeting timing, analyzer status, and data-completeness requirements. |
+<!-- HELP_ID: wizard.validation.master_clock -->
 | Timestamp master clock | The authoritative time reference used to align MOLE and FTIR data streams. |
 | Rejected data | Data excluded from the Method 301 comparison set for documented technical reasons. |
 
@@ -155,6 +157,7 @@ EPA Method 301 requires six quadruplicate sets when comparing a candidate method
 
 If the deployed field configuration does not create six quadruplicate sets, the study may still provide strong side-by-side evidence, but the final report shall clearly distinguish that study from a full Method 301 validation.
 
+<!-- HELP_ID: runner.ftir.apply_selected_sweep -->
 ### 4.5 Data Normalization and Timestamp Alignment
 
 Post-processing shall be performed as follows:
@@ -168,6 +171,7 @@ Post-processing shall be performed as follows:
 - separate raw, filtered, and averaged datasets as distinct deliverables; and
 - document all exclusions, replacements, and adjustments in an auditable log.
 
+<!-- HELP_ID: runner.ftir.exclude_selected -->
 ### 4.6 Data Management Deliverables
 
 The test package shall include:
@@ -194,6 +198,7 @@ The test package shall include:
 | 5 |  |  |  |  |  |  |  |
 | 6 |  |  |  |  |  |  |  |
 
+<!-- HELP_ID: runner.ftir.accept_selected_set -->
 ## 5. Acceptance Criteria
 
 Acceptance criteria shall follow EPA Method 301 for comparison of a candidate method to a validated method.

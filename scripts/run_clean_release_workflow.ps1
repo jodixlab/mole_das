@@ -223,8 +223,7 @@ finally {
             Invoke-Native -FilePath $python -ArgumentList @(
                 $docSyncScript,
                 "--repo-root", $repo,
-                "--output-dir", $artifactDir,
-                "--write-state"
+                "--output-dir", $artifactDir
             ) -WorkingDirectory $repo
             Add-StepResult -Name "ui_help_doc_update_pack" -Status "PASS" -Detail "UI help documentation update pack generated."
             Write-SummaryFiles

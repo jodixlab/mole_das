@@ -1,31 +1,31 @@
 {
   "schema": "mole_ui_help_doc_sync_state_v1",
-  "generated_utc": "2026-04-15T17:57:20.631673+00:00",
+  "generated_utc": "2026-04-15T18:25:29.153956+00:00",
   "source_manifest": "config/mole_ui_help_doc_sources_v1.json",
   "sources": [
     {
       "id": "technical_manual",
       "doc_label": "MOLE DAS Technical and Operating Manual",
       "path": "docs/MOLE_DAS_TECHNICAL_AND_OPERATING_MANUAL_2026_03_12.md",
-      "sha256": "f51b1bc273141f728b198ab092f579679ea4dc5be52ed9a5397d98c38a599177"
+      "sha256": "be520dec66f7dff171a55e10caacd1ea4f102bc339b74b0f0617e4a25c3fa0d6"
     },
     {
       "id": "terms_definitions",
       "doc_label": "MOLE DAS Terms, Definitions, and References",
       "path": "docs/MOLE_DAS_TERMS_DEFINITIONS_AND_REFERENCES_2026_03_12.md",
-      "sha256": "98db4a97a90ad9173d28361b22c960ebf8ae0df1b91dbcf9661e570f3387b95b"
+      "sha256": "2cf8d088474f9baae47f278ce302bf8d4527284d7a2e9d88f52a4753935a6050"
     },
     {
       "id": "worksteps_master",
       "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
       "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
-      "sha256": "849e0f1829bac3ac4ba7d888c9ee278ccb6e4b06c5a851754bf1c737c075d442"
+      "sha256": "52a03b8a8fa0700c2077913d8cf1542d499015a879574bc24f81ff0698309861"
     },
     {
       "id": "ftir_method301_protocol",
       "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
       "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
-      "sha256": "13e13153397b337dea7aed01f10e7bc9ab945fbe01f626a5ed9ad6b9cd971860"
+      "sha256": "8c60d2f401fb559de73ca02ee0116b8bb22b2cb1d28128ce3aedf8fd1ee56b36"
     }
   ]
 }

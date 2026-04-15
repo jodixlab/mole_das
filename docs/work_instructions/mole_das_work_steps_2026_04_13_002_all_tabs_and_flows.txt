@@ -1060,11 +1060,15 @@ Testing Flow Paths
 				- review comparison sets
 				- apply explicit reviewer decisions to every comparison set
 				- resolve any QA hard blocks
+				[HELP_ID: runner.ftir.lock_review]
 				- lock FTIR review
+				[HELP_ID: runner.ftir.sign_off_action]
 				- sign off FTIR validation
 			- Session Review / Approval
 				- lock package review
+				[HELP_ID: runner.session_review.sign_off_action]
 				- sign off package review
+			[HELP_ID: runner.report.build_final_report]
 			- Build report
 	- Expected outputs:
 		- formal FTIR validation package

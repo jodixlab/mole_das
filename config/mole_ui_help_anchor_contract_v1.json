@@ -1,0 +1,76 @@
+{
+  "schema": "mole_ui_help_anchor_contract_v1",
+  "note": "Required help IDs that must resolve to stable source anchors in the canonical docs.",
+  "required_anchors": [
+    {
+      "help_id": "wizard.actions.load_existing_config",
+      "doc_id": "technical_manual",
+      "note": "Wizard load/resume workflow"
+    },
+    {
+      "help_id": "wizard.actions.save_apply",
+      "doc_id": "technical_manual",
+      "note": "Wizard commit/handoff workflow"
+    },
+    {
+      "help_id": "wizard.session_intent.diagnostics_only",
+      "doc_id": "terms_definitions",
+      "note": "Diagnostics-only governing term"
+    },
+    {
+      "help_id": "wizard.session_intent.may_support_compliance",
+      "doc_id": "terms_definitions",
+      "note": "Compliance-support governing term"
+    },
+    {
+      "help_id": "runner.recovery.export_support_bundle",
+      "doc_id": "technical_manual",
+      "note": "Runtime recovery/support action"
+    },
+    {
+      "help_id": "runner.report.build_final_report",
+      "doc_id": "worksteps_master",
+      "note": "Formal report-builder action"
+    },
+    {
+      "help_id": "runner.session_review.sign_off_action",
+      "doc_id": "worksteps_master",
+      "note": "Shared package approval action"
+    },
+    {
+      "help_id": "runner.ftir.lock_review",
+      "doc_id": "worksteps_master",
+      "note": "FTIR frozen review action"
+    },
+    {
+      "help_id": "runner.ftir.sign_off_action",
+      "doc_id": "worksteps_master",
+      "note": "FTIR approval action"
+    },
+    {
+      "help_id": "wizard.validation.mode",
+      "doc_id": "ftir_method301_protocol",
+      "note": "Formal vs informed comparison basis"
+    },
+    {
+      "help_id": "wizard.validation.master_clock",
+      "doc_id": "ftir_method301_protocol",
+      "note": "Timestamp master clock basis"
+    },
+    {
+      "help_id": "runner.ftir.apply_selected_sweep",
+      "doc_id": "ftir_method301_protocol",
+      "note": "Alignment offset application"
+    },
+    {
+      "help_id": "runner.ftir.exclude_selected",
+      "doc_id": "ftir_method301_protocol",
+      "note": "Row-level exclusion control"
+    },
+    {
+      "help_id": "runner.ftir.accept_selected_set",
+      "doc_id": "ftir_method301_protocol",
+      "note": "Comparison-set acceptance control"
+    }
+  ]
+}

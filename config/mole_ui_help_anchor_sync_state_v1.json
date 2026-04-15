@@ -1,0 +1,119 @@
+{
+  "schema": "mole_ui_help_anchor_sync_state_v1",
+  "generated_utc": "2026-04-15T18:25:29.153956+00:00",
+  "anchor_contract_path": "config/mole_ui_help_anchor_contract_v1.json",
+  "anchors": [
+    {
+      "help_id": "wizard.actions.load_existing_config",
+      "doc_id": "technical_manual",
+      "doc_label": "MOLE DAS Technical and Operating Manual",
+      "path": "docs/MOLE_DAS_TECHNICAL_AND_OPERATING_MANUAL_2026_03_12.md",
+      "excerpt_hash": "992f41d951d5c765a6f086365c24784d6c0365d51ee161b8ef9c236aebf8a015",
+      "registry_hash": "6881291f3ff2a629291c6a22b6c684b9055671a079e0f7e5b1a86e62258abf07"
+    },
+    {
+      "help_id": "wizard.actions.save_apply",
+      "doc_id": "technical_manual",
+      "doc_label": "MOLE DAS Technical and Operating Manual",
+      "path": "docs/MOLE_DAS_TECHNICAL_AND_OPERATING_MANUAL_2026_03_12.md",
+      "excerpt_hash": "cd92c1ca70d112ce9b9c082c666f2a7e44550c0b05cd308116e86e45ecc1534e",
+      "registry_hash": "c0ba8408a597597a889d702b589a53737ef957d96c8a58f9f737a932d7ed9d80"
+    },
+    {
+      "help_id": "wizard.session_intent.diagnostics_only",
+      "doc_id": "terms_definitions",
+      "doc_label": "MOLE DAS Terms, Definitions, and References",
+      "path": "docs/MOLE_DAS_TERMS_DEFINITIONS_AND_REFERENCES_2026_03_12.md",
+      "excerpt_hash": "b5851721492e9d1bf6776aaaa87daa1242bc0fb0dcda2fe9e40ba0b95b1d544c",
+      "registry_hash": "699ed869859d95a72dd8da0dfa8914b8a8d002eef8674b2a32f646194ce8478f"
+    },
+    {
+      "help_id": "wizard.session_intent.may_support_compliance",
+      "doc_id": "terms_definitions",
+      "doc_label": "MOLE DAS Terms, Definitions, and References",
+      "path": "docs/MOLE_DAS_TERMS_DEFINITIONS_AND_REFERENCES_2026_03_12.md",
+      "excerpt_hash": "a336abff6f96da5a18b6852cd4672563a84374a8d69c737ce39c8bb2c6ecd0ad",
+      "registry_hash": "1b612802f49a69929404fb5eaa1d051d9a4543aaf90ec2c367d049fcefeb29f1"
+    },
+    {
+      "help_id": "runner.recovery.export_support_bundle",
+      "doc_id": "technical_manual",
+      "doc_label": "MOLE DAS Technical and Operating Manual",
+      "path": "docs/MOLE_DAS_TECHNICAL_AND_OPERATING_MANUAL_2026_03_12.md",
+      "excerpt_hash": "bbb322be86f133ccfb6f065fad0200f311059ea94123a8075eb5e90e38b2a61a",
+      "registry_hash": "1bebdbbf954bf3b40d138935256005c301ab58a3c7aa0c8b47a49802a5a0f9af"
+    },
+    {
+      "help_id": "runner.report.build_final_report",
+      "doc_id": "worksteps_master",
+      "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+      "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
+      "excerpt_hash": "f64915eb2e1bb07c7e31dd76d50cbce8f070847b803db6f7e6f25283612b1f28",
+      "registry_hash": "7712a2f27195c1639a5fbbad58a40bf2564deeb89a0a330c4aa71e6621a22605"
+    },
+    {
+      "help_id": "runner.session_review.sign_off_action",
+      "doc_id": "worksteps_master",
+      "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+      "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
+      "excerpt_hash": "8532968156ad64034b246bac1184fcd66fcf2c26d4119acd4f3af226af9d8d41",
+      "registry_hash": "dee5e2cce7a594bd4c695df7b98367d591135bc241d7c33664d8a6c1e9782984"
+    },
+    {
+      "help_id": "runner.ftir.lock_review",
+      "doc_id": "worksteps_master",
+      "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+      "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
+      "excerpt_hash": "87d75bcf75c9c28e868f62f6a277770c6895156c231e8bc7769050091e16f35f",
+      "registry_hash": "80bc95d35422aa3ea0f0c0017b5ae091902e79d3eeee6a126f997ef40a54bfa6"
+    },
+    {
+      "help_id": "runner.ftir.sign_off_action",
+      "doc_id": "worksteps_master",
+      "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+      "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
+      "excerpt_hash": "7c7146e701dfe7e5050a08f4ea586d22a571ccb37f5ff4d246fa699663ed598a",
+      "registry_hash": "79dec1e143d2c5e267207b1404c1f1c4cf13cf61d9f60ba7e5f4b0541d0f0c4b"
+    },
+    {
+      "help_id": "wizard.validation.mode",
+      "doc_id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "excerpt_hash": "b3ca924cc4ea1bf5ea58c526fe012a851a5027a137d05ad75b96ff73cd3bfcad",
+      "registry_hash": "465570cafe3406dbb3edf146ac390d56a3d072a54cd29c38a1409eb5315b1cfe"
+    },
+    {
+      "help_id": "wizard.validation.master_clock",
+      "doc_id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "excerpt_hash": "7d2d73aa013e62407c59bf9f82daa0e09317ba339dcf64be03595630ed8ffaf2",
+      "registry_hash": "bbffdf2e957a3c5244b8b9e76f5f5773e633c2eb96ca18d5c9ee5f46fa1d364d"
+    },
+    {
+      "help_id": "runner.ftir.apply_selected_sweep",
+      "doc_id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "excerpt_hash": "64b146a22c867a7bb0e8a42afea62d5710da15145c128d18fe68830e19105306",
+      "registry_hash": "542a875cb495f975bcc0fb6d566eff9a884a6d2c8a89d9d959eee1ad8b2ccc97"
+    },
+    {
+      "help_id": "runner.ftir.exclude_selected",
+      "doc_id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "excerpt_hash": "e2317f86f6a85bde68518aa5ed527343735d1bfe4796c472ab14ac408b102114",
+      "registry_hash": "95dbc37bdcfe05ce74cb935b910c67eceef8b1a03ec52fa16ae8baf6955bf21d"
+    },
+    {
+      "help_id": "runner.ftir.accept_selected_set",
+      "doc_id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "excerpt_hash": "5b5f9ebf0b4a17a0a293c6a58275743c100be9195d14f81a3669ebdadfb8f2bf",
+      "registry_hash": "5bcb156e8385605b2d3615da190d6edadfe3e4679e2739c4e017ab2d215ded46"
+    }
+  ]
+}
