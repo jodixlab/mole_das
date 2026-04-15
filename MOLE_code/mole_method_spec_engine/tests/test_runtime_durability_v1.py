@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
@@ -86,6 +86,20 @@ class RuntimeDurabilityTests(unittest.TestCase):
             self.assertEqual(manifest["app"], "runner")
             self.assertTrue(manifest["artifacts"]["config"]["copied"])
             self.assertFalse(manifest["artifacts"]["missing"]["copied"])
+
+    def test_health_journal_updates_latest_and_history(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            paths = record_health_journal(root / "journal", label="runner", event="START", payload={"state": "RUNNING"}, keep_lines=3)
+            self.assertTrue(paths["latest"].exists())
+            self.assertTrue(paths["history"].exists())
+            latest = json.loads(paths["latest"].read_text(encoding="utf-8"))
+            self.assertEqual(latest["state"], "RUNNING")
+            self.assertEqual(latest["last_event"], "START")
+            record_health_journal(root / "journal", label="runner", event="STOP", payload={"state": "STOPPED"}, keep_lines=3)
+            history_lines = paths["history"].read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(history_lines), 2)
+            self.assertEqual(json.loads(history_lines[-1])["event"], "STOP")
 
 
 if __name__ == "__main__":

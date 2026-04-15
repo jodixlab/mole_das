@@ -112,11 +112,12 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
     latest_matching_path = None
+    record_health_journal = None
     write_recovery_snapshot = None
 
 
@@ -15514,12 +15515,48 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception:
             return None
 
+    def _runner_health_journal_paths(sess_local: Dict[str, Any]) -> Dict[str, Optional[Path]]:
+        journal_dir = _runner_recovery_dir(sess_local).parent / "health_journal"
+        latest = journal_dir / "runner_health__latest.json"
+        history = journal_dir / "runner_health__history.jsonl"
+        return {
+            "latest": latest if latest.exists() else None,
+            "history": history if history.exists() else None,
+        }
+
+    def _record_runner_health_event(sess_local: Dict[str, Any], event: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        if record_health_journal is None:
+            return
+        review = _session_review_block(sess_local)
+        review_signoff = _session_review_signoff_block(review)
+        ftir_blk = _ftir_validation_block(sess_local)
+        ftir_signoff = ftir_blk.get("signoff") if isinstance(ftir_blk.get("signoff"), dict) else {}
+        run_blk = ((sess_local.get("daq_runner") or {}).get("runs") or []) if isinstance((sess_local.get("daq_runner") or {}).get("runs"), list) else []
+        active_run = run_blk[-1] if run_blk else {}
+        payload = {
+            "job_id": str(_job_id(sess_local)),
+            "config_path": str(cfg_path),
+            "session_review_locked": bool(review.get("review_locked")),
+            "session_review_decision": str(review_signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED",
+            "session_review_basis": str(review_signoff.get("basis") or "").strip().upper(),
+            "ftir_review_locked": bool(ftir_blk.get("review_locked")),
+            "ftir_signoff_decision": str(ftir_signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED",
+            "ftir_signoff_basis": str(ftir_signoff.get("basis") or "").strip().upper(),
+            "acquisition_state": str(acq_var.get() or "").strip(),
+            "active_run_no": active_run.get("run_no"),
+            "active_run_status": str(active_run.get("status") or "").strip(),
+        }
+        if isinstance(extra, dict):
+            payload.update(extra)
+        record_health_journal(_runner_recovery_dir(sess_local).parent / "health_journal", label="runner_health", event=event, payload=payload)
+
     def _export_runner_support_bundle(sess_local: Dict[str, Any]) -> None:
         if create_support_bundle is None:
             messagebox.showerror("Support Bundle", "Support bundle helper is unavailable in this runtime.")
             return
         try:
             outputs = init_outputs(sess_local, cfg_path, None)
+            journal = _runner_health_journal_paths(sess_local)
             bundle = create_support_bundle(
                 outputs.exports_dir / "support_bundles",
                 label="runner_support_bundle",
@@ -15539,6 +15576,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "runner_config": cfg_path,
                     "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
                     "runner_ui_crash_log": _runner_crash_log_path(sess_local),
+                    "runner_health_latest": journal.get("latest"),
+                    "runner_health_history": journal.get("history"),
                     "build_manifest": outputs.meta_dir / "build.json",
                     "session_manifest": outputs.meta_dir / "manifest.json",
                     "report_pack_summary": outputs.exports_dir / "report_pack_v1" / "summary.json",
@@ -17393,6 +17432,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             review["review_lock_iso"] = now_iso()
             sess["session_review"] = review
             _save_session(sess)
+            _record_runner_health_event(sess, "SESSION_REVIEW_LOCK")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _apply_session_review_lock_state(sess)
@@ -17420,6 +17460,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             }
             sess["session_review"] = review
             _save_session(sess)
+            _record_runner_health_event(sess, "SESSION_REVIEW_UNLOCK")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _apply_session_review_lock_state(sess)
@@ -17462,6 +17503,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             }
             sess["session_review"] = review
             _save_session(sess)
+            _record_runner_health_event(sess, "SESSION_REVIEW_SIGNOFF")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _apply_session_review_lock_state(sess)
@@ -17486,6 +17528,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             }
             sess["session_review"] = review
             _save_session(sess)
+            _record_runner_health_event(sess, "SESSION_REVIEW_CLEAR_SIGNOFF")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _apply_session_review_lock_state(sess)
@@ -17533,6 +17576,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, preview)
             sess["ftir_validation"] = blk
             _save_session(sess)
+            _record_runner_health_event(sess, "FTIR_REVIEW_LOCK")
             _refresh_report_builder_status(sess)
             _refresh_ftir_validation_preview(sess)
             _apply_ftir_validation_lock_state(sess)
@@ -17596,6 +17640,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, snap_payload)
             sess["ftir_validation"] = blk
             _save_session(sess)
+            _record_runner_health_event(sess, "FTIR_REVIEW_SIGNOFF")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _refresh_ftir_validation_preview(sess)
@@ -17625,6 +17670,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 blk["review_snapshot"] = _write_ftir_validation_locked_snapshot(sess, snap_payload)
             sess["ftir_validation"] = blk
             _save_session(sess)
+            _record_runner_health_event(sess, "FTIR_REVIEW_CLEAR_SIGNOFF")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _refresh_ftir_validation_preview(sess)
@@ -17654,6 +17700,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             }
             sess["ftir_validation"] = blk
             _save_session(sess)
+            _record_runner_health_event(sess, "FTIR_REVIEW_UNLOCK")
             _report_builder_load_form(sess)
             _refresh_report_builder_status(sess)
             _refresh_ftir_validation_preview(sess)
@@ -17792,6 +17839,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             except Exception as e:
                 raise RuntimeError(f"mole_report_pack_v1.py not available: {e}")
             out_dir = generate_report_pack_v1(session=sess, cfg_path=cfg_path, session_dir=outputs.out_dir)
+            _record_runner_health_event(
+                sess,
+                "REPORT_BUILD_SUCCESS",
+                {
+                    "report_pack_dir": str(out_dir),
+                    "final_report_dir": str(outputs.out_dir / "exports" / "final_report_v1"),
+                },
+            )
             _refresh_report_builder_status(sess)
             pths = _report_builder_paths(sess)
             final_docx = pths.get("final_report_docx")
@@ -17807,6 +17862,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 f"Final report (Markdown): {final_md}",
             )
         except Exception as e:
+            try:
+                _record_runner_health_event(sess if isinstance(sess, dict) else _load_session(), "REPORT_BUILD_FAILURE", {"error": str(e)})
+            except Exception:
+                pass
             messagebox.showerror("Report Builder", str(e))
 
     def _open_report_builder_final() -> None:
@@ -18662,6 +18721,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
             acq_var.set("Acquisition: RUNNING")
             status_var.set("Status: ACQUIRING")
+            _record_runner_health_event(sess, "ACQ_START", {"sample_period_s": sp, "site_refresh_s": sr})
             log("Acquisition started (in-UI dummy driver).")
         except Exception as e:
             messagebox.showerror("Acquisition", str(e))
@@ -18702,6 +18762,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 acq["thread"] = None
                 acq["stop"] = None
                 acq["record_evt"] = None
+            except Exception:
+                pass
+            try:
+                latest_sess = _load_session()
+                _record_runner_health_event(latest_sess, "ACQ_STOP")
             except Exception:
                 pass
 

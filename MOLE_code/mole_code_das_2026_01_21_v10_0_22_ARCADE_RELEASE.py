@@ -99,12 +99,13 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, record_health_journal, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
     create_support_bundle = None
     latest_matching_path = None
+    record_health_journal = None
     write_recovery_snapshot = None
 
 from mole_ui_text_registry import (
@@ -6476,11 +6477,40 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         path_obj = Path(self.ui_log_path)
         return path_obj if path_obj.exists() else None
 
+    def _wizard_health_journal_paths(self) -> Dict[str, Optional[Path]]:
+        journal_dir = Path(self.logs_dir) / "health_journal"
+        latest = journal_dir / "wizard_health__latest.json"
+        history = journal_dir / "wizard_health__history.jsonl"
+        return {
+            "latest": latest if latest.exists() else None,
+            "history": history if history.exists() else None,
+        }
+
+    def _record_wizard_health_event(self, event: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        if record_health_journal is None:
+            return
+        review = self.session.get("session_review") if isinstance(self.session.get("session_review"), dict) else {}
+        signoff = review.get("signoff") if isinstance(review.get("signoff"), dict) else {}
+        payload = {
+            "job_id": str((self.session.get("project") or {}).get("job_id") or ""),
+            "session_config_path": str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip(),
+            "active_session_dir": str(self.var_active_session_dir.get() or "").strip() if hasattr(self, "var_active_session_dir") else "",
+            "review_locked": bool(review.get("review_locked")),
+            "review_decision": str(signoff.get("decision") or "UNSIGNED").strip().upper() or "UNSIGNED",
+            "review_basis": str(signoff.get("basis") or "").strip().upper(),
+            "deliverable_status": self._session_deliverable_summary(review),
+            "validation_status": self._validation_plan_summary(self.session.get("validation_plan") or {}),
+        }
+        if isinstance(extra, dict):
+            payload.update(extra)
+        record_health_journal(Path(self.logs_dir) / "health_journal", label="wizard_health", event=event, payload=payload)
+
     def _create_wizard_support_bundle(self) -> Path:
         if create_support_bundle is None:
             raise RuntimeError("Support bundle helper is unavailable in this runtime.")
         session_cfg = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
         active_session_dir = str(self.var_active_session_dir.get() or "").strip() if hasattr(self, "var_active_session_dir") else ""
+        journal = self._wizard_health_journal_paths()
         return create_support_bundle(
             Path(self.logs_dir) / "support_bundles",
             label="wizard_support_bundle",
@@ -6503,6 +6533,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
                 "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
                 "wizard_crash_log": self._latest_wizard_crash_log_path(),
+                "wizard_health_latest": journal.get("latest"),
+                "wizard_health_history": journal.get("history"),
                 "active_session_summary": (Path(active_session_dir) / "exports" / "report_pack_v1" / "summary.json") if active_session_dir else None,
             },
             keep=10,
@@ -18371,6 +18403,10 @@ def _build_intake(self) -> None:
                     label="mole_master",
                     keep=10,
                 )
+        except Exception:
+            pass
+        try:
+            self._record_wizard_health_event("SAVE_APPLY")
         except Exception:
             pass
 

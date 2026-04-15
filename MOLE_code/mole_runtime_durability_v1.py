@@ -162,3 +162,46 @@ def create_support_bundle(
     rotate_dir_entries(bundle_root, f"{base}__*.zip", keep=keep)
     rotate_dir_entries(bundle_root, f"{base}__*", keep=keep * 2)
     return zip_path
+
+
+def record_health_journal(
+    journal_dir: Path,
+    *,
+    label: str,
+    event: str,
+    payload: Dict[str, Any],
+    keep_lines: int = 200,
+) -> Dict[str, Path]:
+    journal_dir = Path(journal_dir)
+    journal_dir.mkdir(parents=True, exist_ok=True)
+    base = _slug(label, default="health_journal")
+    latest_path = journal_dir / f"{base}__latest.json"
+    history_path = journal_dir / f"{base}__history.jsonl"
+
+    latest_payload: Dict[str, Any] = {}
+    if latest_path.exists():
+        try:
+            latest_payload = json.loads(latest_path.read_text(encoding="utf-8"))
+        except Exception:
+            latest_payload = {}
+    latest_payload.update(dict(payload or {}))
+    latest_payload["last_event"] = str(event or "").strip().upper() or "UPDATE"
+    latest_payload["updated_utc"] = datetime.now(timezone.utc).isoformat()
+    atomic_write_json(latest_path, latest_payload)
+
+    entry = {
+        "event": latest_payload["last_event"],
+        "ts_utc": latest_payload["updated_utc"],
+        "payload": dict(payload or {}),
+    }
+    with history_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    try:
+        lines = history_path.read_text(encoding="utf-8").splitlines()
+        if len(lines) > keep_lines:
+            atomic_write_text(history_path, "\n".join(lines[-keep_lines:]) + "\n")
+    except Exception:
+        pass
+
+    return {"latest": latest_path, "history": history_path}
