@@ -492,6 +492,141 @@ SEED_ENTRIES = {
             ("MOLE FTIR Method 301 Experiment Protocol", "Procedure"),
         ),
     },
+    "runner.report.notice_of_intent_date": {
+        "label": "Notice of intent date",
+        "short_description": "Stores the notice-of-intent timing reference used in the formal report package.",
+        "definition": "The notice-of-intent date is the project-level reporting reference for the submitted or planned NOI timing.",
+        "process_note": "Populate this when the project requires NOI context in the final report or compliance package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.submission_status": {
+        "label": "Submission status",
+        "short_description": "Stores the current submission or filing status associated with the test package.",
+        "definition": "Submission status is the formal deliverable-status note carried into the report context and approval summary.",
+        "process_note": "Use clear status language that matches the current regulatory or client-submission posture.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.observer_contacts": {
+        "label": "Observer contacts",
+        "short_description": "Captures the observer or witness contact context used in the report package.",
+        "definition": "Observer contacts are the people or organizations recorded as test observers, witnesses, or review participants in the formal package.",
+        "process_note": "Use this when observer contact information should travel with the final report context.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.approval_dates": {
+        "label": "Approval dates",
+        "short_description": "Captures approval-date references that need to appear in the report package.",
+        "definition": "Approval dates are the formal dates associated with approvals, agency coordination, or report review milestones.",
+        "process_note": "Enter only the dates that belong in the formal project package and final report context.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.scope": {
+        "label": "Review scope",
+        "short_description": "Defines the package-level approval scope applied to the current formal deliverable.",
+        "definition": "Review scope determines whether the current package is being reviewed as a project review, compliance report, or validation report.",
+        "process_note": "Choose the scope that matches the deliverable being prepared so approval basis and signoff language stay consistent.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.reviewer_name": {
+        "label": "Reviewer name",
+        "short_description": "Stores the person performing the current package-level review.",
+        "definition": "Reviewer name is the package reviewer carried into shared review metadata and final report approval context.",
+        "process_note": "Use the actual reviewer responsible for the current review cycle.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.reviewer_role": {
+        "label": "Reviewer role",
+        "short_description": "Stores the reviewer role associated with the current package-level review.",
+        "definition": "Reviewer role is the formal role or title associated with the recorded package reviewer.",
+        "process_note": "Use the role/title that should persist into the package approval record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.default_approver": {
+        "label": "Default approver",
+        "short_description": "Stores the planned approver for the package-level signoff path.",
+        "definition": "Default approver is the expected signoff authority for the current deliverable scope.",
+        "process_note": "Set this to the person expected to approve the current report or validation package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.default_approver_role": {
+        "label": "Approver role",
+        "short_description": "Stores the formal role of the planned approver for the package-level signoff path.",
+        "definition": "Approver role is the role/title associated with the expected signoff authority.",
+        "process_note": "Use the formal title that belongs in the package approval record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.decision": {
+        "label": "Decision",
+        "short_description": "Records the current package-level approval decision.",
+        "definition": "Decision is the shared review/signoff outcome carried into the report context and approval summary.",
+        "process_note": "Set this only after the review basis and scope are correct for the current package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.acceptance_basis": {
+        "label": "Acceptance basis",
+        "short_description": "Records the approval basis used to justify the current package-level decision.",
+        "definition": "Acceptance basis is the formal basis state attached to the package review and signoff record.",
+        "process_note": "Keep this aligned with the actual deliverable scope and decision state.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.signoff_by": {
+        "label": "Signoff by",
+        "short_description": "Stores the approving person for the current shared review signoff.",
+        "definition": "Signoff by is the person recorded as the package approver in the final approval metadata.",
+        "process_note": "Populate this at actual signoff time so the approval record reflects the true approver.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.signoff_role": {
+        "label": "Signoff role",
+        "short_description": "Stores the approver role for the current shared review signoff.",
+        "definition": "Signoff role is the formal role/title associated with the recorded approving person.",
+        "process_note": "Use the formal approver title that belongs in the package approval record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.notes": {
+        "label": "Session Review Notes",
+        "short_description": "Stores package-level reviewer observations, limitations, and release notes.",
+        "definition": "Session review notes are the shared package-review remarks carried into report context and approval records.",
+        "process_note": "Use this for substantive review observations or package constraints that should survive into the final record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.signoff_note": {
+        "label": "Session Review Signoff Note",
+        "short_description": "Stores the explicit approval conditions, restrictions, or rejection basis attached to signoff.",
+        "definition": "The signoff note is the package-level approval narrative associated with the recorded decision.",
+        "process_note": "Use this to preserve approval conditions, exceptions, or a specific rejection basis.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
 }
 
 

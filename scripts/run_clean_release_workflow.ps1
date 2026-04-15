@@ -120,6 +120,11 @@ try {
         Add-StepResult -Name "smoketest" -Status "PASS" -Detail "Smoketest with launcher/report integration passed."
     }
 
+    Invoke-Step "Run UI help registry audit" {
+        Invoke-Native -FilePath $python -ArgumentList @("scripts\audit_ui_help_registry.py") -WorkingDirectory $workspace
+        Add-StepResult -Name "ui_help_audit" -Status "PASS" -Detail "UI help registry audit passed."
+    }
+
     Invoke-Step "Run release gate" {
         Invoke-Native -FilePath $python -ArgumentList @("MOLE_code\mole_release_gate.py", "--root", ".", "--outdir", "RELEASES\clean_release_workflow", "--strict-hash") -WorkingDirectory $workspace
         Add-StepResult -Name "release_gate" -Status "PASS" -Detail "Release gate completed with strict hashes."

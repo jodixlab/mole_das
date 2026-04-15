@@ -10438,15 +10438,23 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     tk.Label(report_builder_form, text="Agency contact:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     tk.Entry(report_builder_form, textvariable=var_report_agency_contact, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_form, text="Notice of intent date:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_notice_of_intent, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=4, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Submission status:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_submission_status, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=4, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_notice_of_intent = tk.Label(report_builder_form, text="Notice of intent date:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_notice_of_intent.grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_notice_of_intent = tk.Entry(report_builder_form, textvariable=var_report_notice_of_intent, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_notice_of_intent.grid(row=4, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_submission_status = tk.Label(report_builder_form, text="Submission status:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_submission_status.grid(row=4, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_submission_status = tk.Entry(report_builder_form, textvariable=var_report_submission_status, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_submission_status.grid(row=4, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_form, text="Observer contacts:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_observer_contacts, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Approval dates:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_approval_dates, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=5, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_observer_contacts = tk.Label(report_builder_form, text="Observer contacts:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_observer_contacts.grid(row=5, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_observer_contacts = tk.Entry(report_builder_form, textvariable=var_report_observer_contacts, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_observer_contacts.grid(row=5, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_approval_dates = tk.Label(report_builder_form, text="Approval dates:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_approval_dates.grid(row=5, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_approval_dates = tk.Entry(report_builder_form, textvariable=var_report_approval_dates, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_approval_dates.grid(row=5, column=3, sticky="ew", pady=(0, 6))
 
     report_builder_session_review_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_session_review_wrap.pack(fill="x", pady=(0, 8))
@@ -10468,7 +10476,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     report_builder_session_review_form = tk.Frame(report_builder_session_review_wrap, bg=BG)
     report_builder_session_review_form.pack(fill="x", pady=(0, 6))
     _configure_runner_form_grid(report_builder_session_review_form, minspec="runner_two_pair")
-    tk.Label(report_builder_session_review_form, text="Review scope:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_session_review_scope = tk.Label(report_builder_session_review_form, text="Review scope:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_scope.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     cbo_session_review_scope = ttk.Combobox(
         report_builder_session_review_form,
         textvariable=var_session_review_scope,
@@ -10477,19 +10486,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         width=28,
     )
     cbo_session_review_scope.grid(row=0, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Reviewer name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_session_review_reviewer = tk.Label(report_builder_session_review_form, text="Reviewer name:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_reviewer.grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_session_review_reviewer = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_reviewer, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_reviewer.grid(row=0, column=3, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Reviewer role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_session_review_reviewer_role = tk.Label(report_builder_session_review_form, text="Reviewer role:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_reviewer_role.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_session_review_reviewer_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_reviewer_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_reviewer_role.grid(row=1, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Default approver:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_session_review_default_approver = tk.Label(report_builder_session_review_form, text="Default approver:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_default_approver.grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_session_review_default_approver = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_default_approver, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_default_approver.grid(row=1, column=3, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Approver role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_session_review_default_approver_role = tk.Label(report_builder_session_review_form, text="Approver role:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_default_approver_role.grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_session_review_default_approver_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_default_approver_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_default_approver_role.grid(row=2, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Decision:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_session_review_decision = tk.Label(report_builder_session_review_form, text="Decision:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_decision.grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     cbo_session_review_decision = ttk.Combobox(
         report_builder_session_review_form,
         textvariable=var_session_review_decision,
@@ -10498,7 +10512,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         width=22,
     )
     cbo_session_review_decision.grid(row=2, column=3, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Acceptance basis:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_session_review_basis = tk.Label(report_builder_session_review_form, text="Acceptance basis:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_basis.grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     cbo_session_review_basis = ttk.Combobox(
         report_builder_session_review_form,
         textvariable=var_session_review_basis,
@@ -10507,10 +10522,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         width=28,
     )
     cbo_session_review_basis.grid(row=3, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Signoff by:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    lbl_session_review_signoff_by = tk.Label(report_builder_session_review_form, text="Signoff by:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_signoff_by.grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
     ent_session_review_signoff_by = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_signoff_by, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_signoff_by.grid(row=3, column=3, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_session_review_form, text="Signoff role:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    lbl_session_review_signoff_role = tk.Label(report_builder_session_review_form, text="Signoff role:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_session_review_signoff_role.grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
     ent_session_review_signoff_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_signoff_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_signoff_role.grid(row=4, column=1, sticky="ew", pady=(0, 6))
 
@@ -10550,6 +10567,35 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_session_review_sign.pack(side="left", padx=(8, 0))
     btn_session_review_clear_signoff = tk.Button(report_builder_session_review_ctrls, text="Clear Signoff", bg=BTN_BG, fg=FG, relief="flat")
     btn_session_review_clear_signoff.pack(side="left", padx=(8, 0))
+    if help_mgr is not None:
+        for widget in (lbl_report_notice_of_intent, ent_report_notice_of_intent):
+            help_mgr.bind(widget, "runner.report.notice_of_intent_date")
+        for widget in (lbl_report_submission_status, ent_report_submission_status):
+            help_mgr.bind(widget, "runner.report.submission_status")
+        for widget in (lbl_report_observer_contacts, ent_report_observer_contacts):
+            help_mgr.bind(widget, "runner.report.observer_contacts")
+        for widget in (lbl_report_approval_dates, ent_report_approval_dates):
+            help_mgr.bind(widget, "runner.report.approval_dates")
+        for widget in (lbl_session_review_scope, cbo_session_review_scope):
+            help_mgr.bind(widget, "runner.session_review.scope")
+        for widget in (lbl_session_review_reviewer, ent_session_review_reviewer):
+            help_mgr.bind(widget, "runner.session_review.reviewer_name")
+        for widget in (lbl_session_review_reviewer_role, ent_session_review_reviewer_role):
+            help_mgr.bind(widget, "runner.session_review.reviewer_role")
+        for widget in (lbl_session_review_default_approver, ent_session_review_default_approver):
+            help_mgr.bind(widget, "runner.session_review.default_approver")
+        for widget in (lbl_session_review_default_approver_role, ent_session_review_default_approver_role):
+            help_mgr.bind(widget, "runner.session_review.default_approver_role")
+        for widget in (lbl_session_review_decision, cbo_session_review_decision):
+            help_mgr.bind(widget, "runner.session_review.decision")
+        for widget in (lbl_session_review_basis, cbo_session_review_basis):
+            help_mgr.bind(widget, "runner.session_review.acceptance_basis")
+        for widget in (lbl_session_review_signoff_by, ent_session_review_signoff_by):
+            help_mgr.bind(widget, "runner.session_review.signoff_by")
+        for widget in (lbl_session_review_signoff_role, ent_session_review_signoff_role):
+            help_mgr.bind(widget, "runner.session_review.signoff_role")
+        help_mgr.bind(txt_session_review_notes, "runner.session_review.notes")
+        help_mgr.bind(txt_session_review_signoff_note, "runner.session_review.signoff_note")
 
     report_builder_longform = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_longform.pack(fill="x", pady=(0, 8))
