@@ -206,6 +206,44 @@ finally {
         Write-SummaryFiles
     }
 
+    try {
+        $decisionScript = Join-Path $repo "scripts\release_go_no_go_gate.py"
+        if ((Test-Path $decisionScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $decisionScript,
+                "--artifact-dir", $artifactDir,
+                "--allow-pending-operator"
+            ) -WorkingDirectory $repo
+            Add-StepResult -Name "go_no_go_gate" -Status "PASS" -Detail "Release go/no-go decision emitted."
+            Write-SummaryFiles
+        }
+    }
+    catch {
+        Add-StepResult -Name "go_no_go_gate" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        Write-SummaryFiles
+    }
+
+    try {
+        $artifactContractScript = Join-Path $repo "scripts\build_release_artifact_contract.py"
+        if ((Test-Path $artifactContractScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $artifactContractScript,
+                "--repo-root", $repo,
+                "--output-dir", $artifactDir,
+                "--summary-json", $summaryPath,
+                "--python-exe", $python
+            ) -WorkingDirectory $repo
+            Add-StepResult -Name "artifact_contract_finalize" -Status "PASS" -Detail "Release artifact contract refreshed after go/no-go decision."
+            Write-SummaryFiles
+        }
+    }
+    catch {
+        Add-StepResult -Name "artifact_contract_finalize" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        Write-SummaryFiles
+    }
+
     if ((-not $KeepScratch) -and (Test-Path $scratch)) {
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
     }

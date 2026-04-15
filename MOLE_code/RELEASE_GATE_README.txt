@@ -35,6 +35,10 @@ Notes
       dependency_manifest.txt / .json
       release_bundle_summary.md / .json
       release_artifact_contract.md / .json
+      release_go_no_go_decision.md / .json
   - The release gate now also emits a package hygiene report and fails
     if the runtime ZIP contains banned paths or absolute local path
     drift in packaged config/runtime text files.
+  - Use:
+      <root>\RUN_RELEASE_DECISION_GATE.bat
+    for the single final release decision entrypoint before field use.

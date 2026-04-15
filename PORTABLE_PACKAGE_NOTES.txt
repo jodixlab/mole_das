@@ -109,6 +109,10 @@ Release metadata standard:
   - The clean release workflow emits the release artifact contract,
     dependency manifest, and release bundle summary under
     RELEASES\clean_release_workflow\.
+  - The final release decision entrypoint is:
+      RUN_RELEASE_DECISION_GATE.bat
+    This emits the final go / no-go decision under
+      RELEASES\clean_release_workflow\.
 
 Operational troubleshooting notes:
   - Use console launchers first when debugging startup or UI issues.

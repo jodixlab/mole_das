@@ -178,6 +178,14 @@ def main() -> int:
 
     contract_source = _read_json(repo_root / "config" / "mole_release_artifact_contract_v1.json")
     dependencies = _build_dependency_manifest(python_exe)
+    deferred_artifact_ids = [
+        "release_bundle_summary_json",
+        "release_bundle_summary_md",
+        "release_artifact_contract_json",
+        "release_artifact_contract_md",
+        "release_go_no_go_decision_json",
+        "release_go_no_go_decision_md",
+    ]
 
     output_dir.mkdir(parents=True, exist_ok=True)
     dependency_txt = output_dir / "dependency_manifest.txt"
@@ -201,12 +209,7 @@ def main() -> int:
         hygiene,
         dependencies,
         artifacts,
-        ignore_missing_ids=[
-            "release_bundle_summary_json",
-            "release_bundle_summary_md",
-            "release_artifact_contract_json",
-            "release_artifact_contract_md",
-        ],
+        ignore_missing_ids=deferred_artifact_ids,
     )
     contract = {
         "schema": "mole_release_artifact_contract_v1",
@@ -222,7 +225,14 @@ def main() -> int:
     _write_text(output_dir / "release_artifact_contract.md", _contract_md(contract, bundle_summary, dependencies))
 
     artifacts = resolve_artifacts()
-    bundle_summary = _build_bundle_summary(summary, cert, hygiene, dependencies, artifacts)
+    bundle_summary = _build_bundle_summary(
+        summary,
+        cert,
+        hygiene,
+        dependencies,
+        artifacts,
+        ignore_missing_ids=deferred_artifact_ids,
+    )
     contract = {
         "schema": "mole_release_artifact_contract_v1",
         "source_schema": contract_source.get("schema"),

@@ -119,6 +119,20 @@
       "match": "exact",
       "pattern": "release_artifact_contract.md",
       "description": "Human-readable release artifact contract."
+    },
+    {
+      "id": "release_go_no_go_decision_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_go_no_go_decision.json",
+      "description": "Structured release go/no-go decision."
+    },
+    {
+      "id": "release_go_no_go_decision_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "release_go_no_go_decision.md",
+      "description": "Human-readable release go/no-go decision."
     }
   ]
 }
