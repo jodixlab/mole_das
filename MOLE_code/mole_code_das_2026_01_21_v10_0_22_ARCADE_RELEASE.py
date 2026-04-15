@@ -10244,17 +10244,25 @@ def _build_intake(self) -> None:
         ent_site_elev.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=6)
         help_mgr.bind(ent_site_elev, "wizard.site.elevation_ft_msl")
 
-        tk.Button(loc_box, text="Fetch Weather", command=self._fetch_weather_button,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").grid(row=0, column=4, rowspan=2, sticky="ns", padx=12, pady=6)
+        btn_fetch_weather = tk.Button(loc_box, text="Fetch Weather", command=self._fetch_weather_button,
+                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat")
+        btn_fetch_weather.grid(row=0, column=4, rowspan=2, sticky="ns", padx=12, pady=6)
+        help_mgr.bind(btn_fetch_weather, "wizard.site.fetch_weather")
 
-        tk.Button(loc_box, text="Fetch Coordinates", command=self._fetch_coordinates_button,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").grid(row=0, column=5, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        btn_fetch_coordinates = tk.Button(loc_box, text="Fetch Coordinates", command=self._fetch_coordinates_button,
+                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat")
+        btn_fetch_coordinates.grid(row=0, column=5, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        help_mgr.bind(btn_fetch_coordinates, "wizard.site.fetch_coordinates")
 
-        tk.Button(loc_box, text="Fetch Elevation", command=self._fetch_elevation_button,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").grid(row=0, column=6, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        btn_fetch_elevation = tk.Button(loc_box, text="Fetch Elevation", command=self._fetch_elevation_button,
+                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat")
+        btn_fetch_elevation.grid(row=0, column=6, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        help_mgr.bind(btn_fetch_elevation, "wizard.site.fetch_elevation")
 
-        tk.Button(loc_box, text="Open Map", command=self._site_open_map_button,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").grid(row=0, column=7, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        btn_open_map = tk.Button(loc_box, text="Open Map", command=self._site_open_map_button,
+                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat")
+        btn_open_map.grid(row=0, column=7, rowspan=2, sticky="ns", padx=(0, 12), pady=6)
+        help_mgr.bind(btn_open_map, "wizard.site.open_map")
 
         tk.Label(loc_box, textvariable=self.var_site_last_coords, fg=self.FG, bg=self.BG,
                  font=("Consolas", 9)).grid(row=2, column=0, columnspan=8, sticky="w", padx=10, pady=(0, 8))

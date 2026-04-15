@@ -1,10 +1,10 @@
 {
   "registry_version": "1",
-  "generated_utc": "2026-04-15T17:44:37.210232+00:00",
+  "generated_utc": "2026-04-15T18:01:52.355582+00:00",
   "generator": "scripts/seed_ui_help_registry.py",
   "seed_note": "Seeded UI help registry. Re-run after documentation updates; existing manual entries are preserved and seeded entries are refreshed from this script.",
-  "seeded_entry_count": 157,
-  "total_entry_count": 157,
+  "seeded_entry_count": 175,
+  "total_entry_count": 175,
   "entries": {
     "wizard.session_intent.record_data": {
       "label": "Record Data",
@@ -2019,6 +2019,222 @@
         {
           "doc_label": "MOLE DAS Terms, Definitions, and References",
           "section": "Diagnostics Verification"
+        }
+      ]
+    },
+    "wizard.site.fetch_weather": {
+      "label": "Fetch Weather",
+      "short_description": "Retrieves site weather context using the current coordinates and weather-source policy.",
+      "definition": "Fetch Weather is the site-conditions action that populates session weather context from the configured weather source and station logic.",
+      "process_note": "Use this after latitude and longitude are set so the site conditions record can be refreshed from NOAA or station-based weather inputs.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.fetch_coordinates": {
+      "label": "Fetch Coordinates",
+      "short_description": "Attempts to populate site coordinates from the current location metadata.",
+      "definition": "Fetch Coordinates is the site-location action that resolves latitude and longitude from the available site or facility context.",
+      "process_note": "Use this when the session has enough site metadata to resolve coordinates automatically.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.fetch_elevation": {
+      "label": "Fetch Elevation",
+      "short_description": "Resolves elevation from the current site coordinates.",
+      "definition": "Fetch Elevation is the site-location action that looks up elevation above mean sea level for the entered coordinates.",
+      "process_note": "Use this after coordinates are set so the site record can carry a resolved elevation basis.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.open_map": {
+      "label": "Open Map",
+      "short_description": "Opens the current site coordinates in a map view for visual confirmation.",
+      "definition": "Open Map is the location-review action used to visually verify the session site coordinates against a map.",
+      "process_note": "Use this to confirm that the entered or fetched coordinates point at the intended site.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "runner.ftir.browse_file": {
+      "label": "Browse FTIR File",
+      "short_description": "Selects the comparator FTIR export file for the validation package.",
+      "definition": "Browse FTIR File is the action used to choose the source comparator file that will be imported into the FTIR validation workflow.",
+      "process_note": "Use this to point the package at the exact FTIR export intended for review, lock, and report generation.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "FTIR formal Method 301 comparison"
+        }
+      ]
+    },
+    "runner.ftir.open_template_folder": {
+      "label": "Open Template Folder",
+      "short_description": "Opens the FTIR validation template folder used for imports and alignment support.",
+      "definition": "Open Template Folder exposes the maintained FTIR validation templates that support field preparation and review.",
+      "process_note": "Use this when preparing or checking the FTIR import and alignment support files.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "FTIR / validation-specific tabs and sections"
+        }
+      ]
+    },
+    "runner.ftir.open_import_template": {
+      "label": "Open Import Template",
+      "short_description": "Opens the FTIR import template used to prepare comparator data in the expected shape.",
+      "definition": "Open Import Template exposes the maintained FTIR import template used for comparator data preparation.",
+      "process_note": "Use this when the FTIR export needs to be normalized into the expected import structure.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "FTIR / validation-specific tabs and sections"
+        }
+      ]
+    },
+    "runner.ftir.open_alignment_worksheet": {
+      "label": "Open Alignment Worksheet",
+      "short_description": "Opens the FTIR alignment worksheet used to support timestamp and window review.",
+      "definition": "Open Alignment Worksheet exposes the alignment worksheet used to prepare or review comparison-window timing.",
+      "process_note": "Use this when the FTIR comparison package needs explicit window and timestamp alignment support.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "FTIR / validation-specific tabs and sections"
+        }
+      ]
+    },
+    "runner.ftir.refresh_preview": {
+      "label": "Refresh FTIR Validation Preview",
+      "short_description": "Recomputes the current FTIR validation preview and review status from the active settings and evidence.",
+      "definition": "Refresh FTIR Validation Preview updates the current comparison, QA, and review-state preview without building the final report.",
+      "process_note": "Use this after changing FTIR settings, exclusions, or alignment assumptions so the preview reflects current state.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder -> FTIR Side-by-Side Validation"
+        }
+      ]
+    },
+    "runner.runs.new_run": {
+      "label": "New Run",
+      "short_description": "Creates the next run record in the current session.",
+      "definition": "New Run is the run-lifecycle action that opens a new method-input run context for acquisition and run-specific notes.",
+      "process_note": "Use this when starting the next run in the session. Do not create extra runs that are not part of the actual execution record.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Method Inputs (Per Run)"
+        }
+      ]
+    },
+    "runner.runs.end_run": {
+      "label": "End Run",
+      "short_description": "Closes the selected active run record.",
+      "definition": "End Run is the run-lifecycle action that stamps the current run as complete for the session record.",
+      "process_note": "Use this only when the active run is actually complete and ready to be closed in the run history.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Method Inputs (Per Run)"
+        }
+      ]
+    },
+    "runner.runs.save_inputs": {
+      "label": "Save Run Inputs",
+      "short_description": "Writes the current run method-input values into the session state.",
+      "definition": "Save Run Inputs preserves the currently edited run notes and method-input values for the selected run.",
+      "process_note": "Use this after editing per-run inputs so the current run state is preserved before moving on.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Method Inputs (Per Run)"
+        }
+      ]
+    },
+    "runner.report.save_metadata": {
+      "label": "Save Report Metadata",
+      "short_description": "Persists the current report-builder metadata into the session state.",
+      "definition": "Save Report Metadata records the current report-builder inputs without running a full report build.",
+      "process_note": "Use this after editing report metadata so the current report context is preserved.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
+        }
+      ]
+    },
+    "runner.report.build_final_report": {
+      "label": "Build Final Report",
+      "short_description": "Generates the formal report outputs from the current session, report metadata, and supporting artifacts.",
+      "definition": "Build Final Report is the report-builder action that assembles the report pack and final deliverables from the current session state.",
+      "process_note": "Use this only after the package review state and supporting evidence are ready for deliverable generation.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
+        }
+      ]
+    },
+    "runner.report.refresh_status": {
+      "label": "Refresh Status",
+      "short_description": "Refreshes the report-builder status view from current session and export state.",
+      "definition": "Refresh Status updates the report-builder status summaries, artifact paths, and readiness indicators without rebuilding outputs.",
+      "process_note": "Use this after external changes or session-state changes when you need the status panel refreshed.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
+        }
+      ]
+    },
+    "runner.report.open_final_report": {
+      "label": "Open Final Report",
+      "short_description": "Opens the current final report artifact, preferring DOCX or PDF when available.",
+      "definition": "Open Final Report launches the current final deliverable artifact from the report-builder output set.",
+      "process_note": "Use this to review the built final deliverable after report generation completes.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
+        }
+      ]
+    },
+    "runner.report.open_final_report_folder": {
+      "label": "Open Final Report Folder",
+      "short_description": "Opens the folder containing the current final report outputs.",
+      "definition": "Open Final Report Folder exposes the final-report output directory so the built artifacts can be inspected directly.",
+      "process_note": "Use this when you need to inspect or transfer the final report artifact set.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
+        }
+      ]
+    },
+    "runner.report.open_report_pack_folder": {
+      "label": "Open Report Pack Folder",
+      "short_description": "Opens the report-pack folder containing summary and evidence-package artifacts.",
+      "definition": "Open Report Pack Folder exposes the report-pack directory that contains the structured export set behind the final report.",
+      "process_note": "Use this when you need the evidence-oriented report-pack outputs rather than the final formatted deliverable.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Report Builder"
         }
       ]
     }

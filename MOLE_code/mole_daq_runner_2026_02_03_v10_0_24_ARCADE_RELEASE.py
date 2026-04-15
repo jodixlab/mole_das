@@ -10220,6 +10220,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_new_run.pack(fill="x", pady=(0, 6))
     btn_end_run = tk.Button(run_btns, text="End Run", bg=BTN_BG, fg=FG, relief="flat")
     btn_end_run.pack(fill="x")
+    if help_mgr is not None:
+        help_mgr.bind(btn_new_run, "runner.runs.new_run")
+        help_mgr.bind(btn_end_run, "runner.runs.end_run")
 
     runs_right = tk.Frame(runs_wrap, bg=BG)
     runs_right.pack(side="left", fill="both", expand=True, padx=(12, 0))
@@ -10246,6 +10249,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     btn_save_run = tk.Button(runs_right, text="Save Run Inputs", bg=BTN_BG, fg=FG, relief="flat")
     btn_save_run.pack(anchor="e", pady=(10, 0))
+    if help_mgr is not None:
+        help_mgr.bind(btn_save_run, "runner.runs.save_inputs")
 
     # Diagnostics verification workflow
     sec_diag_verify = _section(scroll, TEXT_DIAG_VERIFICATION)
@@ -10943,6 +10948,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_ftir_validation_open_import_template.pack(side="left", padx=(8, 0))
     btn_ftir_validation_open_alignment = tk.Button(report_builder_ftir_btns, text="Open Alignment Worksheet", bg=BTN_BG, fg=FG, relief="flat")
     btn_ftir_validation_open_alignment.pack(side="left", padx=(8, 0))
+    if help_mgr is not None:
+        help_mgr.bind(btn_ftir_validation_browse, "runner.ftir.browse_file")
+        help_mgr.bind(btn_ftir_validation_open_templates, "runner.ftir.open_template_folder")
+        help_mgr.bind(btn_ftir_validation_open_import_template, "runner.ftir.open_import_template")
+        help_mgr.bind(btn_ftir_validation_open_alignment, "runner.ftir.open_alignment_worksheet")
 
     txt_ftir_validation_column_map = _report_builder_labeled_text(
         report_builder_ftir_wrap,
@@ -11032,6 +11042,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_report_builder_open_final_dir.pack(side="left", padx=(8, 0))
     btn_report_builder_open_pack_dir = tk.Button(report_builder_btns, text="Open Report Pack Folder", bg=BTN_BG, fg=FG, relief="flat")
     btn_report_builder_open_pack_dir.pack(side="left", padx=(8, 0))
+    if help_mgr is not None:
+        help_mgr.bind(btn_report_builder_save, "runner.report.save_metadata")
+        help_mgr.bind(btn_report_builder_build, "runner.report.build_final_report")
+        help_mgr.bind(btn_report_builder_refresh, "runner.report.refresh_status")
+        help_mgr.bind(btn_ftir_validation_preview, "runner.ftir.refresh_preview")
+        help_mgr.bind(btn_report_builder_open_final, "runner.report.open_final_report")
+        help_mgr.bind(btn_report_builder_open_final_dir, "runner.report.open_final_report_folder")
+        help_mgr.bind(btn_report_builder_open_pack_dir, "runner.report.open_report_pack_folder")
 
     report_builder_validation_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_validation_wrap.pack(fill="both", expand=True, pady=(0, 8))
