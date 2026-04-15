@@ -4566,6 +4566,43 @@ def main() -> None:
                 log_path.write_text(traceback.format_exc(), encoding='utf-8')
             except Exception:
                 log_path = None
+            try:
+                support_bundle = None
+                if create_support_bundle is not None:
+                    try:
+                        crash_session = ensure_session_schema(session, actor="runner_ui_crash_bundle")
+                    except Exception:
+                        crash_session = dict(session or {})
+                    try:
+                        crash_outputs = init_outputs(crash_session, cfg_path, getattr(args, "outdir", None))
+                    except Exception:
+                        crash_outputs = None
+                    support_bundle = create_support_bundle(
+                        ((crash_outputs.exports_dir / "support_bundles") if crash_outputs is not None else (log_dir / "support_bundles")),
+                        label="runner_support_bundle",
+                        manifest={
+                            "app": "runner",
+                            "version": APP_VERSION,
+                            "app_title": APP_TITLE,
+                            "config_path": str(cfg_path),
+                            "session_dir": str(crash_outputs.out_dir) if crash_outputs is not None else "",
+                            "logs_dir": str(log_dir),
+                            "job_id": str(((crash_session.get("project") or {}).get("job_id") or "")),
+                            "session_schema_version": SESSION_SCHEMA_VERSION,
+                            "python": sys.version,
+                            "fatal_stage": "runner_ui_startup",
+                        },
+                        artifacts={
+                            "runner_config": cfg_path,
+                            "runner_ui_crash_log": log_path,
+                            "runner_recovery_snapshot": (latest_matching_path(((crash_outputs.meta_dir / "recovery") if crash_outputs is not None else (cfg_path.parent / "meta" / "recovery")), "runner_session_config__*.json") if latest_matching_path is not None else None),
+                            "build_manifest": (crash_outputs.meta_dir / "build.json") if crash_outputs is not None else None,
+                            "session_manifest": (crash_outputs.meta_dir / "manifest.json") if crash_outputs is not None else None,
+                        },
+                        keep=10,
+                    )
+            except Exception:
+                support_bundle = None
 
             # Try to alert the operator even if this was launched without a console window.
             try:
@@ -4576,7 +4613,20 @@ def main() -> None:
                 msg = 'DAQ Runner UI failed to start.'
                 if log_path:
                     msg += f"\n\nCrash log:\n{log_path}"
-                messagebox.showerror('MOLE DAQ Runner', msg)
+                if support_bundle:
+                    msg += f"\n\nSupport bundle:\n{support_bundle}"
+                    if messagebox.askyesno('MOLE DAQ Runner', msg + "\n\nOpen the support bundle now?"):
+                        try:
+                            if os.name == "nt":
+                                os.startfile(str(support_bundle))  # type: ignore
+                            elif sys.platform == "darwin":
+                                subprocess.Popen(["open", str(support_bundle)])
+                            else:
+                                subprocess.Popen(["xdg-open", str(support_bundle)])
+                        except Exception:
+                            pass
+                else:
+                    messagebox.showerror('MOLE DAQ Runner', msg)
                 r.destroy()
             except Exception:
                 pass
