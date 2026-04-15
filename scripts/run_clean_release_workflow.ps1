@@ -218,6 +218,25 @@ finally {
     }
 
     try {
+        $docSyncScript = Join-Path $repo "scripts\build_ui_help_doc_update_pack.py"
+        if ((Test-Path $docSyncScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $docSyncScript,
+                "--repo-root", $repo,
+                "--output-dir", $artifactDir,
+                "--write-state"
+            ) -WorkingDirectory $repo
+            Add-StepResult -Name "ui_help_doc_update_pack" -Status "PASS" -Detail "UI help documentation update pack generated."
+            Write-SummaryFiles
+        }
+    }
+    catch {
+        Add-StepResult -Name "ui_help_doc_update_pack" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        Write-SummaryFiles
+    }
+
+    try {
         $artifactContractScript = Join-Path $repo "scripts\build_release_artifact_contract.py"
         if ((Test-Path $artifactContractScript) -and (Test-Path $python)) {
             Invoke-Native -FilePath $python -ArgumentList @(

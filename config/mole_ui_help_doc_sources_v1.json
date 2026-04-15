@@ -1,0 +1,29 @@
+{
+  "schema": "mole_ui_help_doc_sources_v1",
+  "sources": [
+    {
+      "id": "technical_manual",
+      "doc_label": "MOLE DAS Technical and Operating Manual",
+      "path": "docs/MOLE_DAS_TECHNICAL_AND_OPERATING_MANUAL_2026_03_12.md",
+      "required": true
+    },
+    {
+      "id": "terms_definitions",
+      "doc_label": "MOLE DAS Terms, Definitions, and References",
+      "path": "docs/MOLE_DAS_TERMS_DEFINITIONS_AND_REFERENCES_2026_03_12.md",
+      "required": true
+    },
+    {
+      "id": "worksteps_master",
+      "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+      "path": "docs/work_instructions/mole_das_work_steps_2026_04_13_002_all_tabs_and_flows.txt",
+      "required": true
+    },
+    {
+      "id": "ftir_method301_protocol",
+      "doc_label": "MOLE FTIR Method 301 Experiment Protocol",
+      "path": "docs/protocols/MOLE_FTIR_SIDE_BY_SIDE_METHOD_301_EXPERIMENT_PROTOCOL_2026_04_10_001.md",
+      "required": true
+    }
+  ]
+}

@@ -65,6 +65,20 @@
       "description": "Human-readable UI help coverage audit emitted by the clean release workflow."
     },
     {
+      "id": "ui_help_doc_update_pack_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "ui_help_doc_update_pack.json",
+      "description": "Structured UI help documentation change review pack."
+    },
+    {
+      "id": "ui_help_doc_update_pack_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "ui_help_doc_update_pack.md",
+      "description": "Human-readable UI help documentation change review pack."
+    },
+    {
       "id": "production_acceptance_matrix_md",
       "required": true,
       "match": "exact",
