@@ -1998,6 +1998,9 @@ class MoleDASWizard(tk.Tk):
         self._init_session_state()
         self._init_source_catalog_db()
         self._build_shell()
+        self.bind_all("<MouseWheel>", self._on_global_mousewheel, add="+")
+        self.bind_all("<Button-4>", self._on_global_mousewheel, add="+")
+        self.bind_all("<Button-5>", self._on_global_mousewheel, add="+")
         self.goto("WELCOME")
         try:
             self._offer_startup_recovery()
@@ -3290,6 +3293,59 @@ class MoleDASWizard(tk.Tk):
             self.nav_canvas.yview_scroll(steps, "units")
         except Exception:
             pass
+
+    def _mousewheel_steps(self, event) -> Optional[int]:
+        try:
+            if hasattr(event, "num") and event.num in (4, 5):
+                return -1 if event.num == 4 else 1
+            delta = int(getattr(event, "delta", 0) or 0)
+            if delta == 0:
+                return None
+            steps = int(-delta / 120)
+            if steps == 0:
+                steps = -1 if delta > 0 else 1
+            return steps
+        except Exception:
+            return None
+
+    def _widget_supports_vertical_scroll(self, widget: Any) -> bool:
+        try:
+            if widget is None or not hasattr(widget, "yview") or not hasattr(widget, "yview_scroll"):
+                return False
+            pos = widget.yview()
+            if isinstance(pos, (tuple, list)) and len(pos) >= 2:
+                first = float(pos[0])
+                last = float(pos[1])
+                return (last - first) < 0.999
+            return True
+        except Exception:
+            return False
+
+    def _nearest_vertical_scroll_target(self, widget: Any) -> Any:
+        seen: set[str] = set()
+        cur = widget
+        while cur is not None:
+            key = str(cur)
+            if key in seen:
+                break
+            seen.add(key)
+            if self._widget_supports_vertical_scroll(cur):
+                return cur
+            cur = getattr(cur, "master", None)
+        return None
+
+    def _on_global_mousewheel(self, event):
+        try:
+            steps = self._mousewheel_steps(event)
+            if steps is None:
+                return None
+            target = self._nearest_vertical_scroll_target(getattr(event, "widget", None))
+            if target is None:
+                return None
+            target.yview_scroll(steps, "units")
+            return "break"
+        except Exception:
+            return None
 
     def _refresh_nav(self) -> None:
         # Allow the operator to fully configure the session BEFORE Save+Apply.

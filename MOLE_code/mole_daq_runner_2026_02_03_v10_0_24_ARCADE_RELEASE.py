@@ -8293,21 +8293,55 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return False
         return False
 
+    def _mousewheel_steps(event):
+        try:
+            if hasattr(event, "num") and event.num in (4, 5):
+                return -1 if event.num == 4 else 1
+            delta = int(getattr(event, "delta", 0) or 0)
+            if delta == 0:
+                return None
+            steps = -int(delta / 120)
+            if steps == 0:
+                steps = -1 if delta > 0 else 1
+            return steps
+        except Exception:
+            return None
+
+    def _widget_supports_vertical_scroll(widget):
+        try:
+            if widget is None or not hasattr(widget, "yview") or not hasattr(widget, "yview_scroll"):
+                return False
+            pos = widget.yview()
+            if isinstance(pos, (tuple, list)) and len(pos) >= 2:
+                first = float(pos[0])
+                last = float(pos[1])
+                return (last - first) < 0.999
+            return True
+        except Exception:
+            return False
+
+    def _nearest_vertical_scroll_target(widget):
+        seen = set()
+        cur = widget
+        while cur is not None:
+            key = str(cur)
+            if key in seen:
+                break
+            seen.add(key)
+            if _widget_supports_vertical_scroll(cur):
+                return cur
+            cur = getattr(cur, "master", None)
+        return None
+
     def _on_main_mousewheel(event):
         try:
-            widget = getattr(event, "widget", None)
-            if widget is not None and not _widget_is_descendant(widget, main):
+            steps = _mousewheel_steps(event)
+            if steps is None:
                 return None
-            if hasattr(event, "num") and event.num in (4, 5):
-                steps = -1 if event.num == 4 else 1
-            else:
-                delta = int(getattr(event, "delta", 0) or 0)
-                if delta == 0:
-                    return None
-                steps = -int(delta / 120)
-                if steps == 0:
-                    steps = -1 if delta > 0 else 1
-            canvas.yview_scroll(steps, "units")
+            target = _nearest_vertical_scroll_target(getattr(event, "widget", None))
+            if target is None:
+                return None
+            target.yview_scroll(steps, "units")
             return "break"
         except Exception:
             return None
