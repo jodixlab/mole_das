@@ -18460,17 +18460,19 @@ def _build_intake(self) -> None:
             )
         except Exception:
             restore_choice = None
+        restore_meta = None
         if restore_choice is True:
             try:
                 bundle = self._create_wizard_support_bundle()
                 self._dbpaths_open_path(str(bundle))
+                restore_meta = {"bundle_created": True, "bundle_path": str(bundle)}
             except Exception:
-                pass
-            self.load_existing(str(snap))
+                restore_meta = {"bundle_created": False, "bundle_path": ""}
+            self.load_existing(str(snap), restore_meta=restore_meta)
         elif restore_choice is False:
-            self.load_existing(str(snap))
+            self.load_existing(str(snap), restore_meta={"bundle_created": False, "bundle_path": ""})
 
-    def load_existing(self, fp: Optional[str] = None) -> None:
+    def load_existing(self, fp: Optional[str] = None, restore_meta: Optional[Dict[str, Any]] = None) -> None:
         if not fp:
             fp = filedialog.askopenfilename(
                 title="Select session config JSON",
@@ -18490,6 +18492,20 @@ def _build_intake(self) -> None:
             messagebox.showerror("Load Config", "Invalid JSON (root must be an object).")
             return
         self.session = ensure_session_schema(loaded, actor="wizard_load")
+        if isinstance(restore_meta, dict):
+            try:
+                meta = self.session.get("meta") if isinstance(self.session.get("meta"), dict) else {}
+                meta["recovery_restore"] = {
+                    "restored": True,
+                    "snapshot_path": str(fp),
+                    "restored_iso": now_iso(),
+                    "bundle_created": bool(restore_meta.get("bundle_created")),
+                    "bundle_path": str(restore_meta.get("bundle_path") or "").strip(),
+                }
+                self.session["meta"] = meta
+                self._record_wizard_health_event("RECOVERY_RESTORE", dict(meta.get("recovery_restore") or {}))
+            except Exception:
+                pass
 
         # ---------------- project ----------------
         proj = self.session.get("project") or {}

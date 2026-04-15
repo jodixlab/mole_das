@@ -4496,6 +4496,7 @@ def main() -> None:
                         _r.destroy()
                     except Exception:
                         restore_choice = None
+                    bundle_path_txt = ""
                     if restore_choice is True:
                         try:
                             if create_support_bundle is not None:
@@ -4525,6 +4526,7 @@ def main() -> None:
                                     },
                                     keep=10,
                                 )
+                                bundle_path_txt = str(support_bundle)
                                 try:
                                     if os.name == "nt":
                                         os.startfile(str(support_bundle))  # type: ignore
@@ -4541,6 +4543,25 @@ def main() -> None:
                             json.loads(recovery_path.read_text(encoding="utf-8")),
                             actor="runner_recovery_restore",
                         )
+                        meta = restored.get("meta") if isinstance(restored.get("meta"), dict) else {}
+                        meta["recovery_restore"] = {
+                            "restored": True,
+                            "snapshot_path": str(recovery_path),
+                            "restored_iso": now_iso(),
+                            "bundle_created": bool(restore_choice is True and bundle_path_txt),
+                            "bundle_path": bundle_path_txt,
+                        }
+                        restored["meta"] = meta
+                        if record_health_journal is not None:
+                            try:
+                                record_health_journal(
+                                    session_dir_for_recovery / "meta" / "health_journal",
+                                    label="runner_health",
+                                    event="RECOVERY_RESTORE",
+                                    payload=dict(meta.get("recovery_restore") or {}),
+                                )
+                            except Exception:
+                                pass
                         if atomic_write_json is not None:
                             atomic_write_json(cfg_path, restored)
                         else:
