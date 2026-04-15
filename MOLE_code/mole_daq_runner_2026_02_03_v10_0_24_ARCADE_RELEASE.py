@@ -10576,6 +10576,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     ent_session_review_signoff_role = tk.Entry(report_builder_session_review_form, textvariable=var_session_review_signoff_role, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_session_review_signoff_role.grid(row=4, column=1, sticky="ew", pady=(0, 6))
 
+    def _report_builder_labeled_text(parent: Any, title: str, *, height: int = 3, note: str = "") -> tk.Text:
+        box = tk.Frame(parent, bg=BG)
+        box.pack(fill="x", pady=(0, 8))
+        tk.Label(box, text=title, fg=ACC, bg=BG, font=("Consolas", 10, "bold")).pack(anchor="w")
+        if note:
+            tk.Label(box, text=note, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(anchor="w", pady=(2, 4))
+        txt = tk.Text(box, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", height=height, font=("Consolas", 9), wrap="word")
+        txt.pack(fill="x")
+        return txt
+
     txt_session_review_notes = _report_builder_labeled_text(
         report_builder_session_review_wrap,
         "Session Review Notes",
@@ -10664,16 +10674,6 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     report_builder_longform = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_longform.pack(fill="x", pady=(0, 8))
-
-    def _report_builder_labeled_text(parent: Any, title: str, *, height: int = 3, note: str = "") -> tk.Text:
-        box = tk.Frame(parent, bg=BG)
-        box.pack(fill="x", pady=(0, 8))
-        tk.Label(box, text=title, fg=ACC, bg=BG, font=("Consolas", 10, "bold")).pack(anchor="w")
-        if note:
-            tk.Label(box, text=note, fg=FG_DIM, bg=BG, font=("Consolas", 9)).pack(anchor="w", pady=(2, 4))
-        txt = tk.Text(box, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", height=height, font=("Consolas", 9), wrap="word")
-        txt.pack(fill="x")
-        return txt
 
     txt_report_process_narrative = _report_builder_labeled_text(
         report_builder_longform,
