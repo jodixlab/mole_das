@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -14,6 +15,56 @@ def _refs(*items: tuple[str, str]) -> list[dict[str, str]]:
 
 
 SEED_ENTRIES = {
+    "wizard.project.job_id": {
+        "label": "Job ID",
+        "short_description": "Stores the canonical project/session identifier used to name the project package and track the session through the workflow.",
+        "definition": "The Job ID is the leading project identifier in the MOLE DAS naming schema and remains the stable identifier even when the generated project folder includes the broader descriptive slug.",
+        "process_note": "Keep the generated Job ID unless there is a controlled project reason to override it. The downstream project folder now extends this with descriptive project metadata.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.project.project_name": {
+        "label": "Project Name",
+        "short_description": "Describes the project or test campaign name that should travel with the session package and report outputs.",
+        "definition": "Project name is the human-readable project descriptor used in the generated folder name, reports, and session summaries.",
+        "process_note": "Enter the formal project name that should appear in the generated project folder and downstream deliverables.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+        ),
+    },
+    "wizard.project.site_facility": {
+        "label": "Site / Facility",
+        "short_description": "Identifies the physical site or facility where the project is being executed.",
+        "definition": "Site / Facility is the location descriptor used in project metadata, generated folder naming, and final report language.",
+        "process_note": "Use the formal site or facility name expected in the project record and final deliverable.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+        ),
+    },
+    "wizard.project.operator": {
+        "label": "Operator",
+        "short_description": "Stores the operator or company name associated with the project execution context.",
+        "definition": "Operator is the project operator descriptor used in the generated folder name, session metadata, and deliverable context.",
+        "process_note": "Use the formal operator/company name that should persist with the project record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+        ),
+    },
+    "wizard.project.asset_unit_id": {
+        "label": "Asset / Unit ID",
+        "short_description": "Stores the asset or unit identifier used to distinguish the tested source within the project package.",
+        "definition": "Asset / Unit ID is the source-specific unit identifier carried in project metadata, generated folder naming, and report language.",
+        "process_note": "Use the formal unit, engine, compressor, or asset identifier expected in field records and final deliverables.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+        ),
+    },
     "wizard.session_intent.record_data": {
         "label": "Record Data",
         "short_description": "Controls whether the session is intended to capture a recorded evidence stream instead of functioning only as a transient setup shell.",
@@ -183,6 +234,15 @@ SEED_ENTRIES = {
             ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR Reference / Audit Companion Workflow"),
         ),
     },
+    "wizard.reference_ftir.prn_path": {
+        "label": "Path",
+        "short_description": "Points the reference FTIR ingest path at the PRN file or folder used for companion FTIR evidence.",
+        "definition": "The path is the concrete file or folder location scanned by the packaged FTIR ingest path for reference or audit evidence.",
+        "process_note": "Use the actual FTIR export location intended for the current project. Keep this pointed at the controlled evidence source, not a temporary copy.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Reference / Audit FTIR"),
+        ),
+    },
     "wizard.reference_ftir.file_pattern": {
         "label": "Pattern",
         "short_description": "Limits which FTIR files are included when the configured path points at a folder.",
@@ -274,6 +334,16 @@ SEED_ENTRIES = {
             ("MOLE FTIR Method 301 Experiment Protocol", "Scope and Objectives"),
         ),
     },
+    "runner.ftir.master_clock": {
+        "label": "Master clock",
+        "short_description": "Defines the authoritative time basis used by the Runner when aligning MOLE and FTIR evidence.",
+        "definition": "The master clock is the declared time basis used for the side-by-side alignment and final validation package.",
+        "process_note": "Set this to the same declared clock basis used upstream in the validation plan so the Runner and final report stay consistent.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Post-processing and timestamp alignment"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Validation Test Plan"),
+        ),
+    },
     "runner.ftir.execution_profile": {
         "label": "Execution profile",
         "short_description": "Defines whether comparison sets come from session run structure or only from manually defined windows.",
@@ -339,20 +409,126 @@ SEED_ENTRIES = {
             ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR formal Method 301 comparison"),
         ),
     },
+    "runner.test_matrix.waive_reason": {
+        "label": "Waive reason",
+        "short_description": "Captures the explicit rationale for waiving a test-matrix item instead of performing it as planned.",
+        "definition": "A waived test-matrix item requires a documented reason so the session record and final package show why the planned activity was not performed.",
+        "process_note": "Enter the waiver basis before toggling a step to waived so the decision is preserved in the tracking record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Test Matrix"),
+        ),
+    },
+    "runner.test_matrix.toggle_performed": {
+        "label": "Toggle Performed",
+        "short_description": "Marks the selected test-matrix item as performed or not performed.",
+        "definition": "Performed state is the live tracking flag that records whether a planned test-matrix activity has been completed.",
+        "process_note": "Use this only on the selected test-matrix row and keep it aligned with the actual executed work.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Test Matrix"),
+        ),
+    },
+    "runner.test_matrix.toggle_waived": {
+        "label": "Toggle Waived",
+        "short_description": "Marks the selected test-matrix item as waived when it will not be executed.",
+        "definition": "Waived state is the explicit tracking posture for a planned test activity that is intentionally not executed.",
+        "process_note": "Use this only with a documented waive reason so the tracking and final record remain defensible.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Test Matrix"),
+        ),
+    },
+    "runner.runs.notes": {
+        "label": "Run Notes",
+        "short_description": "Stores run-specific notes for the currently selected run in the method-input workflow.",
+        "definition": "Run notes are the per-run freeform remarks preserved with the run record for later review and reporting context.",
+        "process_note": "Use this for material run-specific observations, not general project notes.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Method Inputs (Per Run)"),
+        ),
+    },
+    "runner.side_by_side.note": {
+        "label": "Operator note",
+        "short_description": "Stores the current side-by-side operator note used to annotate alignment and cadence events.",
+        "definition": "The operator note is the current annotation carried with side-by-side sync, bias, purge, and drift events.",
+        "process_note": "Enter the note before logging a side-by-side event when the event needs context preserved in the alignment history.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR Side-by-Side Informed Comparison"),
+            ("MOLE FTIR Method 301 Experiment Protocol", "Procedure"),
+        ),
+    },
+    "runner.side_by_side.sync_mark": {
+        "label": "Mark Sync Point",
+        "short_description": "Records a side-by-side synchronization marker used to align MOLE and FTIR timelines.",
+        "definition": "A sync point is a logged side-by-side event that marks a known alignment reference in the comparison history.",
+        "process_note": "Use this whenever a deliberate synchronization marker is needed to interpret the MOLE/FTIR timeline.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Procedure"),
+        ),
+    },
+    "runner.side_by_side.bias_valve": {
+        "label": "Log Bias Valve",
+        "short_description": "Records the side-by-side bias-valve event required by the comparison cadence when bias is due.",
+        "definition": "Bias-valve events are explicit cadence records used in the side-by-side package and FTIR execution workflow.",
+        "process_note": "Log this after the completed run whenever the planned cadence requires a post-run bias event.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Recommended schedule within one 3-hour FTIR run"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR formal Method 301 comparison"),
+        ),
+    },
+    "runner.side_by_side.ambient_purge": {
+        "label": "Log Ambient Purge",
+        "short_description": "Records the planned ambient purge step in the side-by-side alignment history.",
+        "definition": "Ambient purge is a logged cadence event used when the side-by-side plan requires a purge period between comparison windows.",
+        "process_note": "Log this when the purge step is part of the planned side-by-side procedure and should be preserved in the event history.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Procedure"),
+        ),
+    },
+    "runner.side_by_side.project_drift": {
+        "label": "Log Project Drift",
+        "short_description": "Records the project drift step in the side-by-side alignment history.",
+        "definition": "Project drift is a logged side-by-side event used when the comparison workflow requires drift tracking between windows or runs.",
+        "process_note": "Log this when the project plan or review package requires explicit drift documentation.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Procedure"),
+        ),
+    },
 }
 
 
+def _load_existing_entries() -> dict[str, Any]:
+    try:
+        payload = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    entries = payload.get("entries")
+    return entries if isinstance(entries, dict) else {}
+
+
 def main() -> None:
+    existing_entries = _load_existing_entries()
+    merged_entries: dict[str, Any] = {}
+    for help_id, entry in existing_entries.items():
+        if isinstance(entry, dict):
+            merged_entries[help_id] = dict(entry)
+    for help_id, seed_entry in SEED_ENTRIES.items():
+        current = merged_entries.get(help_id)
+        base = dict(current) if isinstance(current, dict) else {}
+        base.update(seed_entry)
+        merged_entries[help_id] = base
     payload = {
         "registry_version": "1",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "generator": "scripts/seed_ui_help_registry.py",
-        "seed_note": "Phase 1 seeded UI help registry. Expand this file as docs and fields grow.",
-        "entries": SEED_ENTRIES,
+        "seed_note": "Seeded UI help registry. Re-run after documentation updates; existing manual entries are preserved and seeded entries are refreshed from this script.",
+        "seeded_entry_count": len(SEED_ENTRIES),
+        "total_entry_count": len(merged_entries),
+        "entries": merged_entries,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    print(str(OUT_PATH))
+    print(f"{OUT_PATH} | seeded={len(SEED_ENTRIES)} total={len(merged_entries)}")
 
 
 if __name__ == "__main__":

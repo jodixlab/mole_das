@@ -6188,16 +6188,26 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         self._configure_form_grid(form, minspec="wizard_single_field")
 
         r = 0
-        tk.Label(form, text="Job ID", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
-        tk.Entry(form, textvariable=self.var_job_id, width=32).grid(row=r, column=1, sticky="ew", pady=6); r += 1
-        tk.Label(form, text="Project Name", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
-        tk.Entry(form, textvariable=self.var_project_name, width=32).grid(row=r, column=1, sticky="ew", pady=6); r += 1
-        tk.Label(form, text="Site / Facility", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
-        tk.Entry(form, textvariable=self.var_site_facility, width=32).grid(row=r, column=1, sticky="ew", pady=6); r += 1
-        tk.Label(form, text="Operator", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
-        tk.Entry(form, textvariable=self.var_operator, width=32).grid(row=r, column=1, sticky="ew", pady=6); r += 1
-        tk.Label(form, text="Asset / Unit ID", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
-        tk.Entry(form, textvariable=self.var_asset_unit_id, width=32).grid(row=r, column=1, sticky="ew", pady=6); r += 1
+        lbl_job_id = tk.Label(form, text="Job ID", fg=self.FG, bg=self.BG, font=("Consolas", 10))
+        lbl_job_id.grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
+        ent_job_id = tk.Entry(form, textvariable=self.var_job_id, width=32)
+        ent_job_id.grid(row=r, column=1, sticky="ew", pady=6); r += 1
+        lbl_project_name = tk.Label(form, text="Project Name", fg=self.FG, bg=self.BG, font=("Consolas", 10))
+        lbl_project_name.grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
+        ent_project_name = tk.Entry(form, textvariable=self.var_project_name, width=32)
+        ent_project_name.grid(row=r, column=1, sticky="ew", pady=6); r += 1
+        lbl_site_facility = tk.Label(form, text="Site / Facility", fg=self.FG, bg=self.BG, font=("Consolas", 10))
+        lbl_site_facility.grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
+        ent_site_facility = tk.Entry(form, textvariable=self.var_site_facility, width=32)
+        ent_site_facility.grid(row=r, column=1, sticky="ew", pady=6); r += 1
+        lbl_operator = tk.Label(form, text="Operator", fg=self.FG, bg=self.BG, font=("Consolas", 10))
+        lbl_operator.grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
+        ent_operator = tk.Entry(form, textvariable=self.var_operator, width=32)
+        ent_operator.grid(row=r, column=1, sticky="ew", pady=6); r += 1
+        lbl_asset_unit_id = tk.Label(form, text="Asset / Unit ID", fg=self.FG, bg=self.BG, font=("Consolas", 10))
+        lbl_asset_unit_id.grid(row=r, column=0, sticky="w", padx=(0,12), pady=6)
+        ent_asset_unit_id = tk.Entry(form, textvariable=self.var_asset_unit_id, width=32)
+        ent_asset_unit_id.grid(row=r, column=1, sticky="ew", pady=6); r += 1
 
         intent = tk.LabelFrame(outer, text="Session Intent", bg=self.BG, fg=self.FG)
         intent.pack(anchor="nw", pady=(14, 6), fill="x")
@@ -6221,6 +6231,16 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                        command=lambda: self._on_session_intent_toggle("COMPLIANCE"))
         chk_may_support_compliance.grid(row=1, column=1, sticky="w", padx=10, pady=6)
         if help_mgr is not None:
+            for widget in (lbl_job_id, ent_job_id):
+                help_mgr.bind(widget, "wizard.project.job_id")
+            for widget in (lbl_project_name, ent_project_name):
+                help_mgr.bind(widget, "wizard.project.project_name")
+            for widget in (lbl_site_facility, ent_site_facility):
+                help_mgr.bind(widget, "wizard.project.site_facility")
+            for widget in (lbl_operator, ent_operator):
+                help_mgr.bind(widget, "wizard.project.operator")
+            for widget in (lbl_asset_unit_id, ent_asset_unit_id):
+                help_mgr.bind(widget, "wizard.project.asset_unit_id")
             help_mgr.bind(chk_record_data, "wizard.session_intent.record_data")
             help_mgr.bind(chk_tokenize, "wizard.session_intent.tokenize")
             help_mgr.bind(chk_diagnostics_only, "wizard.session_intent.diagnostics_only")

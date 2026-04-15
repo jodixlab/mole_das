@@ -9018,8 +9018,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     side_note_row = tk.Frame(sec_side_by_side, bg=BG)
     side_note_row.pack(fill="x", pady=(0, 6))
-    tk.Label(side_note_row, text="Operator note", fg=FG, bg=BG, font=("Consolas", 9, "bold")).pack(side="left")
-    tk.Entry(
+    lbl_side_note = tk.Label(side_note_row, text="Operator note", fg=FG, bg=BG, font=("Consolas", 9, "bold"))
+    lbl_side_note.pack(side="left")
+    ent_side_note = tk.Entry(
         side_note_row,
         textvariable=var_side_note,
         bg=PANEL_BG,
@@ -9027,7 +9028,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         insertbackground=FG,
         relief="flat",
         width=80,
-    ).pack(side="left", fill="x", expand=True, padx=(8, 0))
+    )
+    ent_side_note.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
     side_btns = tk.Frame(sec_side_by_side, bg=BG)
     side_btns.pack(fill="x", pady=(0, 6))
@@ -9039,6 +9041,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_side_purge.pack(side="left", padx=(6, 0))
     btn_side_drift = tk.Button(side_btns, text="Log Project Drift", bg=BTN_BG, fg=FG, relief="flat")
     btn_side_drift.pack(side="left", padx=(6, 0))
+    if help_mgr is not None:
+        for widget in (lbl_side_note, ent_side_note):
+            help_mgr.bind(widget, "runner.side_by_side.note")
+        help_mgr.bind(btn_side_sync, "runner.side_by_side.sync_mark")
+        help_mgr.bind(btn_side_bias, "runner.side_by_side.bias_valve")
+        help_mgr.bind(btn_side_purge, "runner.side_by_side.ambient_purge")
+        help_mgr.bind(btn_side_drift, "runner.side_by_side.project_drift")
 
     side_history = tk.Text(sec_side_by_side, height=8, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", wrap="none")
     side_history.pack(fill="x")
@@ -10172,8 +10181,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     tm_controls.pack(fill="x", pady=(8, 0))
 
     var_waive_reason = tk.StringVar(value="")
-    tk.Label(tm_controls, text="Waive reason:", fg=FG, bg=BG, font=("Consolas", 9)).pack(side="left")
-    tk.Entry(tm_controls, textvariable=var_waive_reason, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", width=40, font=("Consolas", 9)).pack(side="left", padx=(6, 10))
+    lbl_waive_reason = tk.Label(tm_controls, text="Waive reason:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_waive_reason.pack(side="left")
+    ent_waive_reason = tk.Entry(tm_controls, textvariable=var_waive_reason, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", width=40, font=("Consolas", 9))
+    ent_waive_reason.pack(side="left", padx=(6, 10))
 
     btn_tm_toggle_perf = tk.Button(tm_controls, text="Toggle Performed", bg=BTN_BG, fg=FG, relief="flat")
     btn_tm_toggle_perf.pack(side="left", padx=(0, 6))
@@ -10185,6 +10196,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     btn_tm_launch_console = tk.Button(tm_controls, text="Run QA/QC (Console)", bg=BTN_BG, fg=FG, relief="flat")
     btn_tm_launch_console.pack(side="right")
+    if help_mgr is not None:
+        for widget in (lbl_waive_reason, ent_waive_reason):
+            help_mgr.bind(widget, "runner.test_matrix.waive_reason")
+        help_mgr.bind(btn_tm_toggle_perf, "runner.test_matrix.toggle_performed")
+        help_mgr.bind(btn_tm_toggle_waive, "runner.test_matrix.toggle_waived")
 
     # Method inputs (per run)
     sec_runs = _section(scroll, "Method Inputs (Per Run)")
@@ -10215,9 +10231,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     tk.Label(run_meta, textvariable=var_run_title, fg=ACC2, bg=BG, font=("Consolas", 10, "bold")).pack(anchor="w")
 
     var_run_notes = tk.StringVar(value="")
-    tk.Label(run_meta, text="Notes:", fg=FG, bg=BG, font=("Consolas", 9)).pack(anchor="w", pady=(8, 2))
+    lbl_run_notes = tk.Label(run_meta, text="Notes:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_run_notes.pack(anchor="w", pady=(8, 2))
     ent_run_notes = tk.Entry(run_meta, textvariable=var_run_notes, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
     ent_run_notes.pack(fill="x")
+    if help_mgr is not None:
+        for widget in (lbl_run_notes, ent_run_notes):
+            help_mgr.bind(widget, "runner.runs.notes")
 
     tk.Label(run_meta, text="", bg=BG).pack(pady=4)
 
