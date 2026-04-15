@@ -501,6 +501,78 @@ SEED_ENTRIES = {
             ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
         ),
     },
+    "runner.report.client_name": {
+        "label": "Client name",
+        "short_description": "Stores the client name used in the formal report package.",
+        "definition": "Client name is the project customer or client identifier carried into the report context and final deliverable.",
+        "process_note": "Use the formal client name that should appear in the final report.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.facility_owner": {
+        "label": "Facility owner / operator",
+        "short_description": "Stores the facility owner or operator name used in the formal report package.",
+        "definition": "Facility owner / operator is the owner/operator identity carried into the report context and final deliverable.",
+        "process_note": "Use the formal facility owner or operator name expected in the final report.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.test_company": {
+        "label": "Test company",
+        "short_description": "Stores the test company responsible for the project execution or report package.",
+        "definition": "Test company is the organization performing the test program and preparing the deliverable package.",
+        "process_note": "Use the formal test company name that should appear in the final report.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.laboratory": {
+        "label": "Laboratory",
+        "short_description": "Stores the laboratory identity used in the formal report package when applicable.",
+        "definition": "Laboratory is the lab name carried into the report context for analytical or organizational reference.",
+        "process_note": "Use this when a lab identity belongs in the final package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.session_operator": {
+        "label": "Session operator",
+        "short_description": "Stores the session operator name carried into the formal report context.",
+        "definition": "Session operator is the operator identity associated with the active test session and final report context.",
+        "process_note": "Use the person or operator identity that should appear in the formal package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.responsible_official": {
+        "label": "Responsible official",
+        "short_description": "Stores the responsible official identified for the final report package.",
+        "definition": "Responsible official is the formal accountable official carried into the final report and approval context.",
+        "process_note": "Use the actual responsible official expected to appear in the deliverable.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.responsible_title": {
+        "label": "Responsible title",
+        "short_description": "Stores the official title of the responsible official in the final report package.",
+        "definition": "Responsible title is the formal title associated with the recorded responsible official.",
+        "process_note": "Use the title that should appear verbatim in the report.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.agency_contact": {
+        "label": "Agency contact",
+        "short_description": "Stores the relevant agency contact context for the formal report package.",
+        "definition": "Agency contact is the project regulatory contact carried into the report context when applicable.",
+        "process_note": "Use this when the report package needs to preserve the project agency contact.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
     "runner.report.submission_status": {
         "label": "Submission status",
         "short_description": "Stores the current submission or filing status associated with the test package.",
@@ -623,6 +695,69 @@ SEED_ENTRIES = {
         "short_description": "Stores the explicit approval conditions, restrictions, or rejection basis attached to signoff.",
         "definition": "The signoff note is the package-level approval narrative associated with the recorded decision.",
         "process_note": "Use this to preserve approval conditions, exceptions, or a specific rejection basis.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.process_narrative": {
+        "label": "Process Narrative",
+        "short_description": "Stores the report-ready narrative describing the source, duty, and operating context.",
+        "definition": "Process narrative is the formal descriptive narrative used in the final report to explain the source and test context.",
+        "process_note": "Write this in report-ready language because it can flow directly into the formal deliverable.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.control_equipment_description": {
+        "label": "Control Equipment Description",
+        "short_description": "Stores the report-ready description of any relevant control equipment.",
+        "definition": "Control equipment description is the formal narrative describing control devices and relevant operating context for the source.",
+        "process_note": "Use this when the report should describe control devices or control-side operating context.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.planned_deviations": {
+        "label": "Planned Deviations",
+        "short_description": "Stores planned or pre-approved departures from the standard procedure.",
+        "definition": "Planned deviations are the preplanned or pre-approved departures from standard execution preserved in the formal package.",
+        "process_note": "Use one item per line so the package and report can preserve each deviation cleanly.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.field_deviations": {
+        "label": "Field Deviations",
+        "short_description": "Stores observed field deviations that occurred during testing.",
+        "definition": "Field deviations are the actual departures from expected execution observed during the test program.",
+        "process_note": "Use one item per line and keep the text factual and review-ready.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.alternative_method_approvals": {
+        "label": "Alternative Method / Approval References",
+        "short_description": "Stores the identifiers for alternative methods, approvals, or related supporting references.",
+        "definition": "Alternative method / approval references are the formal permit, email, or approval identifiers preserved in the report package.",
+        "process_note": "Use one item per line so each approval or reference remains distinct in the final record.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.impact_statement": {
+        "label": "Impact Statement",
+        "short_description": "Stores the statement describing whether deviations or approvals affected validity or interpretation.",
+        "definition": "Impact statement is the report-ready explanation of whether recorded deviations or approvals affected data validity, comparability, or interpretation.",
+        "process_note": "State the impact clearly so the final report can preserve the conclusion without rework.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.report.correspondence_notes": {
+        "label": "Regulatory / Correspondence Notes",
+        "short_description": "Stores regulatory and correspondence context carried into the final report package.",
+        "definition": "Regulatory / correspondence notes summarize NOI, agency coordination, ERT/CEDRI status, and related project correspondence context.",
+        "process_note": "Use this for concise summary context, not full correspondence transcripts.",
         "doc_refs": _refs(
             ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
         ),

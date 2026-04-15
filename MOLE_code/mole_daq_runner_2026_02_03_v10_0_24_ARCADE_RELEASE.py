@@ -10418,25 +10418,41 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     var_session_review_lock_status = tk.StringVar(value="Session review state: UNLOCKED")
     var_session_review_signoff_status = tk.StringVar(value="Session review signoff: UNSIGNED")
 
-    tk.Label(report_builder_form, text="Client name:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_client_name, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Facility owner / operator:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_facility_owner, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=0, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_client_name = tk.Label(report_builder_form, text="Client name:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_client_name.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_client_name = tk.Entry(report_builder_form, textvariable=var_report_client_name, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_client_name.grid(row=0, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_facility_owner = tk.Label(report_builder_form, text="Facility owner / operator:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_facility_owner.grid(row=0, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_facility_owner = tk.Entry(report_builder_form, textvariable=var_report_facility_owner, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_facility_owner.grid(row=0, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_form, text="Test company:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_test_company, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=1, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Laboratory:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_laboratory, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=1, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_test_company = tk.Label(report_builder_form, text="Test company:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_test_company.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_test_company = tk.Entry(report_builder_form, textvariable=var_report_test_company, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_test_company.grid(row=1, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_laboratory = tk.Label(report_builder_form, text="Laboratory:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_laboratory.grid(row=1, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_laboratory = tk.Entry(report_builder_form, textvariable=var_report_laboratory, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_laboratory.grid(row=1, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_form, text="Session operator:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_session_operator, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=2, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Responsible official:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_responsible_official, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=2, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_session_operator = tk.Label(report_builder_form, text="Session operator:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_session_operator.grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_session_operator = tk.Entry(report_builder_form, textvariable=var_report_session_operator, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_session_operator.grid(row=2, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_responsible_official = tk.Label(report_builder_form, text="Responsible official:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_responsible_official.grid(row=2, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_responsible_official = tk.Entry(report_builder_form, textvariable=var_report_responsible_official, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_responsible_official.grid(row=2, column=3, sticky="ew", pady=(0, 6))
 
-    tk.Label(report_builder_form, text="Responsible title:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_responsible_title, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=1, sticky="ew", pady=(0, 6))
-    tk.Label(report_builder_form, text="Agency contact:", fg=FG, bg=BG, font=("Consolas", 9)).grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
-    tk.Entry(report_builder_form, textvariable=var_report_agency_contact, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9)).grid(row=3, column=3, sticky="ew", pady=(0, 6))
+    lbl_report_responsible_title = tk.Label(report_builder_form, text="Responsible title:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_responsible_title.grid(row=3, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
+    ent_report_responsible_title = tk.Entry(report_builder_form, textvariable=var_report_responsible_title, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_responsible_title.grid(row=3, column=1, sticky="ew", pady=(0, 6))
+    lbl_report_agency_contact = tk.Label(report_builder_form, text="Agency contact:", fg=FG, bg=BG, font=("Consolas", 9))
+    lbl_report_agency_contact.grid(row=3, column=2, sticky="w", padx=(14, 8), pady=(0, 6))
+    ent_report_agency_contact = tk.Entry(report_builder_form, textvariable=var_report_agency_contact, bg=PANEL_BG, fg=FG, insertbackground=FG, relief="flat", font=("Consolas", 9))
+    ent_report_agency_contact.grid(row=3, column=3, sticky="ew", pady=(0, 6))
 
     lbl_report_notice_of_intent = tk.Label(report_builder_form, text="Notice of intent date:", fg=FG, bg=BG, font=("Consolas", 9))
     lbl_report_notice_of_intent.grid(row=4, column=0, sticky="w", padx=(0, 8), pady=(0, 6))
@@ -10568,6 +10584,22 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_session_review_clear_signoff = tk.Button(report_builder_session_review_ctrls, text="Clear Signoff", bg=BTN_BG, fg=FG, relief="flat")
     btn_session_review_clear_signoff.pack(side="left", padx=(8, 0))
     if help_mgr is not None:
+        for widget in (lbl_report_client_name, ent_report_client_name):
+            help_mgr.bind(widget, "runner.report.client_name")
+        for widget in (lbl_report_facility_owner, ent_report_facility_owner):
+            help_mgr.bind(widget, "runner.report.facility_owner")
+        for widget in (lbl_report_test_company, ent_report_test_company):
+            help_mgr.bind(widget, "runner.report.test_company")
+        for widget in (lbl_report_laboratory, ent_report_laboratory):
+            help_mgr.bind(widget, "runner.report.laboratory")
+        for widget in (lbl_report_session_operator, ent_report_session_operator):
+            help_mgr.bind(widget, "runner.report.session_operator")
+        for widget in (lbl_report_responsible_official, ent_report_responsible_official):
+            help_mgr.bind(widget, "runner.report.responsible_official")
+        for widget in (lbl_report_responsible_title, ent_report_responsible_title):
+            help_mgr.bind(widget, "runner.report.responsible_title")
+        for widget in (lbl_report_agency_contact, ent_report_agency_contact):
+            help_mgr.bind(widget, "runner.report.agency_contact")
         for widget in (lbl_report_notice_of_intent, ent_report_notice_of_intent):
             help_mgr.bind(widget, "runner.report.notice_of_intent_date")
         for widget in (lbl_report_submission_status, ent_report_submission_status):
@@ -10652,6 +10684,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         height=3,
         note="Summarize NOI, agency coordination, ERT/CEDRI status, and related correspondence context.",
     )
+    if help_mgr is not None:
+        help_mgr.bind(txt_report_process_narrative, "runner.report.process_narrative")
+        help_mgr.bind(txt_report_control_equipment, "runner.report.control_equipment_description")
+        help_mgr.bind(txt_report_planned_deviations, "runner.report.planned_deviations")
+        help_mgr.bind(txt_report_field_deviations, "runner.report.field_deviations")
+        help_mgr.bind(txt_report_alt_approvals, "runner.report.alternative_method_approvals")
+        help_mgr.bind(txt_report_impact_statement, "runner.report.impact_statement")
+        help_mgr.bind(txt_report_correspondence_notes, "runner.report.correspondence_notes")
 
     report_builder_ftir_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_ftir_wrap.pack(fill="x", pady=(0, 8))
