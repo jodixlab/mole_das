@@ -8080,6 +8080,7 @@ def _build_intake(self) -> None:
             values=self._source_category_options, state="disabled", width=28
         )
         cb_cat.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_cat, "wizard.source.category")
 
         ttk.Label(box, text="Application:").grid(row=1, column=0, sticky="w", padx=10, pady=8)
         self.cb_source_application = ttk.Combobox(
@@ -8087,6 +8088,7 @@ def _build_intake(self) -> None:
             values=app_options_for(self.var_source_category.get()), state="disabled", width=28
         )
         self.cb_source_application.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(self.cb_source_application, "wizard.source.application")
 
 
         ttk.Label(box, text="Service Class:").grid(row=2, column=0, sticky="w", padx=10, pady=8)
@@ -8095,6 +8097,7 @@ def _build_intake(self) -> None:
             values=["Stationary", "Portable", "Mobile", "Offshore", "Unknown"], state="readonly", width=28
         )
         cb_sc.grid(row=2, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_sc, "wizard.source.service_class")
 
         ttk.Label(box, text="Output Type:").grid(row=3, column=0, sticky="w", padx=10, pady=8)
         cb_ot = ttk.Combobox(
@@ -8102,6 +8105,7 @@ def _build_intake(self) -> None:
             values=["Mechanical", "Electrical", "Thermal", "Unknown"], state="readonly", width=28
         )
         cb_ot.grid(row=3, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_ot, "wizard.source.output_type")
 
         # Engine cycle classification (2-cycle / 4-cycle) - used downstream for regulatory applicability
         ttk.Label(box, text="Engine Cycle:").grid(row=4, column=0, sticky="w", padx=10, pady=8)
@@ -8110,6 +8114,7 @@ def _build_intake(self) -> None:
             values=getattr(self, "_engine_cycle_options", ["UNKNOWN", "2_CYL", "4_CYL"]), state="readonly", width=28
         )
         self.cb_engine_cycle.grid(row=4, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(self.cb_engine_cycle, "wizard.source.engine_cycle")
 
         def _refresh_engine_cycle_state(*_args):
             cat_v = (self.var_source_category.get() or "").strip()
@@ -8129,6 +8134,7 @@ def _build_intake(self) -> None:
         ttk.Label(box, text="Cyl Count:").grid(row=5, column=0, sticky="w", padx=10, pady=8)
         self.ent_engine_cyl_count = white_entry(box, self.var_engine_cyl_count, width=10)
         self.ent_engine_cyl_count.grid(row=5, column=1, sticky="w", padx=(0, 10), pady=8)
+        help_mgr.bind(self.ent_engine_cyl_count, "wizard.source.engine_cyl_count")
 
         def _refresh_engine_cyl_state(*_args):
             cat_v = (self.var_source_category.get() or "").strip()
@@ -8171,10 +8177,12 @@ def _build_intake(self) -> None:
         ttk.Label(id_box, text="Manufacturer:").grid(row=0, column=0, sticky="w", padx=10, pady=8)
         self.cb_mfr = ttk.Combobox(id_box, textvariable=self.var_manufacturer, values=[], state="normal", width=28)
         self.cb_mfr.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(self.cb_mfr, "wizard.source.manufacturer")
 
         ttk.Label(id_box, text="Model Number:").grid(row=0, column=2, sticky="w", padx=(18, 6), pady=8)
         self.cb_model = ttk.Combobox(id_box, textvariable=self.var_model_number, values=[], state="normal", width=28)
         self.cb_model.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(self.cb_model, "wizard.source.model_number")
 
 
         try:
@@ -8185,10 +8193,12 @@ def _build_intake(self) -> None:
         ttk.Label(id_box, text="Serial Number:").grid(row=1, column=0, sticky="w", padx=10, pady=8)
         ent_ser = white_entry(id_box, self.var_serial_number, width=30)
         ent_ser.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_ser, "wizard.source.serial_number")
 
         ttk.Label(id_box, text="Asset Tag:").grid(row=1, column=2, sticky="w", padx=(18, 6), pady=8)
         ent_tag = white_entry(id_box, self.var_asset_tag, width=30)
         ent_tag.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_tag, "wizard.source.asset_tag")
 
         def _refresh_catalog_picklists(*_args):
             try:
@@ -8248,15 +8258,22 @@ def _build_intake(self) -> None:
             values=["hp", "kW", "MMBtu/hr"], state="readonly", width=12
         )
         cb_units.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_units, "wizard.source.power_units")
 
         ttk.Label(box2, text="Nameplate / Max:").grid(row=0, column=2, sticky="w", padx=10, pady=8)
-        white_entry(box2, self.var_max_power, width=12).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        ent_max_power = white_entry(box2, self.var_max_power, width=12)
+        ent_max_power.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_max_power, "wizard.source.max_power")
 
         ttk.Label(box2, text="Site Rated:").grid(row=1, column=0, sticky="w", padx=10, pady=8)
-        white_entry(box2, self.var_site_rated_power, width=12).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        ent_site_rated = white_entry(box2, self.var_site_rated_power, width=12)
+        ent_site_rated.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_site_rated, "wizard.source.site_rated_power")
 
         ttk.Label(box2, text="Estimated Operating:").grid(row=1, column=2, sticky="w", padx=10, pady=8)
-        white_entry(box2, self.var_estimated_power, width=12).grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=8)
+        ent_estimated_power = white_entry(box2, self.var_estimated_power, width=12)
+        ent_estimated_power.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_estimated_power, "wizard.source.estimated_power")
 
         ttk.Label(box2, text="Load Basis:").grid(row=2, column=0, sticky="w", padx=10, pady=8)
         cb_basis = ttk.Combobox(
@@ -8264,6 +8281,7 @@ def _build_intake(self) -> None:
             values=["NAMEPLATE", "SITE_RATED", "ESTIMATED"], state="readonly", width=14
         )
         cb_basis.grid(row=2, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_basis, "wizard.source.load_basis")
 
         # --- section: fuel flow note / basis (optional) ---
         box3 = tk.LabelFrame(outer, text="Fuel Flow (optional; run-to-run variation acknowledged)", bg=self.BG, fg=self.FG)
@@ -8276,6 +8294,7 @@ def _build_intake(self) -> None:
             values=["UNSET", "METERED", "MANUAL", "ESTIMATED"], state="readonly", width=14
         )
         cb_ff.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_ff, "wizard.source.fuel_flow_basis")
         ttk.Label(box3, text="Units:").grid(row=0, column=2, sticky="w", padx=10, pady=8)
 
         # Units list is driven by fuel family (gas vs liquid vs dual).
@@ -8311,17 +8330,22 @@ def _build_intake(self) -> None:
             values=unit_opts, state="readonly", width=10
         )
         self.cb_fuel_flow_units.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(self.cb_fuel_flow_units, "wizard.source.fuel_flow_units")
 
 
         ttk.Label(box3, text="Typical variation (%):").grid(row=1, column=0, sticky="w", padx=10, pady=8)
-        white_entry(box3, self.var_fuel_flow_variation_pct, width=6).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        ent_ff_var = white_entry(box3, self.var_fuel_flow_variation_pct, width=6)
+        ent_ff_var.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_ff_var, "wizard.source.fuel_flow_variation_pct")
 
-        tk.Checkbutton(
+        chk_ff_ack = tk.Checkbutton(
             box3, text="Acknowledge run-to-run fuel flow variation",
             variable=self.var_fuel_flow_ack,
             bg=self.BG, fg=self.FG, selectcolor=self.PANEL,
             activebackground=self.BG, activeforeground=self.FG
-        ).grid(row=1, column=2, columnspan=3, sticky="w", padx=10, pady=8)
+        )
+        chk_ff_ack.grid(row=1, column=2, columnspan=3, sticky="w", padx=10, pady=8)
+        help_mgr.bind(chk_ff_ack, "wizard.source.fuel_flow_ack")
 
 
         # --- section: exhaust flow determination ---
@@ -8336,6 +8360,7 @@ def _build_intake(self) -> None:
             state="readonly", width=28
         )
         cb_exh.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_exh, "wizard.source.exhaust_method")
 
         sub = tk.Frame(box4, bg=self.BG)
         sub.grid(row=1, column=0, columnspan=6, sticky="ew", padx=10, pady=(2, 10))
@@ -10201,15 +10226,23 @@ def _build_intake(self) -> None:
         self._configure_form_grid(loc_box, minspec="site_coordinates_grid")
 
         tk.Label(loc_box, text="Latitude:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ttk.Entry(loc_box, textvariable=self.var_site_lat, width=16).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        ent_site_lat = ttk.Entry(loc_box, textvariable=self.var_site_lat, width=16)
+        ent_site_lat.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_site_lat, "wizard.site.latitude")
 
         tk.Label(loc_box, text="Longitude:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=2, sticky="w", padx=(18, 10), pady=8)
-        ttk.Entry(loc_box, textvariable=self.var_site_lon, width=16).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        ent_site_lon = ttk.Entry(loc_box, textvariable=self.var_site_lon, width=16)
+        ent_site_lon.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_site_lon, "wizard.site.longitude")
 
         tk.Label(loc_box, text="Station ID:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=1, column=0, sticky="w", padx=10, pady=6)
-        ttk.Entry(loc_box, textvariable=self.var_site_station_id, width=16).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=6)
+        ent_station_id = ttk.Entry(loc_box, textvariable=self.var_site_station_id, width=16)
+        ent_station_id.grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=6)
+        help_mgr.bind(ent_station_id, "wizard.site.station_id")
         tk.Label(loc_box, text="Elevation (ft MSL):", bg=self.BG, fg=self.FG).grid(row=1, column=2, sticky="w", pady=6)
-        ttk.Entry(loc_box, textvariable=self.var_site_elev_ft_msl, width=16).grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=6)
+        ent_site_elev = ttk.Entry(loc_box, textvariable=self.var_site_elev_ft_msl, width=16)
+        ent_site_elev.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=6)
+        help_mgr.bind(ent_site_elev, "wizard.site.elevation_ft_msl")
 
         tk.Button(loc_box, text="Fetch Weather", command=self._fetch_weather_button,
                   bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").grid(row=0, column=4, rowspan=2, sticky="ns", padx=12, pady=6)
@@ -10232,12 +10265,16 @@ def _build_intake(self) -> None:
         self._configure_form_grid(pol, minspec="two_pair_compact")
 
         tk.Label(pol, text="Mode:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ttk.Combobox(pol, textvariable=self.var_site_mode, values=self._site_mode_options, state="readonly", width=20).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        cb_site_mode = ttk.Combobox(pol, textvariable=self.var_site_mode, values=self._site_mode_options, state="readonly", width=20)
+        cb_site_mode.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_site_mode, "wizard.site.mode")
 
         tk.Label(pol, text="On Fetch Fail:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=2, sticky="w", padx=(18, 10), pady=8)
-        ttk.Combobox(pol, textvariable=self.var_weather_fail, values=self._on_weather_fail_options, state="readonly", width=18).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        cb_weather_fail = ttk.Combobox(pol, textvariable=self.var_weather_fail, values=self._on_weather_fail_options, state="readonly", width=18)
+        cb_weather_fail.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_weather_fail, "wizard.site.weather_fail")
 
-        tk.Checkbutton(
+        chk_auto_weather_compile = tk.Checkbutton(
             pol,
             text="Auto-compile weather data (NOAA every 5 min; Runner backfills later)",
             variable=self.var_auto_weather_compile,
@@ -10245,7 +10282,9 @@ def _build_intake(self) -> None:
             fg=self.BTN_FG,
             selectcolor=self.BG,
             command=lambda: (self._sync_session_from_vars(), self._refresh_nav()),
-        ).grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 8))
+        )
+        chk_auto_weather_compile.grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 8))
+        help_mgr.bind(chk_auto_weather_compile, "wizard.site.auto_weather_compile")
 
         tk.Label(pol, textvariable=self.var_site_last_weather, fg="#9fb0c0", bg=self.BG,
                  font=("Consolas", 9)).grid(row=2, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 8))
@@ -10256,13 +10295,19 @@ def _build_intake(self) -> None:
         self._configure_form_grid(man, minspec="three_pair_compact")
 
         tk.Label(man, text="T_amb ( degF):", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ttk.Entry(man, textvariable=self.var_manual_T, width=12).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        ent_manual_t = ttk.Entry(man, textvariable=self.var_manual_T, width=12)
+        ent_manual_t.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_manual_t, "wizard.site.manual_t_amb_f")
 
         tk.Label(man, text="P_bar (psia):", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=2, sticky="w", padx=(18, 10), pady=8)
-        ttk.Entry(man, textvariable=self.var_manual_P, width=12).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        ent_manual_p = ttk.Entry(man, textvariable=self.var_manual_P, width=12)
+        ent_manual_p.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_manual_p, "wizard.site.manual_p_bar_psia")
 
         tk.Label(man, text="RH (0-1):", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=4, sticky="w", padx=(18, 10), pady=8)
-        ttk.Entry(man, textvariable=self.var_manual_RH, width=12).grid(row=0, column=5, sticky="ew", padx=(0, 10), pady=8)
+        ent_manual_rh = ttk.Entry(man, textvariable=self.var_manual_RH, width=12)
+        ent_manual_rh.grid(row=0, column=5, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_manual_rh, "wizard.site.manual_rh_frac")
 
         # Z model + standard conditions (kept concise)
         zbox = tk.LabelFrame(outer, text="Z Model + Standard Conditions", bg=self.BG, fg=self.FG)
@@ -10270,10 +10315,14 @@ def _build_intake(self) -> None:
         self._configure_form_grid(zbox, minspec="two_pair_form")
 
         tk.Label(zbox, text="Z Model:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ttk.Combobox(zbox, textvariable=self.var_z_model, values=self._z_model_options, state="readonly", width=18).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        cb_z_model = ttk.Combobox(zbox, textvariable=self.var_z_model, values=self._z_model_options, state="readonly", width=18)
+        cb_z_model.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(cb_z_model, "wizard.site.z_model")
 
         tk.Label(zbox, text="Fixed Z:", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=0, column=2, sticky="w", padx=(18, 10), pady=8)
-        ttk.Entry(zbox, textvariable=self.var_fixed_z, width=10).grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        ent_fixed_z = ttk.Entry(zbox, textvariable=self.var_fixed_z, width=10)
+        ent_fixed_z.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=8)
+        help_mgr.bind(ent_fixed_z, "wizard.site.fixed_z")
 
         tk.Label(zbox, text="T_std ( degF):", fg=self.FG, bg=self.BG, font=("Consolas", 10)).grid(row=1, column=0, sticky="w", padx=10, pady=8)
         ttk.Entry(zbox, textvariable=self.var_std_T, width=10).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=8)

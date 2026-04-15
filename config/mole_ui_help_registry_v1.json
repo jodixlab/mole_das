@@ -1,10 +1,10 @@
 {
   "registry_version": "1",
-  "generated_utc": "2026-04-15T17:29:47.659251+00:00",
+  "generated_utc": "2026-04-15T17:36:21.727916+00:00",
   "generator": "scripts/seed_ui_help_registry.py",
   "seed_note": "Seeded UI help registry. Re-run after documentation updates; existing manual entries are preserved and seeded entries are refreshed from this script.",
-  "seeded_entry_count": 91,
-  "total_entry_count": 91,
+  "seeded_entry_count": 123,
+  "total_entry_count": 123,
   "entries": {
     "wizard.session_intent.record_data": {
       "label": "Record Data",
@@ -1207,6 +1207,398 @@
         {
           "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
           "section": "QA/QC"
+        }
+      ]
+    },
+    "wizard.source.category": {
+      "label": "Source Category",
+      "short_description": "Classifies the physical source category so the Wizard can constrain downstream source logic and equipment defaults.",
+      "definition": "Source category is the top-level source classification used to drive source application options, engine-specific fields, and related normalization assumptions.",
+      "process_note": "Set this first in the Source Schema section because downstream fields such as Application, Engine Cycle, and Cylinder Count depend on it.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        },
+        {
+          "doc_label": "MOLE DAS Technical and Operating Manual",
+          "section": "4.1 Wizard-first workflow"
+        }
+      ]
+    },
+    "wizard.source.application": {
+      "label": "Application",
+      "short_description": "Describes the source application within the selected source category.",
+      "definition": "Application is the source-use classification beneath the top-level source category and is used to preserve equipment context in the session package.",
+      "process_note": "Select the application that best matches the tested source after setting Source Category.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        },
+        {
+          "doc_label": "MOLE DAS Technical and Operating Manual",
+          "section": "4.1 Wizard-first workflow"
+        }
+      ]
+    },
+    "wizard.source.service_class": {
+      "label": "Service Class",
+      "short_description": "Captures whether the source is stationary, portable, mobile, offshore, or unknown.",
+      "definition": "Service class is a source-context descriptor used to distinguish the operating deployment class of the equipment.",
+      "process_note": "Use the actual deployment class of the tested equipment so the project record stays defensible.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.output_type": {
+      "label": "Output Type",
+      "short_description": "Records whether the source output is mechanical, electrical, thermal, or unknown.",
+      "definition": "Output type is the functional output classification of the tested source and helps preserve the equipment context in the session record.",
+      "process_note": "Choose the output type that matches the actual work produced by the source.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.engine_cycle": {
+      "label": "Engine Cycle",
+      "short_description": "Stores the engine cycle class used for engine-specific regulatory and equipment context.",
+      "definition": "Engine cycle distinguishes two-cycle, four-cycle, or unknown engine classification for source records where the source category is Engine.",
+      "process_note": "Populate this only for engine sources. Leave the source category correct first so the field is enabled only when appropriate.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.engine_cyl_count": {
+      "label": "Cylinder Count",
+      "short_description": "Stores the engine cylinder count for engine sources.",
+      "definition": "Cylinder count is the equipment-specific engine count used for source identification and regulatory/equipment context where applicable.",
+      "process_note": "Enter this only for engine sources and use the actual installed cylinder count.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.manufacturer": {
+      "label": "Manufacturer",
+      "short_description": "Identifies the equipment manufacturer for the tested source.",
+      "definition": "Manufacturer is the equipment-maker field carried in source metadata and used by the equipment catalog picklists.",
+      "process_note": "Use the manufacturer that matches the actual tested equipment. Review the model defaults after selection.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.model_number": {
+      "label": "Model Number",
+      "short_description": "Identifies the equipment model for the tested source.",
+      "definition": "Model Number is the equipment model identifier carried in the source record and used by catalog-driven defaults where available.",
+      "process_note": "Use the actual model identifier for the tested equipment. This may drive catalog defaults in the source form.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.serial_number": {
+      "label": "Serial Number",
+      "short_description": "Captures the equipment serial number for source identification.",
+      "definition": "Serial Number is the source-specific equipment serial identifier recorded in project metadata and supporting documentation.",
+      "process_note": "Enter the actual equipment serial number used in field and report records.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.asset_tag": {
+      "label": "Asset Tag",
+      "short_description": "Captures the local asset tag or plant identifier for the tested source.",
+      "definition": "Asset Tag is the plant or operator-specific asset identifier that supplements model and serial information.",
+      "process_note": "Use the facility\u2019s actual asset tag when one exists so the project record matches field documentation.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.power_units": {
+      "label": "Power Units",
+      "short_description": "Defines the engineering units used for rating and capacity inputs.",
+      "definition": "Power Units determines the unit basis for the source rating and capacity values used in normalization context.",
+      "process_note": "Choose the unit basis before entering rating values so Nameplate, Site Rated, and Estimated Operating stay coherent.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.max_power": {
+      "label": "Nameplate / Max",
+      "short_description": "Stores the nameplate or maximum rated source capacity.",
+      "definition": "Nameplate / Max is the maximum equipment rating preserved for source normalization context and reporting.",
+      "process_note": "Enter the best-supported nameplate or maximum rating available for the tested source.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.site_rated_power": {
+      "label": "Site Rated",
+      "short_description": "Stores the site-rated or declared operating capacity for the source.",
+      "definition": "Site Rated is the source\u2019s site-declared or permitted rating used when nameplate data is not the chosen normalization basis.",
+      "process_note": "Use the declared site-rated value when that is the operational rating the project intends to use.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.estimated_power": {
+      "label": "Estimated Operating",
+      "short_description": "Stores an estimated operating rating when stronger rating evidence is unavailable.",
+      "definition": "Estimated Operating is the fallback operating-capacity estimate used only when better rating evidence is not available.",
+      "process_note": "Use this only as a fallback and prefer nameplate or site-rated values when available.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.load_basis": {
+      "label": "Load Basis",
+      "short_description": "Selects which rating basis should be treated as the current operating basis.",
+      "definition": "Load Basis declares whether nameplate, site-rated, or estimated capacity is the active basis for source normalization context.",
+      "process_note": "Choose the basis that matches the project\u2019s defensible rating reference.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.source.fuel_flow_basis": {
+      "label": "Fuel Flow Basis",
+      "short_description": "Declares whether fuel flow is metered, manual, estimated, or unset.",
+      "definition": "Fuel Flow Basis is the data-quality posture for fuel flow information used in optional source and exhaust-flow logic.",
+      "process_note": "Choose the strongest basis actually available and leave it unset when no fuel-flow value is being carried.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Fuel Analysis"
+        }
+      ]
+    },
+    "wizard.source.fuel_flow_units": {
+      "label": "Fuel Flow Units",
+      "short_description": "Defines the engineering units used for optional fuel-flow values.",
+      "definition": "Fuel Flow Units stores the unit basis for the declared fuel-flow context and adapts to the resolved fuel family.",
+      "process_note": "Use units consistent with the source fuel family and the actual field or records basis.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Fuel Analysis"
+        }
+      ]
+    },
+    "wizard.source.fuel_flow_variation_pct": {
+      "label": "Typical Variation (%)",
+      "short_description": "Captures the expected run-to-run fuel-flow variation percentage.",
+      "definition": "Typical Variation is an acknowledgement value representing expected run-to-run fuel-flow variability.",
+      "process_note": "Use a realistic variation figure if fuel flow is being carried into the source context.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Fuel Analysis"
+        }
+      ]
+    },
+    "wizard.source.fuel_flow_ack": {
+      "label": "Acknowledge Fuel Flow Variation",
+      "short_description": "Confirms that run-to-run fuel-flow variation is recognized for the current source context.",
+      "definition": "This acknowledgement indicates that optional fuel-flow context may vary between runs and should be treated accordingly.",
+      "process_note": "Check this when the project is intentionally carrying an approximate or variable fuel-flow context.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Fuel Analysis"
+        }
+      ]
+    },
+    "wizard.source.exhaust_method": {
+      "label": "Exhaust Flow Determination",
+      "short_description": "Declares how exhaust flow will be determined for the source workflow.",
+      "definition": "Exhaust Flow Determination records whether exhaust flow is derived stoichiometrically, measured, or carried from manufacturer inputs.",
+      "process_note": "Choose the actual exhaust-flow determination basis planned for the project so downstream assumptions remain consistent.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Source Info"
+        }
+      ]
+    },
+    "wizard.site.latitude": {
+      "label": "Latitude",
+      "short_description": "Stores the site latitude in WGS84 coordinates.",
+      "definition": "Latitude is the site-location coordinate used for weather and location-aware project context.",
+      "process_note": "Use the actual test-site latitude or fetch coordinates before weather compilation.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.longitude": {
+      "label": "Longitude",
+      "short_description": "Stores the site longitude in WGS84 coordinates.",
+      "definition": "Longitude is the site-location coordinate used for weather and location-aware project context.",
+      "process_note": "Use the actual test-site longitude or fetch coordinates before weather compilation.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.station_id": {
+      "label": "Station ID",
+      "short_description": "Stores the preferred weather-station identifier for site weather retrieval.",
+      "definition": "Station ID is the site weather-reference identifier used to anchor weather compilation when a specific station is known.",
+      "process_note": "Populate this when a preferred station is known; otherwise let the weather workflow resolve it from coordinates.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.elevation_ft_msl": {
+      "label": "Elevation (ft MSL)",
+      "short_description": "Stores the site elevation above mean sea level in feet.",
+      "definition": "Elevation is the site-location elevation used for environmental context and related computations.",
+      "process_note": "Enter or fetch the site elevation in feet MSL so the site record stays internally consistent.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.mode": {
+      "label": "Weather Mode",
+      "short_description": "Declares whether site conditions are sourced automatically from weather data or managed manually.",
+      "definition": "Weather Mode controls whether the session relies on automatic weather retrieval or manual site-condition fallback.",
+      "process_note": "Use the mode that matches how site conditions will be maintained for the session.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.weather_fail": {
+      "label": "On Fetch Fail",
+      "short_description": "Defines the failover behavior if automatic weather retrieval is unsuccessful.",
+      "definition": "On Fetch Fail is the policy setting that determines how the session should behave when weather retrieval cannot complete as planned.",
+      "process_note": "Choose the failover posture that matches the project\u2019s tolerance for manual fallback versus interruption.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.auto_weather_compile": {
+      "label": "Auto-compile Weather Data",
+      "short_description": "Controls whether the session should compile weather data automatically for the site context.",
+      "definition": "Auto-compile weather data enables periodic weather compilation and later Runner backfill for the declared site coordinates and station.",
+      "process_note": "Enable this when the project intends to carry automatically compiled weather data in the session record.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.manual_t_amb_f": {
+      "label": "T_amb (degF)",
+      "short_description": "Stores manual ambient temperature as an optional site-condition fallback value.",
+      "definition": "Manual ambient temperature is the fallback temperature value used when the session relies on manually entered site conditions.",
+      "process_note": "Use this only when manual site-condition fallback is part of the project\u2019s site-conditions posture.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.manual_p_bar_psia": {
+      "label": "P_bar (psia)",
+      "short_description": "Stores manual barometric pressure as an optional site-condition fallback value.",
+      "definition": "Manual barometric pressure is the fallback pressure value used when the session relies on manually entered site conditions.",
+      "process_note": "Use this only when manual site-condition fallback is part of the project\u2019s site-conditions posture.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.manual_rh_frac": {
+      "label": "RH (0-1)",
+      "short_description": "Stores manual relative humidity as an optional site-condition fallback value.",
+      "definition": "Manual RH is the fallback relative-humidity fraction used when the session relies on manually entered site conditions.",
+      "process_note": "Enter RH as a fraction from 0 to 1 when using manual site-condition fallback.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.z_model": {
+      "label": "Z Model",
+      "short_description": "Defines the compressibility-factor model used for site-condition handling.",
+      "definition": "Z Model is the compressibility-factor treatment used in the site-conditions context, including ideal or fixed-Z handling.",
+      "process_note": "Use the project\u2019s intended compressibility treatment and provide Fixed Z when that mode is selected.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
+        }
+      ]
+    },
+    "wizard.site.fixed_z": {
+      "label": "Fixed Z",
+      "short_description": "Stores the fixed compressibility factor when a fixed-Z site-condition model is used.",
+      "definition": "Fixed Z is the explicit compressibility-factor value carried when the site-condition posture uses a fixed-Z model.",
+      "process_note": "Populate this only when the selected Z Model requires a fixed Z value.",
+      "doc_refs": [
+        {
+          "doc_label": "MOLE DAS Worksteps - All Tabs and Flows",
+          "section": "Site Conditions"
         }
       ]
     }
