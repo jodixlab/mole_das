@@ -99,10 +99,11 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, latest_matching_path, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
+    create_support_bundle = None
     latest_matching_path = None
     write_recovery_snapshot = None
 
@@ -3101,6 +3102,14 @@ class MoleDASWizard(tk.Tk):
             recovery_actions,
             text="Open Last DB Backup",
             command=self._open_latest_wizard_db_backup,
+            bg="#14202d",
+            fg=self.BTN_FG,
+            relief="flat",
+        ).pack(fill="x", pady=(0, 4))
+        tk.Button(
+            recovery_actions,
+            text="Export Support Bundle",
+            command=self._export_wizard_support_bundle,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
@@ -6445,6 +6454,47 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             messagebox.showwarning("SQLite Backup", "No SQLite backup is available yet.")
             return
         self._dbpaths_open_path(str(backup))
+
+    def _latest_wizard_crash_log_path(self) -> Optional[Path]:
+        path_obj = Path(self.ui_log_path)
+        return path_obj if path_obj.exists() else None
+
+    def _export_wizard_support_bundle(self) -> None:
+        if create_support_bundle is None:
+            messagebox.showerror("Support Bundle", "Support bundle helper is unavailable in this runtime.")
+            return
+        try:
+            session_cfg = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
+            active_session_dir = str(self.var_active_session_dir.get() or "").strip() if hasattr(self, "var_active_session_dir") else ""
+            bundle = create_support_bundle(
+                Path(self.logs_dir) / "support_bundles",
+                label="wizard_support_bundle",
+                manifest={
+                    "app": "wizard",
+                    "version": VERSION,
+                    "app_title": APP_TITLE,
+                    "base_dir": str(self.base_dir),
+                    "logs_dir": str(self.logs_dir),
+                    "backups_dir": str(self.backups_dir),
+                    "session_config_path": session_cfg,
+                    "active_session_dir": active_session_dir,
+                    "job_id": str((self.session.get("project") or {}).get("job_id") or ""),
+                    "session_schema_version": SESSION_SCHEMA_VERSION,
+                    "python": sys.version,
+                },
+                artifacts={
+                    "wizard_config": mole_cfg_path(self.base_dir),
+                    "session_config": Path(session_cfg) if session_cfg else None,
+                    "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
+                    "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
+                    "wizard_crash_log": self._latest_wizard_crash_log_path(),
+                    "active_session_summary": (Path(active_session_dir) / "exports" / "report_pack_v1" / "summary.json") if active_session_dir else None,
+                },
+                keep=10,
+            )
+            self._dbpaths_open_path(str(bundle))
+        except Exception as e:
+            messagebox.showerror("Support Bundle", str(e))
 
     def _apply_validation_plan_policy(self) -> None:
         session_type = str(self.var_validation_session_type.get() or "STANDARD_TEST").strip().upper() or "STANDARD_TEST"

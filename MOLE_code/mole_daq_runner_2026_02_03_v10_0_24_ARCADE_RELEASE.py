@@ -112,9 +112,10 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, latest_matching_path, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
+    create_support_bundle = None
     latest_matching_path = None
     write_recovery_snapshot = None
 
@@ -8058,6 +8059,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         bg=BTN_BG,
         fg=FG,
         relief="flat",
+    ).pack(fill="x", pady=(0, 4))
+    tk.Button(
+        recovery_btns,
+        text="Export Support Bundle",
+        command=lambda: _export_runner_support_bundle(_load_session()),
+        bg=BTN_BG,
+        fg=FG,
+        relief="flat",
     ).pack(fill="x")
 
     btns = tk.Frame(left_inner, bg=BG)
@@ -15435,6 +15444,60 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 recovery_status_var.set("Recoverable state: (unavailable)")
             except Exception:
                 pass
+
+    def _runner_logs_dir(sess_local: Dict[str, Any]) -> Path:
+        try:
+            return Path(str(((sess_local.get("paths") or {}).get("logs_dir") or (cfg_path.parent / "mole_das_logs")))).expanduser().resolve()
+        except Exception:
+            return cfg_path.parent.resolve()
+
+    def _runner_crash_log_path(sess_local: Dict[str, Any]) -> Optional[Path]:
+        log_dir = _runner_logs_dir(sess_local)
+        if latest_matching_path is not None:
+            try:
+                return latest_matching_path(log_dir, f"mole_daq_runner_ui_crash_{cfg_path.stem}_*.log")
+            except Exception:
+                pass
+        try:
+            logs = sorted(log_dir.glob(f"mole_daq_runner_ui_crash_{cfg_path.stem}_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+            return logs[0] if logs else None
+        except Exception:
+            return None
+
+    def _export_runner_support_bundle(sess_local: Dict[str, Any]) -> None:
+        if create_support_bundle is None:
+            messagebox.showerror("Support Bundle", "Support bundle helper is unavailable in this runtime.")
+            return
+        try:
+            outputs = init_outputs(sess_local, cfg_path, None)
+            bundle = create_support_bundle(
+                outputs.exports_dir / "support_bundles",
+                label="runner_support_bundle",
+                manifest={
+                    "app": "runner",
+                    "version": APP_VERSION,
+                    "app_title": APP_TITLE,
+                    "config_path": str(cfg_path),
+                    "session_dir": str(outputs.out_dir),
+                    "meta_dir": str(outputs.meta_dir),
+                    "exports_dir": str(outputs.exports_dir),
+                    "job_id": str(_job_id(sess_local)),
+                    "session_schema_version": SESSION_SCHEMA_VERSION,
+                    "python": sys.version,
+                },
+                artifacts={
+                    "runner_config": cfg_path,
+                    "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
+                    "runner_ui_crash_log": _runner_crash_log_path(sess_local),
+                    "build_manifest": outputs.meta_dir / "build.json",
+                    "session_manifest": outputs.meta_dir / "manifest.json",
+                    "report_pack_summary": outputs.exports_dir / "report_pack_v1" / "summary.json",
+                },
+                keep=10,
+            )
+            _open_fs_target(bundle, title="Open Support Bundle Failed")
+        except Exception as e:
+            messagebox.showerror("Support Bundle", str(e))
 
     def _ftir_validation_block(sess_local: Dict[str, Any]) -> Dict[str, Any]:
         blk = sess_local.get("ftir_validation")

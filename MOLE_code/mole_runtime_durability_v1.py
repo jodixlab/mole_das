@@ -4,9 +4,11 @@ import json
 import os
 import re
 import sqlite3
+import shutil
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 
 def _utc_stamp() -> str:
@@ -114,3 +116,49 @@ def backup_sqlite_database(
 
     rotate_dir_entries(backup_dir, f"{base}__*.sqlite", keep=keep)
     return out
+
+
+def create_support_bundle(
+    bundle_root: Path,
+    *,
+    label: str,
+    manifest: Dict[str, Any],
+    artifacts: Mapping[str, Optional[Path]],
+    keep: int = 10,
+) -> Path:
+    bundle_root = Path(bundle_root)
+    bundle_root.mkdir(parents=True, exist_ok=True)
+    base = _slug(label, default="support_bundle")
+    bundle_dir = bundle_root / f"{base}__{_utc_stamp()}"
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    copied: Dict[str, Dict[str, Any]] = {}
+    for name, source in artifacts.items():
+        src = Path(source).expanduser() if source is not None else None
+        if src is None or not src.exists() or not src.is_file():
+            copied[str(name)] = {"source": str(source) if source is not None else "", "copied": False}
+            continue
+        safe_name = _slug(str(name), default="artifact")
+        dest = bundle_dir / f"{safe_name}{src.suffix}"
+        shutil.copy2(src, dest)
+        copied[str(name)] = {
+            "source": str(src),
+            "copied": True,
+            "bundle_path": str(dest),
+        }
+
+    manifest_payload = dict(manifest or {})
+    manifest_payload.setdefault("created_utc", datetime.now(timezone.utc).isoformat())
+    manifest_payload["artifacts"] = copied
+    manifest_path = bundle_dir / "support_bundle_manifest.json"
+    atomic_write_json(manifest_path, manifest_payload)
+
+    zip_path = bundle_root / f"{bundle_dir.name}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for item in sorted(bundle_dir.rglob("*")):
+            if item.is_file():
+                zf.write(item, item.relative_to(bundle_dir))
+
+    rotate_dir_entries(bundle_root, f"{base}__*.zip", keep=keep)
+    rotate_dir_entries(bundle_root, f"{base}__*", keep=keep * 2)
+    return zip_path
