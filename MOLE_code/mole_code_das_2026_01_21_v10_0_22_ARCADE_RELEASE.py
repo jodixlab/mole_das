@@ -18441,9 +18441,9 @@ def _build_intake(self) -> None:
                     )
         except Exception:
             latest_event = ""
-        restore = False
+        restore_choice = None
         try:
-            restore = messagebox.askyesno(
+            restore_choice = messagebox.askyesnocancel(
                 "Session Recovery",
                 (
                     "A Wizard recovery snapshot is available.\n\n"
@@ -18452,13 +18452,22 @@ def _build_intake(self) -> None:
                     f"Snapshot: {snap.name}\n"
                     f"Updated: {created}\n\n"
                     + (latest_event + "\n\n" if latest_event else "")
-                    + "Restore this snapshot into the Wizard now?"
+                    + "YES = restore and open a pre-restore support bundle.\n"
+                    + "NO = restore only.\n"
+                    + "CANCEL = skip recovery."
                 ),
                 default="no",
             )
         except Exception:
-            restore = False
-        if restore:
+            restore_choice = None
+        if restore_choice is True:
+            try:
+                bundle = self._create_wizard_support_bundle()
+                self._dbpaths_open_path(str(bundle))
+            except Exception:
+                pass
+            self.load_existing(str(snap))
+        elif restore_choice is False:
             self.load_existing(str(snap))
 
     def load_existing(self, fp: Optional[str] = None) -> None:

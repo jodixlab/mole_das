@@ -4478,21 +4478,65 @@ def main() -> None:
                                     f"Last journal event: {str(health.get('last_event') or '(n/a)')}\n"
                                     f"Journal updated: {str(health.get('updated_utc') or '(time unavailable)')}\n\n"
                                 )
-                        restore = _mb.askyesno(
+                        restore_choice = _mb.askyesnocancel(
                             "DAQ Runner Recovery",
-                            "A Runner recovery snapshot is available.\n\n"
-                            f"Current live config: {cfg_path.name}\n"
-                            f"Current live updated: {live_updated}\n\n"
-                            f"Snapshot: {recovery_path.name}\n"
-                            f"Updated: {updated}\n\n"
-                            f"{latest_event}"
-                            "Restore this snapshot before opening the UI?",
+                            (
+                                "A Runner recovery snapshot is available.\n\n"
+                                f"Current live config: {cfg_path.name}\n"
+                                f"Current live updated: {live_updated}\n\n"
+                                f"Snapshot: {recovery_path.name}\n"
+                                f"Updated: {updated}\n\n"
+                                f"{latest_event}"
+                                "YES = restore and open a pre-restore support bundle.\n"
+                                "NO = restore only.\n"
+                                "CANCEL = skip recovery."
+                            ),
                             default="no",
                         )
                         _r.destroy()
                     except Exception:
-                        restore = False
-                    if restore:
+                        restore_choice = None
+                    if restore_choice is True:
+                        try:
+                            if create_support_bundle is not None:
+                                preview_session = ensure_session_schema(json.loads(cfg_path.read_text(encoding="utf-8")), actor="runner_recovery_bundle")
+                                preview_outputs = init_outputs(preview_session, cfg_path, getattr(args, "outdir", None))
+                                support_bundle = create_support_bundle(
+                                    preview_outputs.exports_dir / "support_bundles",
+                                    label="runner_support_bundle",
+                                    manifest={
+                                        "app": "runner",
+                                        "version": APP_VERSION,
+                                        "app_title": APP_TITLE,
+                                        "config_path": str(cfg_path),
+                                        "session_dir": str(preview_outputs.out_dir),
+                                        "meta_dir": str(preview_outputs.meta_dir),
+                                        "exports_dir": str(preview_outputs.exports_dir),
+                                        "job_id": str(((preview_session.get("project") or {}).get("job_id") or "")),
+                                        "session_schema_version": SESSION_SCHEMA_VERSION,
+                                        "python": sys.version,
+                                        "recovery_prompt_bundle": True,
+                                    },
+                                    artifacts={
+                                        "runner_config_live": cfg_path,
+                                        "runner_recovery_snapshot": recovery_path,
+                                        "runner_health_latest": (session_dir_for_recovery / "meta" / "health_journal" / "runner_health__latest.json"),
+                                        "runner_health_history": (session_dir_for_recovery / "meta" / "health_journal" / "runner_health__history.jsonl"),
+                                    },
+                                    keep=10,
+                                )
+                                try:
+                                    if os.name == "nt":
+                                        os.startfile(str(support_bundle))  # type: ignore
+                                    elif sys.platform == "darwin":
+                                        subprocess.Popen(["open", str(support_bundle)])
+                                    else:
+                                        subprocess.Popen(["xdg-open", str(support_bundle)])
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                    if restore_choice in (True, False):
                         restored = ensure_session_schema(
                             json.loads(recovery_path.read_text(encoding="utf-8")),
                             actor="runner_recovery_restore",
