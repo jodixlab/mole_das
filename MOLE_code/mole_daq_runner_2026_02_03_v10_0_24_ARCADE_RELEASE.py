@@ -8183,38 +8183,47 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     _bind_safe_wrap(recovery_status_lbl, left, pad_px=32, min_wrap=180)
     recovery_btns = tk.Frame(left_inner, bg=BG)
     recovery_btns.pack(fill="x", padx=12, pady=(0, 8))
-    tk.Button(
+    btn_runner_open_recovery_snapshot = tk.Button(
         recovery_btns,
         text="Open Recovery Snapshot",
         command=lambda: _open_fs_target(_runner_recovery_snapshot_path(_load_session()), title="Open Recovery Snapshot Failed"),
         bg=BTN_BG,
         fg=FG,
         relief="flat",
-    ).pack(fill="x", pady=(0, 4))
-    tk.Button(
+    )
+    btn_runner_open_recovery_snapshot.pack(fill="x", pady=(0, 4))
+    btn_runner_open_recovery_folder = tk.Button(
         recovery_btns,
         text="Open Recovery Folder",
         command=lambda: _open_fs_target(_runner_recovery_dir(_load_session()), title="Open Recovery Folder Failed"),
         bg=BTN_BG,
         fg=FG,
         relief="flat",
-    ).pack(fill="x", pady=(0, 4))
-    tk.Button(
+    )
+    btn_runner_open_recovery_folder.pack(fill="x", pady=(0, 4))
+    btn_runner_export_support_bundle = tk.Button(
         recovery_btns,
         text="Export Support Bundle",
         command=lambda: _export_runner_support_bundle(_load_session()),
         bg=BTN_BG,
         fg=FG,
         relief="flat",
-    ).pack(fill="x", pady=(0, 4))
-    tk.Button(
+    )
+    btn_runner_export_support_bundle.pack(fill="x", pady=(0, 4))
+    btn_runner_view_recovery_history = tk.Button(
         recovery_btns,
         text="View Recovery History",
         command=lambda: _show_runner_recovery_history(_load_session()),
         bg=BTN_BG,
         fg=FG,
         relief="flat",
-    ).pack(fill="x")
+    )
+    btn_runner_view_recovery_history.pack(fill="x")
+    if help_mgr is not None:
+        help_mgr.bind(btn_runner_open_recovery_snapshot, "runner.recovery.open_snapshot")
+        help_mgr.bind(btn_runner_open_recovery_folder, "runner.recovery.open_folder")
+        help_mgr.bind(btn_runner_export_support_bundle, "runner.recovery.export_support_bundle")
+        help_mgr.bind(btn_runner_view_recovery_history, "runner.recovery.view_history")
 
     btns = tk.Frame(left_inner, bg=BG)
     btns.pack(fill="x", padx=12, pady=(8, 10))
@@ -10648,6 +10657,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             help_mgr.bind(widget, "runner.session_review.signoff_role")
         help_mgr.bind(txt_session_review_notes, "runner.session_review.notes")
         help_mgr.bind(txt_session_review_signoff_note, "runner.session_review.signoff_note")
+        help_mgr.bind(btn_session_review_lock, "runner.session_review.lock_review")
+        help_mgr.bind(btn_session_review_unlock, "runner.session_review.unlock_review")
+        help_mgr.bind(btn_session_review_sign, "runner.session_review.sign_off_action")
+        help_mgr.bind(btn_session_review_clear_signoff, "runner.session_review.clear_signoff_action")
 
     report_builder_longform = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_longform.pack(fill="x", pady=(0, 8))
@@ -11215,6 +11228,20 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     btn_ftir_validation_sign.pack(side="left", padx=(16, 0))
     btn_ftir_validation_clear_signoff = tk.Button(ftir_review_ctrls, text="Clear Signoff", bg=BTN_BG, fg=FG, relief="flat")
     btn_ftir_validation_clear_signoff.pack(side="left", padx=(8, 0))
+    if help_mgr is not None:
+        help_mgr.bind(btn_ftir_validation_apply_sweep, "runner.ftir.apply_selected_sweep")
+        help_mgr.bind(ent_ftir_validation_set_review_reason, "runner.ftir.set_review_reason")
+        help_mgr.bind(btn_ftir_validation_accept_set, "runner.ftir.accept_selected_set")
+        help_mgr.bind(btn_ftir_validation_reject_set, "runner.ftir.reject_selected_set")
+        help_mgr.bind(btn_ftir_validation_clear_set_reviews, "runner.ftir.clear_all_set_decisions")
+        help_mgr.bind(ent_ftir_validation_exclusion_reason, "runner.ftir.exclusion_reason")
+        help_mgr.bind(btn_ftir_validation_exclude, "runner.ftir.exclude_selected")
+        help_mgr.bind(btn_ftir_validation_include, "runner.ftir.include_selected")
+        help_mgr.bind(btn_ftir_validation_clear_exclusions, "runner.ftir.clear_all_exclusions")
+        help_mgr.bind(btn_ftir_validation_lock, "runner.ftir.lock_review")
+        help_mgr.bind(btn_ftir_validation_unlock, "runner.ftir.unlock_review")
+        help_mgr.bind(btn_ftir_validation_sign, "runner.ftir.sign_off_action")
+        help_mgr.bind(btn_ftir_validation_clear_signoff, "runner.ftir.clear_signoff_action")
 
     report_builder_text_wrap = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_text_wrap.pack(fill="both", expand=True)

@@ -66,6 +66,86 @@ SEED_ENTRIES = {
             ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
         ),
     },
+    "wizard.actions.save_apply": {
+        "label": "Save + Apply Config",
+        "short_description": "Validates the current Wizard state, persists the session configuration, and prepares the handoff state for downstream execution.",
+        "definition": "Save + Apply Config is the main Wizard commit action that writes the working project/session configuration into the active MOLE DAS session package.",
+        "process_note": "Use this after completing required Wizard inputs so the Runner and downstream exports inherit the current session plan and metadata.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.actions.load_existing_config": {
+        "label": "Load Existing Config",
+        "short_description": "Loads an existing Wizard/session configuration back into the current Wizard shell.",
+        "definition": "Load Existing Config restores a previously saved MOLE DAS configuration so planning, review, or edits can continue from an existing session record.",
+        "process_note": "Use this when resuming an existing project or when a saved configuration must be reviewed before Save + Apply.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.recovery.open_snapshot": {
+        "label": "Open Recovery Snapshot",
+        "short_description": "Opens the latest Wizard recovery snapshot preserved for restore and support purposes.",
+        "definition": "Recovery snapshot is the last rotated Wizard state written to disk as part of the runtime durability and recovery path.",
+        "process_note": "Use this to inspect the latest recoverable Wizard state before restoring or preparing a support bundle.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.recovery.open_db_backup": {
+        "label": "Open Last DB Backup",
+        "short_description": "Opens the most recent rotated Wizard-side SQLite backup for recovery inspection.",
+        "definition": "Last DB backup is the latest preserved database backup written by the durability layer during Wizard save/apply activity.",
+        "process_note": "Use this when validating the last recoverable database state or collecting support evidence after a failure.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.3 Data and evidence root"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.recovery.export_support_bundle": {
+        "label": "Export Support Bundle",
+        "short_description": "Collects the latest recovery, config, and crash-support artifacts into a single support bundle.",
+        "definition": "Support bundle is the packaged recovery/support export that preserves the current Wizard state, recovery artifacts, and relevant diagnostics for field support.",
+        "process_note": "Use this before destructive recovery steps or whenever a support-ready capture of the current Wizard state is needed.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.recovery.view_history": {
+        "label": "View Recovery History",
+        "short_description": "Shows the recent Wizard recovery and restore events preserved by the durability journal.",
+        "definition": "Recovery history is the in-app view of recent Wizard recovery snapshots, restore events, and related durability records.",
+        "process_note": "Use this to review the recent recovery chain before restoring or escalating a support issue.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "4.1 Wizard-first workflow"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.export.export_tab_csv": {
+        "label": "Export Tab CSV",
+        "short_description": "Exports the active Wizard tab to a CSV snapshot for external review or transfer.",
+        "definition": "Export Tab CSV writes the currently active Wizard tab content into a tab-scoped CSV extract.",
+        "process_note": "Use this when a single tab must be reviewed or shared without exporting the full project package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.3 Data and evidence root"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
+    "wizard.export.export_full_csv_pack": {
+        "label": "Export Full CSV Pack",
+        "short_description": "Exports the current Wizard state into a broader CSV package across the configured tabs.",
+        "definition": "Export Full CSV Pack writes a multi-tab CSV export set for offline review, transfer, or support use.",
+        "process_note": "Use this when the current Wizard state needs to be captured in a broader flat-file package without switching to the Runner/report path.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.3 Data and evidence root"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Project Configurations (Hub)"),
+        ),
+    },
     "wizard.session_intent.record_data": {
         "label": "Record Data",
         "short_description": "Controls whether the session is intended to capture a recorded evidence stream instead of functioning only as a transient setup shell.",
@@ -872,6 +952,132 @@ SEED_ENTRIES = {
             ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
         ),
     },
+    "runner.ftir.apply_selected_sweep": {
+        "label": "Apply Selected Sweep Offset",
+        "short_description": "Applies the selected alignment sweep offset to the FTIR comparison workflow.",
+        "definition": "Selected sweep offset is the chosen time-offset candidate from the alignment review used to improve MOLE/FTIR pairing before review lock and signoff.",
+        "process_note": "Use this only after reviewing the sweep preview and confirming the selected offset improves pairing quality for the intended comparison sets.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Post-processing and timestamp alignment"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.set_review_reason": {
+        "label": "Selected-set review reason",
+        "short_description": "Stores the reviewer rationale for accepting or rejecting a comparison set.",
+        "definition": "Set review reason is the reviewer narrative attached to a comparison-set acceptance or rejection decision in the FTIR review workflow.",
+        "process_note": "Enter the reason before applying the set decision so the review record preserves the basis for inclusion or rejection.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Data package contents"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.accept_selected_set": {
+        "label": "Accept Selected Set",
+        "short_description": "Marks the selected comparison set as accepted in the FTIR review workflow.",
+        "definition": "Accepted set is a comparison set explicitly approved by the reviewer for inclusion in the frozen FTIR validation package.",
+        "process_note": "Use this only after alignment QA and reviewer rationale support retaining the set in the signed package.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Acceptance Criteria"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR formal Method 301 comparison"),
+        ),
+    },
+    "runner.ftir.reject_selected_set": {
+        "label": "Reject Selected Set",
+        "short_description": "Marks the selected comparison set as rejected in the FTIR review workflow.",
+        "definition": "Rejected set is a comparison set explicitly excluded by reviewer disposition from the frozen FTIR validation package.",
+        "process_note": "Use this when alignment QA, evidence quality, or procedural issues justify rejecting the set from the signed comparison package.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Data package contents"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.clear_all_set_decisions": {
+        "label": "Clear All Set Decisions",
+        "short_description": "Removes the current explicit set-level review decisions from the FTIR review state.",
+        "definition": "Clear All Set Decisions resets the comparison-set review dispositions so the set-review workflow can be reevaluated before lock/signoff.",
+        "process_note": "Use this only when the set-review decisions need to be rebuilt from scratch before lock or signoff.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.exclusion_reason": {
+        "label": "Selected-row exclusion reason",
+        "short_description": "Stores the reviewer rationale for excluding or reinstating aligned comparison rows.",
+        "definition": "Exclusion reason is the reviewer narrative attached to row-level inclusion or exclusion decisions in the FTIR alignment review.",
+        "process_note": "Enter the reason before changing row inclusion so the frozen review package preserves the row-level basis.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Data package contents"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.exclude_selected": {
+        "label": "Exclude Selected",
+        "short_description": "Excludes the selected aligned comparison rows from FTIR statistical treatment and package inclusion.",
+        "definition": "Excluded rows are aligned comparison rows intentionally removed from the FTIR comparison package by reviewer disposition.",
+        "process_note": "Use this only with a documented technical reason so the exclusion register remains defensible.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Post-processing and timestamp alignment"),
+            ("MOLE FTIR Method 301 Experiment Protocol", "Data package contents"),
+        ),
+    },
+    "runner.ftir.include_selected": {
+        "label": "Include Selected",
+        "short_description": "Restores the selected aligned comparison rows to the active FTIR comparison package.",
+        "definition": "Include Selected reverses prior row-level exclusion so the chosen rows return to the live comparison package.",
+        "process_note": "Use this when a previously excluded row is determined to be acceptable for the signed package.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Post-processing and timestamp alignment"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.clear_all_exclusions": {
+        "label": "Clear All Exclusions",
+        "short_description": "Removes all current row-level exclusions from the FTIR review state.",
+        "definition": "Clear All Exclusions resets the row-level exclusion register so the aligned rows can be reevaluated before lock or signoff.",
+        "process_note": "Use this only when the exclusion review must be rebuilt before freezing the FTIR package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.lock_review": {
+        "label": "Lock Review",
+        "short_description": "Freezes the current FTIR review state and creates the locked snapshot used by final reporting.",
+        "definition": "Lock Review is the FTIR review control that freezes the current comparison-set, exclusion, and reviewer state into the locked review package.",
+        "process_note": "Use this only after QA review, exclusions, and set decisions are complete, because the final report prefers the locked snapshot.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Data package contents"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR formal Method 301 comparison"),
+        ),
+    },
+    "runner.ftir.unlock_review": {
+        "label": "Unlock Review",
+        "short_description": "Reopens the FTIR review state so exclusions, set decisions, and signoff can be revised.",
+        "definition": "Unlock Review removes the frozen review state and returns the FTIR comparison package to an editable review posture.",
+        "process_note": "Use this only when the locked FTIR package must be revised; reopening the review invalidates the frozen signed posture.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
+    "runner.ftir.sign_off_action": {
+        "label": "Sign Off",
+        "short_description": "Applies the FTIR reviewer approval decision to the locked comparison package.",
+        "definition": "FTIR signoff records the package-level approval decision for the locked FTIR validation package and carries it into the report path.",
+        "process_note": "Use this only after the review is locked and the acceptance basis matches the actual comparison package posture.",
+        "doc_refs": _refs(
+            ("MOLE FTIR Method 301 Experiment Protocol", "Conclusion"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR formal Method 301 comparison"),
+        ),
+    },
+    "runner.ftir.clear_signoff_action": {
+        "label": "Clear Signoff",
+        "short_description": "Removes the current FTIR signoff decision from the review package.",
+        "definition": "Clear Signoff resets the FTIR approval decision so the locked review package can be re-signed after correction or re-review.",
+        "process_note": "Use this when the signoff record was applied prematurely or must be replaced with a corrected decision.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "FTIR / validation-specific tabs and sections"),
+        ),
+    },
     "runner.ftir.refresh_preview": {
         "label": "Refresh FTIR Validation Preview",
         "short_description": "Recomputes the current FTIR validation preview and review status from the active settings and evidence.",
@@ -1505,6 +1711,80 @@ SEED_ENTRIES = {
         "process_note": "Use this to preserve approval conditions, exceptions, or a specific rejection basis.",
         "doc_refs": _refs(
             ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.lock_review": {
+        "label": "Lock Review",
+        "short_description": "Freezes the package-level shared review state for the current non-FTIR or package-level report path.",
+        "definition": "Session-review lock freezes the shared package review metadata so the deliverable can move into a controlled signoff posture.",
+        "process_note": "Use this after reviewer metadata and review notes are complete and before package-level signoff is applied.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.unlock_review": {
+        "label": "Unlock Review",
+        "short_description": "Reopens the shared package-level review state for edits before signoff.",
+        "definition": "Session-review unlock returns the shared package review metadata to an editable state by removing the locked review posture.",
+        "process_note": "Use this only when the package review metadata or basis needs revision before final signoff.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.sign_off_action": {
+        "label": "Sign Off",
+        "short_description": "Applies the shared package-level signoff decision to the current deliverable path.",
+        "definition": "Shared package signoff records the approval decision for the current report or validation package under the shared review model.",
+        "process_note": "Use this only after the review is locked and the scope, decision, and basis accurately match the deliverable posture.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.session_review.clear_signoff_action": {
+        "label": "Clear Signoff",
+        "short_description": "Removes the current shared package signoff decision from the report-builder review state.",
+        "definition": "Clear Signoff resets the shared package approval record so the package can be re-signed after correction or re-review.",
+        "process_note": "Use this when the signoff record must be removed before a corrected review decision is applied.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.recovery.open_snapshot": {
+        "label": "Open Recovery Snapshot",
+        "short_description": "Opens the latest Runner recovery snapshot preserved by the durability layer.",
+        "definition": "Runner recovery snapshot is the latest saved recoverable Runner config/state capture written to disk for restore and support use.",
+        "process_note": "Use this to inspect the recoverable Runner state before restoring or exporting a support bundle.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.2 DAQ Runner"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.recovery.open_folder": {
+        "label": "Open Recovery Folder",
+        "short_description": "Opens the Runner recovery directory containing snapshots and related recovery artifacts.",
+        "definition": "Recovery folder is the on-disk directory that stores the current Runner recoverable-state artifacts.",
+        "process_note": "Use this when direct access to the recovery files is needed for inspection, restore support, or transfer.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.2 DAQ Runner"),
+        ),
+    },
+    "runner.recovery.export_support_bundle": {
+        "label": "Export Support Bundle",
+        "short_description": "Packages the current Runner recovery, config, and support artifacts into a support-ready bundle.",
+        "definition": "Runner support bundle is the packaged export containing current Runner state, recovery artifacts, and support diagnostics.",
+        "process_note": "Use this before destructive recovery or when field support needs a single support-ready package.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.2 DAQ Runner"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Report Builder"),
+        ),
+    },
+    "runner.recovery.view_history": {
+        "label": "View Recovery History",
+        "short_description": "Shows the recent Runner recovery and restore history recorded by the durability journal.",
+        "definition": "Runner recovery history is the in-app summary of recent recovery snapshots, restore events, and support-bundle provenance.",
+        "process_note": "Use this to review the recent recovery chain before restoring or escalating a field-support issue.",
+        "doc_refs": _refs(
+            ("MOLE DAS Technical and Operating Manual", "2.2 DAQ Runner"),
         ),
     },
     "runner.report.process_narrative": {

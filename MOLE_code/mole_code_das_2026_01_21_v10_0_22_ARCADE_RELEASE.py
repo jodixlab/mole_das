@@ -3092,50 +3092,69 @@ class MoleDASWizard(tk.Tk):
         self.left_footer = tk.Frame(self.left, bg=self.BG)
         self.left_footer.pack(side="bottom", fill="x")
 
-        tk.Button(self.left_footer, text="Save + Apply Config", command=self.save_and_apply,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=(12, 4))
-        tk.Button(self.left_footer, text="Load Existing Config...", command=self.load_existing,
-                  bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=4)
+        btn_save_apply = tk.Button(self.left_footer, text="Save + Apply Config", command=self.save_and_apply,
+                                   bg=self.BTN_BG, fg=self.BTN_FG, relief="flat")
+        btn_save_apply.pack(fill="x", padx=12, pady=(12, 4))
+        btn_load_existing = tk.Button(self.left_footer, text="Load Existing Config...", command=self.load_existing,
+                                      bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat")
+        btn_load_existing.pack(fill="x", padx=12, pady=4)
         recovery_actions = tk.Frame(self.left_footer, bg=self.BG)
         recovery_actions.pack(fill="x", padx=12, pady=(8, 4))
-        tk.Button(
+        btn_open_recovery_snapshot = tk.Button(
             recovery_actions,
             text="Open Recovery Snapshot",
             command=self._open_latest_wizard_recovery_snapshot,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
-        ).pack(fill="x", pady=(0, 4))
-        tk.Button(
+        )
+        btn_open_recovery_snapshot.pack(fill="x", pady=(0, 4))
+        btn_open_db_backup = tk.Button(
             recovery_actions,
             text="Open Last DB Backup",
             command=self._open_latest_wizard_db_backup,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
-        ).pack(fill="x", pady=(0, 4))
-        tk.Button(
+        )
+        btn_open_db_backup.pack(fill="x", pady=(0, 4))
+        btn_export_support_bundle = tk.Button(
             recovery_actions,
             text="Export Support Bundle",
             command=self._export_wizard_support_bundle,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
-        ).pack(fill="x", pady=(0, 4))
-        tk.Button(
+        )
+        btn_export_support_bundle.pack(fill="x", pady=(0, 4))
+        btn_view_recovery_history = tk.Button(
             recovery_actions,
             text="View Recovery History",
             command=self._show_wizard_recovery_history,
             bg="#14202d",
             fg=self.BTN_FG,
             relief="flat",
-        ).pack(fill="x")
+        )
+        btn_view_recovery_history.pack(fill="x")
 
         # CSV export (tab + full package)
-        tk.Button(self.left_footer, text="Export Tab CSV...", command=self.export_current_tab_csv,
-                  bg="#1b2a3a", fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=(12, 4))
-        tk.Button(self.left_footer, text="Export Full CSV Pack...", command=self.export_full_csv_pack,
-                  bg="#14202d", fg=self.BTN_FG, relief="flat").pack(fill="x", padx=12, pady=4)
+        btn_export_tab_csv = tk.Button(self.left_footer, text="Export Tab CSV...", command=self.export_current_tab_csv,
+                                       bg="#1b2a3a", fg=self.BTN_FG, relief="flat")
+        btn_export_tab_csv.pack(fill="x", padx=12, pady=(12, 4))
+        btn_export_full_csv_pack = tk.Button(self.left_footer, text="Export Full CSV Pack...", command=self.export_full_csv_pack,
+                                             bg="#14202d", fg=self.BTN_FG, relief="flat")
+        btn_export_full_csv_pack.pack(fill="x", padx=12, pady=4)
+
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
+        if help_mgr is not None:
+            help_mgr.bind(btn_save_apply, "wizard.actions.save_apply")
+            help_mgr.bind(btn_load_existing, "wizard.actions.load_existing_config")
+            help_mgr.bind(btn_open_recovery_snapshot, "wizard.recovery.open_snapshot")
+            help_mgr.bind(btn_open_db_backup, "wizard.recovery.open_db_backup")
+            help_mgr.bind(btn_export_support_bundle, "wizard.recovery.export_support_bundle")
+            help_mgr.bind(btn_view_recovery_history, "wizard.recovery.view_history")
+            help_mgr.bind(btn_export_tab_csv, "wizard.export.export_tab_csv")
+            help_mgr.bind(btn_export_full_csv_pack, "wizard.export.export_full_csv_pack")
 
         self.lbl_status = tk.Label(self.left_footer, text="", bg=self.BG, fg="#9fb0c0",
                                    justify="left", font=("Consolas", 9))
