@@ -99,10 +99,11 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, latest_matching_path, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
+    latest_matching_path = None
     write_recovery_snapshot = None
 
 from mole_ui_text_registry import (
@@ -1989,6 +1990,10 @@ class MoleDASWizard(tk.Tk):
         self._init_source_catalog_db()
         self._build_shell()
         self.goto("WELCOME")
+        try:
+            self._offer_startup_recovery()
+        except Exception:
+            pass
 
     # ------------------------- init -------------------------
 
@@ -18206,12 +18211,38 @@ def _build_intake(self) -> None:
         self._refresh_nav()
         messagebox.showinfo("Save + Apply", f"Config written:\n{out_path}")
 
-    def load_existing(self) -> None:
-        fp = filedialog.askopenfilename(
-            title="Select session config JSON",
-            initialdir=str(self.config_dir),
-            filetypes=[("JSON", "*.json"), ("All files", "*.*")]
-        )
+    def _offer_startup_recovery(self) -> None:
+        if latest_matching_path is None:
+            return
+        snap = latest_matching_path(Path(self.backups_dir) / "session_recovery", "wizard_session_*.json")
+        if snap is None or (not snap.exists()):
+            return
+        try:
+            created = datetime.fromtimestamp(snap.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            created = snap.name
+        restore = False
+        try:
+            restore = messagebox.askyesno(
+                "Session Recovery",
+                "A Wizard recovery snapshot is available.\n\n"
+                f"Snapshot: {snap.name}\n"
+                f"Updated: {created}\n\n"
+                "Restore this snapshot into the Wizard now?",
+                default="no",
+            )
+        except Exception:
+            restore = False
+        if restore:
+            self.load_existing(str(snap))
+
+    def load_existing(self, fp: Optional[str] = None) -> None:
+        if not fp:
+            fp = filedialog.askopenfilename(
+                title="Select session config JSON",
+                initialdir=str(self.config_dir),
+                filetypes=[("JSON", "*.json"), ("All files", "*.*")]
+            )
         if not fp:
             return
         try:

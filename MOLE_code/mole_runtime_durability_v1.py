@@ -54,6 +54,14 @@ def rotate_dir_entries(directory: Path, pattern: str, *, keep: int) -> None:
             pass
 
 
+def latest_matching_path(directory: Path, pattern: str) -> Optional[Path]:
+    directory = Path(directory)
+    if not directory.exists():
+        return None
+    matches = sorted(directory.glob(pattern), key=lambda p: p.name.lower(), reverse=True)
+    return matches[0] if matches else None
+
+
 def write_recovery_snapshot(
     payload: Dict[str, Any],
     snapshot_dir: Path,

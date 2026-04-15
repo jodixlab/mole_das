@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, latest_matching_path, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
@@ -54,6 +54,15 @@ class RuntimeDurabilityTests(unittest.TestCase):
             finally:
                 verify.close()
             self.assertEqual(row[0], "alpha")
+
+    def test_latest_matching_path_returns_newest_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            first = write_recovery_snapshot({"n": 1}, root, label="wizard_session", keep=5)
+            second = write_recovery_snapshot({"n": 2}, root, label="wizard_session", keep=5)
+            latest = latest_matching_path(root, "wizard_session__*.json")
+            self.assertEqual(latest, second)
+            self.assertNotEqual(first, second)
 
 
 if __name__ == "__main__":

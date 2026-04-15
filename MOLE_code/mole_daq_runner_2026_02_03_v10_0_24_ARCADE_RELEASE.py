@@ -112,9 +112,10 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, latest_matching_path, write_recovery_snapshot
 except Exception:
     atomic_write_json = None
+    latest_matching_path = None
     write_recovery_snapshot = None
 
 
@@ -4439,6 +4440,51 @@ def main() -> None:
 
     if cfg_path is None or not cfg_path.exists():
         raise ConfigError(f"Config not found (provide --config or --session): {cfg_path}")
+
+    if bool(getattr(args, 'ui', False)) and latest_matching_path is not None:
+        try:
+            session_dir_for_recovery = None
+            if isinstance(session_profile, dict):
+                pths = session_profile.get("paths") or {}
+                if pths.get("session_dir"):
+                    session_dir_for_recovery = Path(str(pths.get("session_dir"))).expanduser().resolve()
+            if session_dir_for_recovery is None:
+                try:
+                    preview_session = ensure_session_schema(json.loads(cfg_path.read_text(encoding="utf-8")), actor="runner_recovery_probe")
+                    session_dir_for_recovery = _infer_session_dir(preview_session, cfg_path, getattr(args, "outdir", None))
+                except Exception:
+                    session_dir_for_recovery = None
+            if session_dir_for_recovery is not None:
+                recovery_path = latest_matching_path(session_dir_for_recovery / "meta" / "recovery", "runner_session_config__*.json")
+                if recovery_path is not None and recovery_path.exists():
+                    try:
+                        import tkinter as _tk
+                        from tkinter import messagebox as _mb
+                        _r = _tk.Tk()
+                        _r.withdraw()
+                        updated = datetime.fromtimestamp(recovery_path.stat().st_mtime).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+                        restore = _mb.askyesno(
+                            "DAQ Runner Recovery",
+                            "A Runner recovery snapshot is available.\n\n"
+                            f"Snapshot: {recovery_path.name}\n"
+                            f"Updated: {updated}\n\n"
+                            "Restore this snapshot before opening the UI?",
+                            default="no",
+                        )
+                        _r.destroy()
+                    except Exception:
+                        restore = False
+                    if restore:
+                        restored = ensure_session_schema(
+                            json.loads(recovery_path.read_text(encoding="utf-8")),
+                            actor="runner_recovery_restore",
+                        )
+                        if atomic_write_json is not None:
+                            atomic_write_json(cfg_path, restored)
+                        else:
+                            cfg_path.write_text(json.dumps(restored, indent=2), encoding="utf-8")
+        except Exception:
+            pass
 
     session = ensure_session_schema(json.loads(cfg_path.read_text(encoding="utf-8")), actor="runner_cli_load")
     if isinstance(session_profile, dict):
