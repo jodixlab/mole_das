@@ -8,6 +8,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH = ROOT / "config" / "mole_ui_help_registry_v1.json"
+TARGET_MANIFEST_PATH = ROOT / "config" / "mole_ui_help_target_manifest_v1.json"
 
 
 def _refs(*items: tuple[str, str]) -> list[dict[str, str]]:
@@ -203,6 +204,106 @@ SEED_ENTRIES = {
         "process_note": "This is a read-only result of the current pollutant and workflow state. Review it before acquisition or report generation.",
         "doc_refs": _refs(
             ("MOLE DAS Terms, Definitions, and References", "Diagnostics Verification"),
+            ("MOLE DAS Worksteps - All Tabs and Flows", "QA/QC"),
+        ),
+    },
+    "wizard.pollutants.selection": {
+        "label": "Pollutant Selection",
+        "short_description": "Enables or disables a pollutant in the active project selection set.",
+        "definition": "Pollutant selection drives the downstream QA/QC profile, method resolution, and Test Matrix autogeneration contract.",
+        "process_note": "Select only the pollutants that are actually in scope for the project so the downstream workflow resolves correctly.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+            ("MOLE DAS Technical and Operating Manual", "Pollutants -> QA/QC profile/method auto-population -> Test Matrix autogeneration"),
+        ),
+    },
+    "wizard.pollutants.active": {
+        "label": "Active Pollutant",
+        "short_description": "Selects which enabled pollutant is currently being edited in the active pollutant prescription panel.",
+        "definition": "The active pollutant is the current pollutant context used for pollutant-specific configuration fields on the right-hand editor panel.",
+        "process_note": "Use this to switch between enabled pollutants when reviewing or editing pollutant-specific settings.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.expected_max": {
+        "label": "Expected Max",
+        "short_description": "Stores the expected maximum concentration for the active pollutant.",
+        "definition": "Expected Max is the pollutant-specific expected concentration ceiling used for span suggestion and setup context.",
+        "process_note": "Enter a realistic upper-bound expectation for the active pollutant so downstream suggestions and review context remain defensible.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.units": {
+        "label": "Units",
+        "short_description": "Stores the expected engineering units for the active pollutant.",
+        "definition": "Units determine the engineering basis for the active pollutant’s expected maximum and related setup context.",
+        "process_note": "Use the engineering units that match the actual measurement basis for the pollutant.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.method_selected": {
+        "label": "Method (Selected)",
+        "short_description": "Shows or selects the pollutant-specific method basis currently associated with the active pollutant.",
+        "definition": "Method (Selected) is the pollutant-level method selection used as input to the effective-method and QA/QC resolution logic.",
+        "process_note": "Review this for the active pollutant and keep it aligned with the intended method basis for the project.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.cal_points_selected": {
+        "label": "CAL Points (Selected)",
+        "short_description": "Stores the active pollutant’s selected calibration-point count.",
+        "definition": "CAL Points (Selected) is the pollutant-specific selected calibration-point posture before effective QA/QC resolution.",
+        "process_note": "Use AUTO unless a controlled reason exists to override the pollutant’s selected calibration-point count.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.lin_points_selected": {
+        "label": "LIN Points (Selected)",
+        "short_description": "Stores the active pollutant’s selected linearity-point count.",
+        "definition": "LIN Points (Selected) is the pollutant-specific selected linearity-point posture before effective QA/QC resolution.",
+        "process_note": "Use AUTO unless a controlled reason exists to override the pollutant’s selected linearity-point count.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.pollutants.nox_converter_efficiency": {
+        "label": "NOx Converter Eff.",
+        "short_description": "Enables the optional NOx converter efficiency workflow for the active pollutant when applicable.",
+        "definition": "NOx Converter Eff. is the pollutant-level switch for adding the optional converter-efficiency workflow to the active pollutant prescription.",
+        "process_note": "Use this only when the active pollutant and project configuration require the converter-efficiency workflow.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "Pollutants"),
+        ),
+    },
+    "wizard.qaqc.sig_digits": {
+        "label": "Sig digits (display)",
+        "short_description": "Controls the display precision used in QA/QC-facing numeric presentation.",
+        "definition": "Sig digits (display) defines the displayed significant-digit precision used in QA/QC-facing calculations and review surfaces.",
+        "process_note": "Use the project’s intended review/display precision and avoid changing this casually once a project is underway.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "QA/QC"),
+        ),
+    },
+    "wizard.qaqc.portable_track": {
+        "label": "Portable Track (2-point typical)",
+        "short_description": "Sets the QA/QC posture to the portable-track configuration where that project mode applies.",
+        "definition": "Portable Track is the QA/QC project posture used for portable-style workflows with the typical two-point approach.",
+        "process_note": "Enable this only when the project is intentionally using the portable-track QA/QC posture.",
+        "doc_refs": _refs(
+            ("MOLE DAS Worksteps - All Tabs and Flows", "QA/QC"),
+        ),
+    },
+    "wizard.qaqc.diag_optin_cal_lin": {
+        "label": "DIAG + Record+Token: include Cal/Linearity capture anyway (opt-in)",
+        "short_description": "Allows a diagnostics-flavored project to capture calibration and linearity evidence when intentionally opted in.",
+        "definition": "This opt-in overrides the default diagnostics posture for the limited purpose of including calibration and linearity capture anyway.",
+        "process_note": "Use this only when the project intentionally needs Cal/Linearity capture despite the diagnostics posture.",
+        "doc_refs": _refs(
             ("MOLE DAS Worksteps - All Tabs and Flows", "QA/QC"),
         ),
     },
@@ -798,6 +899,14 @@ def main() -> None:
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    target_payload = {
+        "manifest_version": "1",
+        "generated_utc": payload["generated_utc"],
+        "generator": "scripts/seed_ui_help_registry.py",
+        "note": "Current required UI help IDs. Tighten this list as tooltip coverage expands.",
+        "required_help_ids": sorted(merged_entries.keys()),
+    }
+    TARGET_MANIFEST_PATH.write_text(json.dumps(target_payload, indent=2), encoding="utf-8")
     print(f"{OUT_PATH} | seeded={len(SEED_ENTRIES)} total={len(merged_entries)}")
 
 

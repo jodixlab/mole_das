@@ -8912,9 +8912,10 @@ def _build_intake(self) -> None:
         except Exception:
             pass
 
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
         for r, code in enumerate(self._pollutant_codes):
             label = self._pollutant_label_map.get(code, code)
-            tk.Checkbutton(
+            chk_poll_select = tk.Checkbutton(
                 grid,
                 text=label,
                 variable=self.var_pollutants[code],
@@ -8925,7 +8926,10 @@ def _build_intake(self) -> None:
                 activebackground=self.BG,
                 activeforeground=self.FG,
                 font=("Consolas", 11),
-            ).grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
+            )
+            chk_poll_select.grid(row=r, column=0, sticky="w", padx=(0, 8), pady=2)
+            if help_mgr is not None:
+                help_mgr.bind(chk_poll_select, "wizard.pollutants.selection")
 
             tk.Label(
                 grid,
@@ -8955,10 +8959,14 @@ def _build_intake(self) -> None:
         top = tk.Frame(rf, bg=self.BG)
         top.pack(fill="x", pady=(0, 10))
 
-        tk.Label(top, text="Active:", bg=self.BG, fg=self.FG, font=("Consolas", 11)).pack(side="left")
+        lbl_poll_active = tk.Label(top, text="Active:", bg=self.BG, fg=self.FG, font=("Consolas", 11))
+        lbl_poll_active.pack(side="left")
         self.cb_poll_active = ttk.Combobox(top, textvariable=self.var_pollutant_active, values=[], state="readonly", width=12)
         self.cb_poll_active.pack(side="left", padx=(8, 12))
         self.cb_poll_active.bind("<<ComboboxSelected>>", self._on_pollutants_active_changed)
+        if help_mgr is not None:
+            help_mgr.bind(lbl_poll_active, "wizard.pollutants.active")
+            help_mgr.bind(self.cb_poll_active, "wizard.pollutants.active")
 
         tk.Button(top, text="Resolve Now", command=self._pollutants_resolve_and_bind, bg=self.ACCENT, fg="black", relief="flat").pack(side="left")
 
@@ -8990,12 +8998,16 @@ def _build_intake(self) -> None:
             "Expected Max:",
             lambda parent: ttk.Entry(parent, textvariable=self.var_poll_expected_max),
         )
+        if help_mgr is not None:
+            help_mgr.bind(self.ent_poll_expected_max, "wizard.pollutants.expected_max")
 
         self.cb_poll_units = row(
             "Units:",
             lambda parent: ttk.Combobox(parent, textvariable=self.var_poll_expected_units,
                                         values=[], state="readonly", width=10),
         )
+        if help_mgr is not None:
+            help_mgr.bind(self.cb_poll_units, "wizard.pollutants.units")
 
         tk.Label(
             form,
@@ -9011,6 +9023,8 @@ def _build_intake(self) -> None:
             lambda parent: ttk.Combobox(parent, textvariable=self.var_poll_method_selected,
                                         values=[], state="readonly"),
         )
+        if help_mgr is not None:
+            help_mgr.bind(self.cb_poll_method, "wizard.pollutants.method_selected")
 
         tk.Label(form, text=f"Effective Method:", bg=self.BG, fg=self.MUTED, anchor="w",
                  font=("Consolas", 10)).pack(fill="x", padx=(180, 0))
@@ -9026,11 +9040,15 @@ def _build_intake(self) -> None:
             lambda parent: ttk.Combobox(parent, textvariable=self.var_poll_cal_points_selected,
                                         values=["AUTO", "2", "3"], state="readonly", width=8),
         )
+        if help_mgr is not None:
+            help_mgr.bind(self.cb_poll_cal_pts, "wizard.pollutants.cal_points_selected")
         self.cb_poll_lin_pts = row(
             "LIN Points (Selected):",
             lambda parent: ttk.Combobox(parent, textvariable=self.var_poll_lin_points_selected,
                                         values=["AUTO", "2", "3"], state="readonly", width=8),
         )
+        if help_mgr is not None:
+            help_mgr.bind(self.cb_poll_lin_pts, "wizard.pollutants.lin_points_selected")
 
         converter_row = tk.Frame(form, bg=self.BG)
         converter_row.pack(fill="x", pady=(0, 6))
@@ -9057,6 +9075,8 @@ def _build_intake(self) -> None:
             font=("Consolas", 9),
         )
         self.chk_poll_nox_converter_eff.pack(side="left")
+        if help_mgr is not None:
+            help_mgr.bind(self.chk_poll_nox_converter_eff, "wizard.pollutants.nox_converter_efficiency")
         tk.Label(
             form,
             textvariable=self.var_poll_nox_converter_help,
@@ -9294,19 +9314,22 @@ def _build_intake(self) -> None:
         tk.Label(banner,
                  text=("QA/QC REQUIRED (Record=Y, Token=Y, non-DIAG)" if required else "QA/QC not required by policy."),
                  fg=self.FG, bg=self.BG, font=("Consolas", 10)).pack(anchor="w", padx=10, pady=8)
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
         if diag_prompt:
-            tk.Checkbutton(
+            chk_diag_optin_cal_lin = tk.Checkbutton(
                 banner,
                 text="DIAG + Record+Token: include Cal/Linearity capture anyway (opt-in)",
                 variable=self.var_diag_optin_cal_lin,
                 bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG
-            ).pack(anchor="w", padx=10, pady=(0, 8))
+            )
+            chk_diag_optin_cal_lin.pack(anchor="w", padx=10, pady=(0, 8))
+            if help_mgr is not None:
+                help_mgr.bind(chk_diag_optin_cal_lin, "wizard.qaqc.diag_optin_cal_lin")
 
         box = tk.LabelFrame(outer, text="QA/QC Profile", bg=self.BG, fg=self.FG)
         box.pack(fill="x", anchor="nw", pady=(12, 0))
         self._configure_form_grid(box, minspec="wizard_qaqc")
 
-        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
         lbl_qaqc_method = ttk.Label(box, text="Resolved Profile (from Pollutants):")
         lbl_qaqc_method.grid(row=0, column=0, sticky="w", padx=10, pady=8)
         cbo_qaqc_method = ttk.Combobox(box, textvariable=self.var_qaqc_method, state="disabled",
@@ -9316,12 +9339,20 @@ def _build_intake(self) -> None:
             help_mgr.bind(lbl_qaqc_method, "wizard.qaqc.method")
             help_mgr.bind(cbo_qaqc_method, "wizard.qaqc.method")
 
-        ttk.Label(box, text="Sig digits (display):").grid(row=0, column=2, sticky="w", padx=(18, 6), pady=8)
-        ttk.Combobox(box, textvariable=self.var_qaqc_sig_digits, state="readonly",
-                     values=["2", "3", "4", "5", "6", "7", "8"], width=6).grid(row=0, column=3, sticky="w", pady=8)
+        lbl_qaqc_sig_digits = ttk.Label(box, text="Sig digits (display):")
+        lbl_qaqc_sig_digits.grid(row=0, column=2, sticky="w", padx=(18, 6), pady=8)
+        cbo_qaqc_sig_digits = ttk.Combobox(box, textvariable=self.var_qaqc_sig_digits, state="readonly",
+                     values=["2", "3", "4", "5", "6", "7", "8"], width=6)
+        cbo_qaqc_sig_digits.grid(row=0, column=3, sticky="w", pady=8)
+        if help_mgr is not None:
+            help_mgr.bind(lbl_qaqc_sig_digits, "wizard.qaqc.sig_digits")
+            help_mgr.bind(cbo_qaqc_sig_digits, "wizard.qaqc.sig_digits")
 
-        tk.Checkbutton(box, text="Portable Track (2-point typical)", variable=self.var_qaqc_portable,
-                       bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG).grid(row=1, column=0, sticky="w", padx=10, pady=6)
+        chk_qaqc_portable = tk.Checkbutton(box, text="Portable Track (2-point typical)", variable=self.var_qaqc_portable,
+                       bg=self.BG, fg=self.BTN_FG, selectcolor=self.BG)
+        chk_qaqc_portable.grid(row=1, column=0, sticky="w", padx=10, pady=6)
+        if help_mgr is not None:
+            help_mgr.bind(chk_qaqc_portable, "wizard.qaqc.portable_track")
 
         tk.Checkbutton(
             box,
