@@ -39,6 +39,31 @@ function Require-Path {
     }
 }
 
+function Copy-TreeRobust {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    $log = Join-Path $env:TEMP ("mole_robocopy_" + [guid]::NewGuid().ToString("N") + ".log")
+    try {
+        & robocopy $Source $Destination /E /NFL /NDL /NJH /NJS /NC /NS /NP /R:2 /W:1 /LOG:$log | Out-Null
+        $code = $LASTEXITCODE
+        if ($code -ge 8) {
+            $detail = ""
+            if (Test-Path -LiteralPath $log) {
+                $detail = Get-Content -LiteralPath $log -Tail 40 | Out-String
+            }
+            throw "robocopy failed ($code) from $Source to $Destination`n$detail"
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $log) {
+            Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 $RepoRoot = (Resolve-Path $RepoRoot).Path
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $codeRoot = Join-Path $RepoRoot "MOLE_code"
@@ -61,6 +86,9 @@ $specRoot = Join-Path $buildRoot "spec"
 $runtimeZip = Join-Path $OutputRoot "$BundleLabel`_runtime.zip"
 $runtimeRoot = Join-Path $OutputRoot "runtime"
 $runtimeCodeRoot = Join-Path $runtimeRoot "MOLE_code"
+$shareRoot = Join-Path $OutputRoot "shareable"
+$installRoot = Join-Path $shareRoot $BundleLabel
+$shareZip = Join-Path $OutputRoot "$BundleLabel`_portable_exe_bundle.zip"
 
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 if (Test-Path -LiteralPath $buildRoot) {
@@ -140,6 +168,19 @@ Write-Host ""
 Write-Host "==> Build ScriptRunner executable"
 Build-Executable -Name "MOLE_ScriptRunner" -EntryScript $scriptRunnerEntry -ContentsDirectory "script_runner_internal"
 
+Write-Host ""
+Write-Host "==> Prepare trimmed distributable"
+if (Test-Path -LiteralPath $shareRoot) {
+    Remove-Item -LiteralPath $shareRoot -Recurse -Force
+}
+New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
+Copy-TreeRobust -Source $runtimeRoot -Destination (Join-Path $installRoot "runtime")
+
+$shareRuntimeCodeRoot = Join-Path $installRoot "runtime\MOLE_code"
+if (Test-Path -LiteralPath (Join-Path $shareRuntimeCodeRoot ".venv")) {
+    Remove-Item -LiteralPath (Join-Path $shareRuntimeCodeRoot ".venv") -Recurse -Force
+}
+
 $launcher = @'
 @echo off
 setlocal
@@ -152,6 +193,29 @@ if not exist "%ROOT%\MOLE_DAS_Wizard.exe" (
 start "" "%ROOT%\MOLE_DAS_Wizard.exe"
 '@
 Set-Content -LiteralPath (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat") -Value $launcher -Encoding ASCII
+Set-Content -LiteralPath (Join-Path $installRoot "LAUNCH_MOLE_DAS_EXE.bat") -Value $launcher -Encoding ASCII
+
+$installer = @'
+@echo off
+setlocal
+set "SRC=%~dp0runtime"
+set "DEST=%LOCALAPPDATA%\MOLE_DAS"
+if not exist "%SRC%\MOLE_code\MOLE_DAS_Wizard.exe" (
+  echo Missing runtime payload in %SRC%
+  pause
+  exit /b 1
+)
+echo Installing MOLE-DAS executable bundle to:
+echo   %DEST%
+if exist "%DEST%" rmdir /s /q "%DEST%"
+mkdir "%DEST%"
+xcopy "%SRC%\*" "%DEST%\" /E /I /Y >nul
+echo.
+echo Installed.
+echo Launching Wizard...
+start "" "%DEST%\MOLE_code\MOLE_DAS_Wizard.exe"
+'@
+Set-Content -LiteralPath (Join-Path $installRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.bat") -Value $installer -Encoding ASCII
 
 $notes = @"
 MOLE-DAS Windows Executable Bundle
@@ -174,6 +238,24 @@ Layout requirement:
 - The executables depend on sibling runtime content in runtime\MOLE_code and the package root data/assets/docs folders.
 "@
 Set-Content -LiteralPath (Join-Path $OutputRoot "README_EXECUTABLE_BUNDLE.txt") -Value $notes -Encoding ASCII
+Set-Content -LiteralPath (Join-Path $installRoot "README_EXECUTABLE_BUNDLE.txt") -Value $notes -Encoding ASCII
+
+if (Test-Path -LiteralPath $shareZip) {
+    Remove-Item -LiteralPath $shareZip -Force
+}
+Invoke-Native -FilePath $python -ArgumentList @(
+    "-c",
+    @"
+from pathlib import Path
+import zipfile
+src = Path(r'''$installRoot''')
+dst = Path(r'''$shareZip''')
+with zipfile.ZipFile(dst, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+    for path in src.rglob('*'):
+        if path.is_file():
+            zf.write(path, path.relative_to(src))
+"@
+) -WorkingDirectory $RepoRoot
 
 Write-Host ""
 Write-Host "Executable bundle ready:"
