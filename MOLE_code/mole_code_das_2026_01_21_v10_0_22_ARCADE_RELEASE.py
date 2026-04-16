@@ -6305,99 +6305,94 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         ).pack(anchor="w", padx=14, pady=(12, 2))
         tk.Label(
             panel,
-            text="Theme-style welcome art. Friendly mole. Questionable wrench discipline.",
+            text="Branded welcome art. Hardhat mole, wrench in hand, production-safe badge treatment.",
             bg=self.PANEL,
             fg=self.MUTED,
             font=("Consolas", 9),
         ).pack(anchor="w", padx=14, pady=(0, 10))
 
-        art = tk.Canvas(
-            panel,
-            width=420,
-            height=270,
+        art_frame = tk.Frame(panel, bg="#091019", highlightbackground="#1d3144", highlightthickness=2, bd=0)
+        art_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        base_dir = getattr(self, "base_dir", None) or _app_base_dir()
+        base_dir = Path(base_dir).resolve()
+        candidates = [
+            base_dir / "mole_logo.png",
+            base_dir / "mole_assets" / "branding" / "mole_logo.png",
+            base_dir / "mole_logo_130.png",
+            base_dir / "mole_assets" / "branding" / "mole_logo_130.png",
+            base_dir.parent / "mole_assets" / "branding" / "mole_logo.png",
+        ]
+        logo_path = next((p for p in candidates if p.exists()), None)
+
+        if not logo_path:
+            tk.Label(
+                art_frame,
+                text="[Welcome art missing]",
+                bg="#091019",
+                fg="#ff6666",
+                font=("Consolas", 10, "bold"),
+            ).pack(anchor="center", expand=True, pady=40)
+            return
+
+        rendered = False
+        try:
+            from PIL import Image, ImageTk  # type: ignore
+
+            img = Image.open(logo_path).convert("RGBA")
+            target_h = 310
+            target_w = max(1, int(img.width * (target_h / float(img.height or 1))))
+            img = img.resize((target_w, target_h), Image.LANCZOS)
+            self._welcome_brand_imgtk = ImageTk.PhotoImage(img)
+            tk.Label(
+                art_frame,
+                image=self._welcome_brand_imgtk,
+                bg="#091019",
+                bd=0,
+            ).pack(anchor="center", padx=18, pady=(18, 10))
+            rendered = True
+        except Exception:
+            rendered = False
+
+        if not rendered:
+            try:
+                self._welcome_brand_imgtk = tk.PhotoImage(file=str(logo_path))
+                tk.Label(
+                    art_frame,
+                    image=self._welcome_brand_imgtk,
+                    bg="#091019",
+                    bd=0,
+                ).pack(anchor="center", padx=18, pady=(18, 10))
+                rendered = True
+            except Exception:
+                rendered = False
+
+        if not rendered:
+            tk.Label(
+                art_frame,
+                text="[Welcome art failed to load]",
+                bg="#091019",
+                fg="#ff6666",
+                font=("Consolas", 10, "bold"),
+            ).pack(anchor="center", expand=True, pady=40)
+            return
+
+        tk.Label(
+            art_frame,
+            text="Crew chief on duty.",
             bg="#091019",
-            highlightthickness=0,
-            bd=0,
-        )
-        art.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-
-        # Backdrop
-        art.create_rectangle(0, 0, 420, 270, fill="#091019", outline="")
-        art.create_rectangle(14, 16, 406, 254, outline="#1d3144", width=2)
-        art.create_arc(255, 34, 385, 164, start=30, extent=250, style="arc", outline="#15384b", width=2)
-        art.create_arc(270, 54, 398, 182, start=25, extent=240, style="arc", outline="#123041", width=1)
-
-        # Ground and shadow
-        art.create_oval(90, 202, 302, 246, fill="#071018", outline="")
-        art.create_rectangle(0, 236, 420, 270, fill="#08131e", outline="")
-
-        # Body
-        fur = "#5f6f79"
-        fur_dark = "#41505a"
-        belly = "#93a2ab"
-        glove = "#c8d2d7"
-        accent = self.ACCENT
-        tool = "#9ec3d9"
-
-        art.create_oval(120, 108, 268, 232, fill=fur, outline=fur_dark, width=3)
-        art.create_oval(147, 136, 243, 225, fill=belly, outline="#6a7a84", width=2)
-
-        # Head / snout
-        art.create_oval(138, 55, 258, 158, fill=fur, outline=fur_dark, width=3)
-        art.create_oval(170, 96, 236, 140, fill="#c1c9ce", outline="#7b8a92", width=2)
-        art.create_oval(192, 110, 214, 128, fill="#ff8a8a", outline="#874d4d", width=2)
-
-        # Helmet / cap
-        art.create_arc(145, 48, 256, 128, start=5, extent=170, style="pieslice", fill="#162231", outline="#2f4d68", width=2)
-        art.create_rectangle(156, 82, 248, 94, fill=accent, outline="#7c4f00", width=2)
-        art.create_text(202, 88, text="MOLE", fill="#101820", font=("Consolas", 9, "bold"))
-
-        # Eyes / brow
-        art.create_line(171, 92, 190, 88, fill="#182734", width=3)
-        art.create_line(214, 88, 231, 92, fill="#182734", width=3)
-        art.create_oval(173, 95, 187, 109, fill="#f4f9fc", outline="#34424e")
-        art.create_oval(217, 95, 231, 109, fill="#f4f9fc", outline="#34424e")
-        art.create_oval(178, 99, 184, 105, fill="#11181f", outline="")
-        art.create_oval(220, 99, 226, 105, fill="#11181f", outline="")
-
-        # Teeth
-        art.create_rectangle(194, 126, 199, 138, fill="#f5f8fa", outline="#7d8d97")
-        art.create_rectangle(205, 126, 210, 138, fill="#f5f8fa", outline="#7d8d97")
-
-        # Ears
-        art.create_oval(148, 62, 171, 84, fill=fur_dark, outline="#30404a", width=2)
-        art.create_oval(226, 62, 249, 84, fill=fur_dark, outline="#30404a", width=2)
-
-        # Feet
-        art.create_oval(138, 206, 176, 238, fill=fur_dark, outline="#34424e", width=2)
-        art.create_oval(212, 206, 250, 238, fill=fur_dark, outline="#34424e", width=2)
-
-        # Left arm across body
-        art.create_oval(126, 142, 173, 188, fill=fur, outline=fur_dark, width=2)
-        art.create_oval(122, 169, 151, 196, fill=glove, outline="#73838b", width=2)
-
-        # Raised right arm + glove
-        art.create_line(241, 150, 282, 111, smooth=True, fill=fur, width=22)
-        art.create_oval(271, 95, 300, 124, fill=glove, outline="#73838b", width=2)
-
-        # Wrench
-        art.create_line(292, 108, 348, 68, fill=tool, width=10, capstyle="round")
-        art.create_oval(342, 54, 364, 76, outline=tool, width=6)
-        art.create_line(347, 58, 358, 69, fill="#091019", width=6)
-        art.create_rectangle(286, 101, 296, 115, fill=tool, outline=tool)
-
-        # Waving motion lines
-        art.create_arc(307, 30, 367, 88, start=210, extent=80, style="arc", outline=accent, width=3)
-        art.create_arc(322, 18, 394, 92, start=210, extent=72, style="arc", outline=self.ARCADE_YELLOW, width=2)
-
-        # Tail
-        art.create_line(247, 191, 286, 203, 306, 193, smooth=True, fill="#c98ea7", width=5)
-
-        # Speech bubble
-        art.create_oval(276, 138, 394, 198, fill="#121d2a", outline="#33526e", width=2)
-        art.create_polygon(286, 176, 267, 184, 283, 161, fill="#121d2a", outline="#33526e", width=2)
-        art.create_text(336, 160, text="WELCOME", fill=self.ARCADE_YELLOW, font=("Consolas", 12, "bold"))
-        art.create_text(336, 178, text="LET'S BUILD", fill=self.FG, font=("Consolas", 10))
+            fg=self.ARCADE_YELLOW,
+            font=("Consolas", 10, "bold"),
+        ).pack(anchor="center", pady=(0, 6))
+        tk.Label(
+            art_frame,
+            text="Hardhat. Wrench. Same MOLE badge treatment as the shipped branding asset.",
+            bg="#091019",
+            fg=self.MUTED,
+            wraplength=340,
+            justify="center",
+            font=("Consolas", 9),
+        ).pack(anchor="center", padx=12, pady=(0, 14))
 
     # ------------------------- screens (minimal set; unchanged ones shortened) -------------------------
 
