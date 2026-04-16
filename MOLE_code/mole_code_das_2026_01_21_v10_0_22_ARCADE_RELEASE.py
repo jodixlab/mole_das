@@ -6292,16 +6292,176 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         tk.Button(btns, text="Copy Report", command=lambda: (self.clipboard_clear(), self.clipboard_append(text)), bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").pack(side="left")
         tk.Button(btns, text="Close", command=dlg.destroy, bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").pack(side="right")
 
+    def _build_welcome_mascot(self, parent: tk.Widget) -> None:
+        panel = tk.Frame(parent, bg=self.PANEL, highlightbackground="#213246", highlightthickness=1, bd=0)
+        panel.pack(fill="both", expand=True)
+
+        tk.Label(
+            panel,
+            text="MOLE Crew Chief",
+            bg=self.PANEL,
+            fg=self.ARCADE_YELLOW,
+            font=("Consolas", 12, "bold"),
+        ).pack(anchor="w", padx=14, pady=(12, 2))
+        tk.Label(
+            panel,
+            text="Theme-style welcome art. Friendly mole. Questionable wrench discipline.",
+            bg=self.PANEL,
+            fg=self.MUTED,
+            font=("Consolas", 9),
+        ).pack(anchor="w", padx=14, pady=(0, 10))
+
+        art = tk.Canvas(
+            panel,
+            width=420,
+            height=270,
+            bg="#091019",
+            highlightthickness=0,
+            bd=0,
+        )
+        art.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        # Backdrop
+        art.create_rectangle(0, 0, 420, 270, fill="#091019", outline="")
+        art.create_rectangle(14, 16, 406, 254, outline="#1d3144", width=2)
+        art.create_arc(255, 34, 385, 164, start=30, extent=250, style="arc", outline="#15384b", width=2)
+        art.create_arc(270, 54, 398, 182, start=25, extent=240, style="arc", outline="#123041", width=1)
+
+        # Ground and shadow
+        art.create_oval(90, 202, 302, 246, fill="#071018", outline="")
+        art.create_rectangle(0, 236, 420, 270, fill="#08131e", outline="")
+
+        # Body
+        fur = "#5f6f79"
+        fur_dark = "#41505a"
+        belly = "#93a2ab"
+        glove = "#c8d2d7"
+        accent = self.ACCENT
+        tool = "#9ec3d9"
+
+        art.create_oval(120, 108, 268, 232, fill=fur, outline=fur_dark, width=3)
+        art.create_oval(147, 136, 243, 225, fill=belly, outline="#6a7a84", width=2)
+
+        # Head / snout
+        art.create_oval(138, 55, 258, 158, fill=fur, outline=fur_dark, width=3)
+        art.create_oval(170, 96, 236, 140, fill="#c1c9ce", outline="#7b8a92", width=2)
+        art.create_oval(192, 110, 214, 128, fill="#ff8a8a", outline="#874d4d", width=2)
+
+        # Helmet / cap
+        art.create_arc(145, 48, 256, 128, start=5, extent=170, style="pieslice", fill="#162231", outline="#2f4d68", width=2)
+        art.create_rectangle(156, 82, 248, 94, fill=accent, outline="#7c4f00", width=2)
+        art.create_text(202, 88, text="MOLE", fill="#101820", font=("Consolas", 9, "bold"))
+
+        # Eyes / brow
+        art.create_line(171, 92, 190, 88, fill="#182734", width=3)
+        art.create_line(214, 88, 231, 92, fill="#182734", width=3)
+        art.create_oval(173, 95, 187, 109, fill="#f4f9fc", outline="#34424e")
+        art.create_oval(217, 95, 231, 109, fill="#f4f9fc", outline="#34424e")
+        art.create_oval(178, 99, 184, 105, fill="#11181f", outline="")
+        art.create_oval(220, 99, 226, 105, fill="#11181f", outline="")
+
+        # Teeth
+        art.create_rectangle(194, 126, 199, 138, fill="#f5f8fa", outline="#7d8d97")
+        art.create_rectangle(205, 126, 210, 138, fill="#f5f8fa", outline="#7d8d97")
+
+        # Ears
+        art.create_oval(148, 62, 171, 84, fill=fur_dark, outline="#30404a", width=2)
+        art.create_oval(226, 62, 249, 84, fill=fur_dark, outline="#30404a", width=2)
+
+        # Feet
+        art.create_oval(138, 206, 176, 238, fill=fur_dark, outline="#34424e", width=2)
+        art.create_oval(212, 206, 250, 238, fill=fur_dark, outline="#34424e", width=2)
+
+        # Left arm across body
+        art.create_oval(126, 142, 173, 188, fill=fur, outline=fur_dark, width=2)
+        art.create_oval(122, 169, 151, 196, fill=glove, outline="#73838b", width=2)
+
+        # Raised right arm + glove
+        art.create_line(241, 150, 282, 111, smooth=True, fill=fur, width=22)
+        art.create_oval(271, 95, 300, 124, fill=glove, outline="#73838b", width=2)
+
+        # Wrench
+        art.create_line(292, 108, 348, 68, fill=tool, width=10, capstyle="round")
+        art.create_oval(342, 54, 364, 76, outline=tool, width=6)
+        art.create_line(347, 58, 358, 69, fill="#091019", width=6)
+        art.create_rectangle(286, 101, 296, 115, fill=tool, outline=tool)
+
+        # Waving motion lines
+        art.create_arc(307, 30, 367, 88, start=210, extent=80, style="arc", outline=accent, width=3)
+        art.create_arc(322, 18, 394, 92, start=210, extent=72, style="arc", outline=self.ARCADE_YELLOW, width=2)
+
+        # Tail
+        art.create_line(247, 191, 286, 203, 306, 193, smooth=True, fill="#c98ea7", width=5)
+
+        # Speech bubble
+        art.create_oval(276, 138, 394, 198, fill="#121d2a", outline="#33526e", width=2)
+        art.create_polygon(286, 176, 267, 184, 283, 161, fill="#121d2a", outline="#33526e", width=2)
+        art.create_text(336, 160, text="WELCOME", fill=self.ARCADE_YELLOW, font=("Consolas", 12, "bold"))
+        art.create_text(336, 178, text="LET'S BUILD", fill=self.FG, font=("Consolas", 10))
+
     # ------------------------- screens (minimal set; unchanged ones shortened) -------------------------
 
     def _build_welcome(self) -> None:
         self._header("Welcome", "QA/QC + Test Matrix now support minimum CAL/LIN capture fields (portable track oriented).")
         body = tk.Frame(self.center, bg=self.BG)
         body.pack(fill="both", expand=True, padx=20, pady=10)
-        tk.Label(body, text="Proceed: Project -> Source -> QA/QC -> Test Matrix -> Site -> Fuel -> Apply -> Runner",
-                 fg=self.FG, bg=self.BG, font=("Consolas", 11)).pack(anchor="w", pady=10)
-        tk.Button(body, text="Go to Project Configs", command=lambda: self.goto("PROJECT"),
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat", padx=12, pady=8).pack(anchor="w", pady=12)
+        hero = tk.Frame(body, bg=self.BG)
+        hero.pack(fill="both", expand=True)
+        hero.grid_columnconfigure(0, weight=3)
+        hero.grid_columnconfigure(1, weight=2)
+        hero.grid_rowconfigure(0, weight=1)
+
+        copy_box = tk.Frame(hero, bg=self.BG)
+        copy_box.grid(row=0, column=0, sticky="nsew", padx=(0, 18))
+
+        tk.Label(
+            copy_box,
+            text="Proceed: Project -> Source -> QA/QC -> Test Matrix -> Site -> Fuel -> Apply -> Runner",
+            fg=self.FG,
+            bg=self.BG,
+            justify="left",
+            wraplength=620,
+            font=("Consolas", 11),
+        ).pack(anchor="w", pady=(10, 12))
+        tk.Label(
+            copy_box,
+            text="The Welcome screen is now the front porch. Meet the shop mole, grab the wrench, and head into configuration.",
+            fg=self.MUTED,
+            bg=self.BG,
+            justify="left",
+            wraplength=620,
+            font=("Consolas", 10),
+        ).pack(anchor="w", pady=(0, 14))
+        tk.Button(
+            copy_box,
+            text="Go to Project Configs",
+            command=lambda: self.goto("PROJECT"),
+            bg=self.BTN_BG,
+            fg=self.BTN_FG,
+            relief="flat",
+            padx=12,
+            pady=8,
+        ).pack(anchor="w", pady=(0, 14))
+
+        quick_box = tk.LabelFrame(copy_box, text="Quick Route", bg=self.BG, fg=self.FG)
+        quick_box.pack(anchor="nw", fill="x", pady=(0, 8))
+        tk.Label(
+            quick_box,
+            text=(
+                "1. Define the job and session intent.\n"
+                "2. Configure source, QA/QC, site, and fuel data.\n"
+                "3. Apply the config and launch the Runner.\n"
+                "4. Build reports after acquisition and review."
+            ),
+            fg=self.FG,
+            bg=self.BG,
+            justify="left",
+            font=("Consolas", 10),
+        ).pack(anchor="w", padx=12, pady=12)
+
+        art_box = tk.Frame(hero, bg=self.BG)
+        art_box.grid(row=0, column=1, sticky="nsew")
+        self._build_welcome_mascot(art_box)
 
     def _build_project(self) -> None:
         self._header("Project Configurations (Hub)", "Identifiers + session intent + fuel selection.")
@@ -8063,6 +8223,13 @@ def _build_intake(self) -> None:
                 # Scrollable container (Source Details can exceed vertical space)
         _outer_wrap = tk.Frame(self.center, bg=self.BG)
         _outer_wrap.pack(fill="both", expand=True, padx=20, pady=10)
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
+        if help_mgr is None:
+            class _NullHelpManager:
+                @staticmethod
+                def bind(*_args, **_kwargs):
+                    return None
+            help_mgr = _NullHelpManager()
 
         _canvas = tk.Canvas(_outer_wrap, bg=self.BG, highlightthickness=0)
         _vbar = tk.Scrollbar(_outer_wrap, orient="vertical", command=_canvas.yview)
@@ -10344,6 +10511,13 @@ def _build_intake(self) -> None:
         self._header("Site Conditions", "Enter coordinates + optionally fetch NOAA weather. Configure failover policy.")
         outer = tk.Frame(self.center, bg=self.BG)
         outer.pack(fill="both", expand=True, padx=20, pady=10)
+        help_mgr = get_ui_help_tooltip_manager(self) if get_ui_help_tooltip_manager is not None else None
+        if help_mgr is None:
+            class _NullHelpManager:
+                @staticmethod
+                def bind(*_args, **_kwargs):
+                    return None
+            help_mgr = _NullHelpManager()
 
         # Location / Coordinates
         loc_box = tk.LabelFrame(outer, text="Coordinates (WGS84)", bg=self.BG, fg=self.FG)
