@@ -1,12 +1,22 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
+def _app_root() -> Path:
+    try:
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent.parent
+    except Exception:
+        pass
+    return Path(__file__).resolve().parent.parent
+
+
 def _default_registry_path() -> Path:
-    return Path(__file__).resolve().parent.parent / "config" / "mole_ui_help_registry_v1.json"
+    return _app_root() / "config" / "mole_ui_help_registry_v1.json"
 
 
 def load_ui_help_registry(path: Optional[Path] = None) -> Dict[str, Any]:
