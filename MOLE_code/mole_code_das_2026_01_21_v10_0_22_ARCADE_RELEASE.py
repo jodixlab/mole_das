@@ -1868,7 +1868,8 @@ class MoleDASWizard(tk.Tk):
           so the UI still shows branding without any extra deps.
         """
 
-        base_dir = Path(__file__).resolve().parent
+        base_dir = getattr(self, "base_dir", None) or _app_base_dir()
+        base_dir = Path(base_dir).resolve()
         candidates = [
             # Preferred: pre-sized icon (no resize dependency)
             base_dir / "mole_logo_130.png",

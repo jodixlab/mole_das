@@ -170,11 +170,9 @@ Build-Executable -Name "MOLE_ScriptRunner" -EntryScript $scriptRunnerEntry -Cont
 
 Write-Host ""
 Write-Host "==> Prepare trimmed distributable"
-if (Test-Path -LiteralPath $shareRoot) {
-    Remove-Item -LiteralPath $shareRoot -Recurse -Force
-}
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
-Copy-TreeRobust -Source $runtimeRoot -Destination (Join-Path $installRoot "runtime")
+$shareRuntimeRoot = Join-Path $installRoot "runtime"
+Copy-TreeRobust -Source $runtimeRoot -Destination $shareRuntimeRoot
 
 $shareRuntimeCodeRoot = Join-Path $installRoot "runtime\MOLE_code"
 if (Test-Path -LiteralPath (Join-Path $shareRuntimeCodeRoot ".venv")) {
@@ -239,6 +237,43 @@ Layout requirement:
 "@
 Set-Content -LiteralPath (Join-Path $OutputRoot "README_EXECUTABLE_BUNDLE.txt") -Value $notes -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $installRoot "README_EXECUTABLE_BUNDLE.txt") -Value $notes -Encoding ASCII
+
+$iconPath = Join-Path $installRoot "MOLE_DAS.ico"
+Invoke-Native -FilePath $python -ArgumentList @(
+    "-c",
+    @"
+from pathlib import Path
+from PIL import Image
+candidates = [
+    Path(r'''$installRoot''') / 'runtime' / 'MOLE_code' / 'mole_logo_130.png',
+    Path(r'''$installRoot''') / 'runtime' / 'MOLE_code' / 'mole_logo.png',
+    Path(r'''$installRoot''') / 'runtime' / 'mole_assets' / 'branding' / 'mole_logo_130.png',
+    Path(r'''$installRoot''') / 'runtime' / 'mole_assets' / 'branding' / 'mole_logo.png',
+]
+dst = Path(r'''$iconPath''')
+for src in candidates:
+    if src.exists():
+        img = Image.open(src)
+        img.save(dst, format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
+        print(dst)
+        break
+else:
+    raise SystemExit('MOLE logo source not found for icon generation')
+"@
+) -WorkingDirectory $RepoRoot
+
+$shell = New-Object -ComObject WScript.Shell
+$launchShortcut = $shell.CreateShortcut((Join-Path $installRoot "Launch MOLE-DAS.lnk"))
+$launchShortcut.TargetPath = (Join-Path $installRoot "LAUNCH_MOLE_DAS_EXE.bat")
+$launchShortcut.WorkingDirectory = $installRoot
+$launchShortcut.IconLocation = $iconPath
+$launchShortcut.Save()
+
+$installShortcut = $shell.CreateShortcut((Join-Path $installRoot "Install MOLE-DAS.lnk"))
+$installShortcut.TargetPath = (Join-Path $installRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.bat")
+$installShortcut.WorkingDirectory = $installRoot
+$installShortcut.IconLocation = $iconPath
+$installShortcut.Save()
 
 if (Test-Path -LiteralPath $shareZip) {
     Remove-Item -LiteralPath $shareZip -Force
