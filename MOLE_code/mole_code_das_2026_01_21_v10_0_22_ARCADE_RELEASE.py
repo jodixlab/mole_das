@@ -194,6 +194,18 @@ def _script_runner_command(script: Path) -> list[str]:
     return [sys.executable, str(script)]
 
 
+def _resolve_app_relative_path(path_value: Any, *, base_dir: Optional[Path] = None) -> Path:
+    p = Path(str(path_value or "")).expanduser()
+    if p.is_absolute():
+        return p
+    base = Path(base_dir or _app_base_dir())
+    app_root = base.parent
+    cand = (app_root / p).resolve()
+    if cand.exists():
+        return cand
+    return cand
+
+
 APP_TITLE = "MOLE CONTROL DAS - Session Setup Wizard v10.0.20"
 VERSION = "2026_01_21_v10_0_22"
 SESSION_SCHEMA_VERSION = "mole_session_config_v2"
@@ -18294,7 +18306,7 @@ def _build_intake(self) -> None:
         try:
             p = ((self.session.get("paths") or {}).get("daq_runner_script") or "").strip()
             if p:
-                pp = Path(p).expanduser()
+                pp = _resolve_app_relative_path(p, base_dir=self.base_dir)
                 if pp.exists():
                     return pp
         except Exception:
@@ -18305,7 +18317,7 @@ def _build_intake(self) -> None:
             if v is not None:
                 p = str(v.get() or "").strip()
                 if p:
-                    pp = Path(p).expanduser()
+                    pp = _resolve_app_relative_path(p, base_dir=self.base_dir)
                     if pp.exists():
                         return pp
         except Exception:
@@ -18384,9 +18396,9 @@ def _build_intake(self) -> None:
 
         # Prefer runner_config/session_profile written into sessions/...
         pths = (self.session.get("paths") or {})
-        runner_cfg_p = Path(str(pths.get("runner_config_path") or "")).expanduser() if pths.get("runner_config_path") else cfg_p
-        session_profile_p = Path(str(pths.get("session_profile_path") or "")).expanduser() if pths.get("session_profile_path") else None
-        outdir_p = Path(str(pths.get("daq_run_dir") or "")).expanduser() if pths.get("daq_run_dir") else None
+        runner_cfg_p = _resolve_app_relative_path(pths.get("runner_config_path"), base_dir=self.base_dir) if pths.get("runner_config_path") else cfg_p
+        session_profile_p = _resolve_app_relative_path(pths.get("session_profile_path"), base_dir=self.base_dir) if pths.get("session_profile_path") else None
+        outdir_p = _resolve_app_relative_path(pths.get("daq_run_dir"), base_dir=self.base_dir) if pths.get("daq_run_dir") else None
         launch_cfg_p = runner_cfg_p
 
         def _is_sim_driver_spec(spec: Any) -> bool:
