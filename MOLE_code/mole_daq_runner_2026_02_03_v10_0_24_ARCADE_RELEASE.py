@@ -175,8 +175,8 @@ def _is_frozen() -> bool:
 def _app_base_dir() -> Path:
     """Base directory for bundled resources (works in dev + frozen builds)."""
     try:
-        if _is_frozen() and hasattr(sys, "_MEIPASS"):
-            return Path(getattr(sys, "_MEIPASS")).resolve()
+        if _is_frozen():
+            return Path(sys.executable).resolve().parent
     except Exception:
         pass
     return Path(__file__).resolve().parent
@@ -4373,7 +4373,7 @@ def main() -> None:
     # --- v10.0.24C preflight (stability hardening) ---
     try:
         from mole_preflight import run_preflight, format_preflight_report
-        pf = run_preflight(app="daq_runner", code_dir=Path(__file__).resolve().parent, strict_hash=False)
+        pf = run_preflight(app="daq_runner", code_dir=_app_base_dir(), strict_hash=False)
         rpt = format_preflight_report(pf)
         if pf.get("errors"):
             # If UI mode, attempt a dialog; otherwise print.

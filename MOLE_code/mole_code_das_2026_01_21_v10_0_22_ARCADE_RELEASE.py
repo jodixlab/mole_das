@@ -157,6 +157,43 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 
+def _is_frozen_runtime() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def _app_base_dir() -> Path:
+    try:
+        if _is_frozen_runtime():
+            return Path(sys.executable).resolve().parent
+    except Exception:
+        pass
+    return Path(__file__).resolve().parent
+
+
+def _python_gui_executable() -> str:
+    exe = sys.executable
+    try:
+        if not _is_frozen_runtime() and os.name == "nt" and exe.lower().endswith("python.exe"):
+            pyw = exe[:-10] + "pythonw.exe"
+            if Path(pyw).exists():
+                return pyw
+    except Exception:
+        pass
+    return exe
+
+
+def _script_runner_command(script: Path) -> list[str]:
+    script = Path(script).resolve()
+    try:
+        if _is_frozen_runtime():
+            runner = _app_base_dir() / "MOLE_ScriptRunner.exe"
+            if runner.exists():
+                return [str(runner), str(script)]
+    except Exception:
+        pass
+    return [sys.executable, str(script)]
+
+
 APP_TITLE = "MOLE CONTROL DAS - Session Setup Wizard v10.0.20"
 VERSION = "2026_01_21_v10_0_22"
 SESSION_SCHEMA_VERSION = "mole_session_config_v2"
@@ -1989,7 +2026,7 @@ class MoleDASWizard(tk.Tk):
         except Exception:
             pass
 
-        self.base_dir = Path(__file__).resolve().parent
+        self.base_dir = _app_base_dir()
         self._init_stable_paths_and_config()
 
 
@@ -11125,7 +11162,7 @@ def _build_intake(self) -> None:
             # Report path
             report_path = Path(self.logs_dir) / "commissioning_report_latest.json"
 
-            cmd = [sys.executable, str(script), "--config", str(cfg_path), "--profile", profile_key, "--report", str(report_path)]
+            cmd = _script_runner_command(script) + ["--config", str(cfg_path), "--profile", profile_key, "--report", str(report_path)]
             try:
                 subprocess.run(cmd, check=False)
             except Exception as e:
@@ -12144,9 +12181,7 @@ def _build_intake(self) -> None:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             report_path = logs_dir / f"commissioning_report_{ts}.json"
 
-            cmd = [
-                sys.executable,
-                str(script),
+            cmd = _script_runner_command(script) + [
                 "--config",
                 str(cfg_path),
                 "--profile",
@@ -13229,7 +13264,7 @@ def _build_intake(self) -> None:
                 messagebox.showinfo("Process Session", "The RAW->Processed helper is not included in this runtime package.")
                 return
 
-            cmd = [sys.executable, str(script), "--session", sdir]
+            cmd = _script_runner_command(script) + ["--session", sdir]
             _append("$")
             _append(" ".join(cmd))
             try:
@@ -13271,7 +13306,7 @@ def _build_intake(self) -> None:
                 messagebox.showerror("Export Session", f"Packager script not found:\n{script}")
                 return
 
-            cmd = [sys.executable, str(script), "export", "--session", sdir, "--out", out_path]
+            cmd = _script_runner_command(script) + ["export", "--session", sdir, "--out", out_path]
             _append("$")
             _append(" ".join(cmd))
             try:
@@ -13303,7 +13338,7 @@ def _build_intake(self) -> None:
                 messagebox.showinfo("Sync Session", "The session sync helper is not included in this runtime package.")
                 return
 
-            cmd = [sys.executable, str(script), "--source", sdir, "--dest-root", dest_root, "--verify"]
+            cmd = _script_runner_command(script) + ["--source", sdir, "--dest-root", dest_root, "--verify"]
             _append("$")
             _append(" ".join(cmd))
             try:
@@ -13338,7 +13373,7 @@ def _build_intake(self) -> None:
                 messagebox.showerror("Import Session", f"Packager script not found:\n{script}")
                 return
 
-            cmd = [sys.executable, str(script), "ingest", "--package", zip_path, "--sessions-root", sessions_root, "--on-conflict", "new", "--verify"]
+            cmd = _script_runner_command(script) + ["ingest", "--package", zip_path, "--sessions-root", sessions_root, "--on-conflict", "new", "--verify"]
             _append("$")
             _append(" ".join(cmd))
             try:
@@ -13750,7 +13785,7 @@ def _build_intake(self) -> None:
                 messagebox.showerror("Ingest", f"Packager ingest script not found:\n{script}")
                 return
 
-            cmd = [sys.executable, str(script), "ingest", "--package", pth, "--sessions-root", str(getattr(self, "sessions_root", ""))]
+            cmd = _script_runner_command(script) + ["ingest", "--package", pth, "--sessions-root", str(getattr(self, "sessions_root", ""))]
             _append("$")
             _append(" ".join(cmd))
             try:
@@ -18249,6 +18284,14 @@ def _build_intake(self) -> None:
         3) newest mole_daq_runner_*.py in same folder as this wizard
         """
         try:
+            if _is_frozen_runtime():
+                exe = self.base_dir / "MOLE_DAQ_Runner.exe"
+                if exe.exists():
+                    return exe
+        except Exception:
+            pass
+
+        try:
             p = ((self.session.get("paths") or {}).get("daq_runner_script") or "").strip()
             if p:
                 pp = Path(p).expanduser()
@@ -18270,7 +18313,7 @@ def _build_intake(self) -> None:
 
         # Prefer a runner matching this wizard's version tag (avoid mismatched flag sets)
         try:
-            here = Path(__file__).resolve().parent
+            here = self.base_dir
             m = re.search(r"(v\d+_\d+_\d+)", str(VERSION))
             vtag = m.group(1) if m else ""
             if vtag:
@@ -18281,7 +18324,7 @@ def _build_intake(self) -> None:
             pass
 
         try:
-            here = Path(__file__).resolve().parent
+            here = self.base_dir
             cands = sorted(here.glob("mole_daq_runner_*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
             if cands:
                 return cands[0]
@@ -18420,17 +18463,10 @@ def _build_intake(self) -> None:
         except Exception:
             launch_cfg_p = runner_cfg_p
 
-        exe = sys.executable
-        # Prefer pythonw.exe for UI launches on Windows (avoids a console window)
-        try:
-            if os.name == "nt" and exe.lower().endswith("python.exe"):
-                pyw = exe[:-10] + "pythonw.exe"
-                if Path(pyw).exists():
-                    exe = pyw
-        except Exception:
-            pass
-
-        cmd = [exe, str(runner), "--config", str(launch_cfg_p), "--ui"]
+        if str(runner).lower().endswith(".exe"):
+            cmd = [str(runner), "--config", str(launch_cfg_p), "--ui"]
+        else:
+            cmd = [_python_gui_executable(), str(runner), "--config", str(launch_cfg_p), "--ui"]
         try:
             if session_profile_p and session_profile_p.exists():
                 cmd += ["--session", str(session_profile_p)]
@@ -26389,7 +26425,7 @@ if __name__ == "__main__":
     # --- v10.0.24C preflight: fail-fast on missing assets/modules; warn on soft issues ---
     try:
         from mole_preflight import run_preflight, format_preflight_report
-        pf = run_preflight(app="wizard", code_dir=Path(__file__).resolve().parent, strict_hash=False)
+        pf = run_preflight(app="wizard", code_dir=_app_base_dir(), strict_hash=False)
         if pf.get("errors"):
             try:
                 _r = tk.Tk()
