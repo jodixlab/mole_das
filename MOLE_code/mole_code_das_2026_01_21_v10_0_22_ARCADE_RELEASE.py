@@ -6341,11 +6341,25 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
 
         art_frame = tk.Frame(panel, bg="#091019", highlightbackground="#1d3144", highlightthickness=2, bd=0)
         art_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        candidates = [
+        master_candidates = [
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_192.png",
+        ]
+        legacy_candidates = [
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
@@ -6353,10 +6367,6 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
@@ -6364,25 +6374,18 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
+        candidates = list(master_candidates if welcome_master_approved else (master_candidates + legacy_candidates))
         def _sha256_local(path: Path) -> str:
             import hashlib
             return hashlib.sha256(path.read_bytes()).hexdigest()
