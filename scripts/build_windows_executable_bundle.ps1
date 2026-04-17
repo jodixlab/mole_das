@@ -86,6 +86,7 @@ $specRoot = Join-Path $buildRoot "spec"
 $runtimeZip = Join-Path $OutputRoot "$BundleLabel`_runtime.zip"
 $runtimeRoot = Join-Path $OutputRoot "runtime"
 $runtimeCodeRoot = Join-Path $runtimeRoot "MOLE_code"
+$runtimeConfigRoot = Join-Path $runtimeRoot "config"
 $shareRoot = Join-Path $OutputRoot "shareable"
 $installRoot = Join-Path $shareRoot $BundleLabel
 $shareZip = Join-Path $OutputRoot "$BundleLabel`_portable_exe_bundle.zip"
@@ -110,6 +111,25 @@ if (Test-Path -LiteralPath $runtimeRoot) {
     Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
 }
 Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtimeRoot -Force
+
+$welcomeManifestPath = Join-Path $runtimeConfigRoot "mole_welcome_asset_manifest_v1.json"
+$welcomeAssetApproved = $false
+if (Test-Path -LiteralPath $welcomeManifestPath) {
+    try {
+        $welcomeManifest = Get-Content -LiteralPath $welcomeManifestPath -Raw | ConvertFrom-Json
+        $welcomeAssetApproved = [bool]$welcomeManifest.approved
+        $welcomeManifest.packaged_build_version = $BundleLabel
+        $welcomeManifest.packaged_build_at = (Get-Date).ToUniversalTime().ToString("o")
+        $welcomeManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $welcomeManifestPath -Encoding UTF8
+    }
+    catch {
+        $welcomeAssetApproved = $false
+    }
+}
+if (-not $welcomeAssetApproved) {
+    Get-ChildItem -Path (Join-Path $runtimeRoot "mole_assets\sprites") -Filter "mole_welcome_master_sheet_*.png" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path (Join-Path $runtimeCodeRoot "mole_assets\sprites") -Filter "mole_welcome_master_sheet_*.png" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+}
 
 function Build-Executable {
     param(

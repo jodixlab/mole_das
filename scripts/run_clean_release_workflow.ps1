@@ -236,6 +236,24 @@ finally {
     }
 
     try {
+        $welcomeReviewScript = Join-Path $repo "scripts\build_welcome_asset_review_pack.py"
+        if ((Test-Path $welcomeReviewScript) -and (Test-Path $python)) {
+            Invoke-Native -FilePath $python -ArgumentList @(
+                $welcomeReviewScript,
+                "--repo-root", $repo,
+                "--output-dir", $artifactDir
+            ) -WorkingDirectory $repo
+            Add-StepResult -Name "welcome_asset_review_pack" -Status "PASS" -Detail "Welcome asset manifest and review pack generated."
+            Write-SummaryFiles
+        }
+    }
+    catch {
+        Add-StepResult -Name "welcome_asset_review_pack" -Status "FAIL" -Detail $_.Exception.Message
+        $summary.status = "FAIL"
+        Write-SummaryFiles
+    }
+
+    try {
         $artifactContractScript = Join-Path $repo "scripts\build_release_artifact_contract.py"
         if ((Test-Path $artifactContractScript) -and (Test-Path $python)) {
             Invoke-Native -FilePath $python -ArgumentList @(

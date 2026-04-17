@@ -182,6 +182,24 @@ def _python_gui_executable() -> str:
     return exe
 
 
+def _load_welcome_asset_manifest(base_dir: Optional[Path] = None) -> Dict[str, Any]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "config" / "mole_welcome_asset_manifest_v1.json",
+        base / "config" / "mole_welcome_asset_manifest_v1.json",
+        base / "mole_assets" / "config" / "mole_welcome_asset_manifest_v1.json",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            continue
+    return {}
+
+
 def _script_runner_command(script: Path) -> list[str]:
     script = Path(script).resolve()
     try:
@@ -6303,6 +6321,14 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             fg=self.ARCADE_YELLOW,
             font=("Consolas", 12, "bold"),
         ).pack(anchor="w", padx=14, pady=(12, 2))
+        manifest = _load_welcome_asset_manifest(base_dir)
+        welcome_master_approved = bool(manifest.get("approved"))
+        approved_sheets = {
+            str(item.get("file_name")): str(item.get("sha256"))
+            for item in (manifest.get("assembled_sheets") or [])
+            if isinstance(item, dict) and item.get("file_name") and item.get("sha256")
+        }
+
         tk.Label(
             panel,
             text="High-resolution branded reel. Hardhat mole. Wrench wave. Same MOLE palette, cleaner presentation.",
@@ -6358,7 +6384,25 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
-        sprite_path = next((p for p in candidates if p.exists()), None)
+        def _sha256_local(path: Path) -> str:
+            import hashlib
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+
+        sprite_path = None
+        for p in candidates:
+            if not p.exists():
+                continue
+            if "mole_welcome_master_sheet_" in p.name:
+                expected_hash = approved_sheets.get(p.name)
+                if not welcome_master_approved or not expected_hash:
+                    continue
+                try:
+                    if _sha256_local(p) != expected_hash:
+                        continue
+                except Exception:
+                    continue
+            sprite_path = p
+            break
         is_brand_reel = bool(sprite_path and ("brand_sheet" in sprite_path.name or "welcome_master" in sprite_path.name))
 
         if not sprite_path:

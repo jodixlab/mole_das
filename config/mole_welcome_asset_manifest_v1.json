@@ -1,0 +1,43 @@
+{
+  "schema": "mole_welcome_asset_manifest_v1",
+  "asset_id": "mole_welcome_animation_reel",
+  "asset_family": "welcome_animation",
+  "asset_status": "approved",
+  "approved": true,
+  "approved_version_label": "welcome_master_v1",
+  "prompt_version": "welcome_animation_prompt_pack_2026_04_17_001",
+  "source_key_art": {
+    "path": "output/imagegen/welcome_master/welcome_master_keyart_v3.png",
+    "sha256": "eb9e89deaadd0ffc2effc7f0bf2828baf439ee75b32477c4e7d99ba7da4274b8"
+  },
+  "frames_dir": "output/imagegen/welcome_master/frames",
+  "frame_count": 8,
+  "assembled_sheets": [
+    {
+      "file_name": "mole_welcome_master_sheet_512.png",
+      "path": "mole_assets/sprites/mole_welcome_master_sheet_512.png",
+      "sha256": "4b070461e8817603fa26c56e096ee80a12af5428d0ddf2765554061e0a813ae2"
+    },
+    {
+      "file_name": "mole_welcome_master_sheet_384.png",
+      "path": "mole_assets/sprites/mole_welcome_master_sheet_384.png",
+      "sha256": "cae813f7fdeb0aacbfea8e649adeaf0e7831665eae16e7d657709603a44f4dcb"
+    },
+    {
+      "file_name": "mole_welcome_master_sheet_256.png",
+      "path": "mole_assets/sprites/mole_welcome_master_sheet_256.png",
+      "sha256": "b432fcf9c7352185d9c21a0554dfcf6e53fc51495cb4e5e73d7c575a76bfe8a4"
+    },
+    {
+      "file_name": "mole_welcome_master_sheet_192.png",
+      "path": "mole_assets/sprites/mole_welcome_master_sheet_192.png",
+      "sha256": "328c5399d42f6531089479667ba8583eafec168473586486c70ca946bdebd303"
+    }
+  ],
+  "approved_by": "codex",
+  "approved_at": "2026-04-17T16:36:42.615759+00:00",
+  "approval_note": "Approved welcome animation reel for packaged use.",
+  "packaged_build_version": null,
+  "packaged_build_at": null,
+  "updated_at": "2026-04-17T16:36:42.615759+00:00"
+}

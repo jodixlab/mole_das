@@ -121,6 +121,41 @@
       "description": "Freeze-style dependency manifest from the clean runtime."
     },
     {
+      "id": "welcome_asset_manifest_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "welcome_asset_manifest.json",
+      "description": "Structured welcome animation asset manifest copied into the release artifact set."
+    },
+    {
+      "id": "welcome_asset_review_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "welcome_asset_review.json",
+      "description": "Structured review summary for the approved welcome animation asset."
+    },
+    {
+      "id": "welcome_asset_review_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "welcome_asset_review.md",
+      "description": "Human-readable review summary for the approved welcome animation asset."
+    },
+    {
+      "id": "welcome_asset_contact_sheet_png",
+      "required": true,
+      "match": "exact",
+      "pattern": "welcome_asset_contact_sheet.png",
+      "description": "Contact sheet preview of the welcome animation frames."
+    },
+    {
+      "id": "welcome_asset_preview_gif",
+      "required": true,
+      "match": "exact",
+      "pattern": "welcome_asset_preview.gif",
+      "description": "Looping preview GIF of the welcome animation asset."
+    },
+    {
       "id": "release_bundle_summary_json",
       "required": true,
       "match": "exact",

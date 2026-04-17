@@ -65,4 +65,8 @@ for ($i = 0; $i -lt $framePrompts.Count; $i++) {
 if (-not $DryRun) {
     Write-Host "Assembling master sheet ..."
     & $venvPython (Join-Path $repoRoot "scripts\assemble_welcome_master_sheet.py")
+    Write-Host "Refreshing welcome asset manifest ..."
+    & $venvPython (Join-Path $repoRoot "scripts\update_welcome_asset_manifest.py") --repo-root $repoRoot
+    Write-Host "Building welcome asset review pack ..."
+    & $venvPython (Join-Path $repoRoot "scripts\build_welcome_asset_review_pack.py") --repo-root $repoRoot --output-dir (Join-Path $repoRoot "output\imagegen\welcome_master\review")
 }
