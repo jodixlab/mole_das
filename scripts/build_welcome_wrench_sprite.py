@@ -36,13 +36,11 @@ def _draw_wrench(canvas: Image.Image, pivot: tuple[float, float], angle_deg: flo
     arc1 = (255, 159, 26, 230)
     arc2 = (255, 204, 51, 210)
 
-    # Handle
     draw.line([pt(tx, ty), pt(hx, hy)], fill=outline, width=30)
     draw.line([pt(tx, ty), pt(hx, hy)], fill=fill2, width=20)
     draw.line([pt(tx, ty), pt(hx, hy)], fill=fill, width=14)
     draw.line([pt(tx, ty), pt(hx, hy)], fill=hi, width=5)
 
-    # Open-end head
     jaw_angle_1 = angle + math.radians(26)
     jaw_angle_2 = angle - math.radians(26)
     j1x = hx + math.cos(jaw_angle_1) * head_len
@@ -59,20 +57,16 @@ def _draw_wrench(canvas: Image.Image, pivot: tuple[float, float], angle_deg: flo
     draw.line([pt(backx, backy), pt(j2x, j2y)], fill=fill, width=10)
     draw.ellipse([backx - 10 * scale, backy - 10 * scale, backx + 10 * scale, backy + 10 * scale], fill=fill2, outline=outline, width=5)
 
-    # Grip / paw overlay to make the wrench read as held.
     glove_box = [px - 16 * scale, py - 13 * scale, px + 14 * scale, py + 14 * scale]
     glove_outline = (118, 74, 47, 255)
     draw.ellipse(glove_box, fill=glove_shadow, outline=glove_outline, width=4)
     draw.ellipse([glove_box[0] + 6, glove_box[1] + 3, glove_box[2] - 3, glove_box[3] - 4], fill=glove, outline=None)
-    # Fingers curling over the handle.
     for dx, dy in ((-4, -4), (4, 0), (8, 5)):
         cx = px + dx * scale
         cy = py + dy * scale
         draw.ellipse([cx - 6 * scale, cy - 5 * scale, cx + 4 * scale, cy + 5 * scale], fill=glove, outline=glove_outline, width=3)
 
-    # Motion accents.
     if angle_deg < -42 or angle_deg > -16:
-        lift = -1 if angle_deg < -30 else 1
         ax = hx + math.cos(angle) * 14 * scale
         ay = hy - math.sin(angle) * 14 * scale
         draw.arc([ax - 18 * scale, ay - 24 * scale, ax + 18 * scale, ay + 24 * scale], start=220, end=300, fill=arc1, width=8)
@@ -84,8 +78,6 @@ def _draw_wrench(canvas: Image.Image, pivot: tuple[float, float], angle_deg: flo
 
 def build_brand_sheet(logo_path: Path, out_dir: Path) -> None:
     src = Image.open(logo_path).convert("RGBA")
-
-    # Crop the mascot area from the branded logo. Tuned to exclude the text block.
     mascot = src.crop((0, 0, 286, 252))
     mascot = mascot.resize((438, 386), Image.LANCZOS)
 
@@ -101,7 +93,6 @@ def build_brand_sheet(logo_path: Path, out_dir: Path) -> None:
         bob_y = int(round(4 * math.sin((idx / float(count)) * math.tau)))
         drift_x = int(round(2 * math.sin((idx / float(count)) * math.tau * 0.5)))
 
-        # Subtle whole-character float for a more polished loop.
         char = mascot
         if abs(phase) > 0.45:
             rot = -1.2 if phase > 0 else 1.2
@@ -109,7 +100,6 @@ def build_brand_sheet(logo_path: Path, out_dir: Path) -> None:
 
         canvas.alpha_composite(char, (34 + drift_x, 56 + bob_y))
 
-        # Wrench pivot tuned to the branded right-hand grip location after resize/composite.
         pivot = (380 + drift_x, 282 + bob_y)
         angle = 106 + (28 * ((phase + 1.0) / 2.0))
         _draw_wrench(canvas, pivot, angle)
