@@ -6317,6 +6317,10 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         base_dir = getattr(self, "base_dir", None) or _app_base_dir()
         base_dir = Path(base_dir).resolve()
         candidates = [
+            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
@@ -6324,6 +6328,10 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
@@ -6331,11 +6339,19 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_512.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_384.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_256.png",
+            base_dir / "sprites" / "mole_welcome_master_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
@@ -6343,7 +6359,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
         sprite_path = next((p for p in candidates if p.exists()), None)
-        is_brand_reel = bool(sprite_path and "brand_sheet" in sprite_path.name)
+        is_brand_reel = bool(sprite_path and ("brand_sheet" in sprite_path.name or "welcome_master" in sprite_path.name))
 
         if not sprite_path:
             tk.Label(
