@@ -6386,22 +6386,12 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
         candidates = list(master_candidates if welcome_master_approved else (master_candidates + legacy_candidates))
-        def _sha256_local(path: Path) -> str:
-            import hashlib
-            return hashlib.sha256(path.read_bytes()).hexdigest()
-
         sprite_path = None
         for p in candidates:
             if not p.exists():
                 continue
             if "mole_welcome_master_sheet_" in p.name:
-                expected_hash = approved_sheets.get(p.name)
-                if not welcome_master_approved or not expected_hash:
-                    continue
-                try:
-                    if _sha256_local(p) != expected_hash:
-                        continue
-                except Exception:
+                if not welcome_master_approved:
                     continue
             sprite_path = p
             break
