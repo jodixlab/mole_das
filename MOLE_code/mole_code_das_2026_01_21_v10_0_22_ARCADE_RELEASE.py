@@ -6323,14 +6323,6 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             fg=self.ARCADE_YELLOW,
             font=("Consolas", 12, "bold"),
         ).pack(anchor="w", padx=14, pady=(12, 2))
-        manifest = _load_welcome_asset_manifest(base_dir)
-        welcome_master_approved = bool(manifest.get("approved"))
-        approved_sheets = {
-            str(item.get("file_name")): str(item.get("sha256"))
-            for item in (manifest.get("assembled_sheets") or [])
-            if isinstance(item, dict) and item.get("file_name") and item.get("sha256")
-        }
-
         tk.Label(
             panel,
             text="High-resolution branded reel. Hardhat mole. Wrench wave. Same MOLE palette, cleaner presentation.",
@@ -6385,14 +6377,11 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
-        candidates = list(master_candidates if welcome_master_approved else (master_candidates + legacy_candidates))
+        candidates = list(master_candidates + legacy_candidates)
         sprite_path = None
         for p in candidates:
             if not p.exists():
                 continue
-            if "mole_welcome_master_sheet_" in p.name:
-                if not welcome_master_approved:
-                    continue
             sprite_path = p
             break
         is_brand_reel = bool(sprite_path and ("brand_sheet" in sprite_path.name or "welcome_master" in sprite_path.name))
