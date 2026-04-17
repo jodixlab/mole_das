@@ -6305,7 +6305,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         ).pack(anchor="w", padx=14, pady=(12, 2))
         tk.Label(
             panel,
-            text="Branded welcome art. Hardhat mole, wrench in hand, production-safe badge treatment.",
+            text="Runner-style sprite reel. Hardhat mole. Wrench wave. Same arcade palette and pixel treatment.",
             bg=self.PANEL,
             fg=self.MUTED,
             font=("Consolas", 9),
@@ -6317,76 +6317,119 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         base_dir = getattr(self, "base_dir", None) or _app_base_dir()
         base_dir = Path(base_dir).resolve()
         candidates = [
-            base_dir / "mole_logo.png",
-            base_dir / "mole_assets" / "branding" / "mole_logo.png",
-            base_dir / "mole_logo_130.png",
-            base_dir / "mole_assets" / "branding" / "mole_logo_130.png",
-            base_dir.parent / "mole_assets" / "branding" / "mole_logo.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
+            base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
-        logo_path = next((p for p in candidates if p.exists()), None)
+        sprite_path = next((p for p in candidates if p.exists()), None)
 
-        if not logo_path:
+        if not sprite_path:
             tk.Label(
                 art_frame,
-                text="[Welcome art missing]",
+                text="[Welcome sprite reel missing]",
                 bg="#091019",
                 fg="#ff6666",
                 font=("Consolas", 10, "bold"),
             ).pack(anchor="center", expand=True, pady=40)
             return
 
-        rendered = False
         try:
-            from PIL import Image, ImageTk  # type: ignore
-
-            img = Image.open(logo_path).convert("RGBA")
-            target_h = 310
-            target_w = max(1, int(img.width * (target_h / float(img.height or 1))))
-            img = img.resize((target_w, target_h), Image.LANCZOS)
-            self._welcome_brand_imgtk = ImageTk.PhotoImage(img)
-            tk.Label(
-                art_frame,
-                image=self._welcome_brand_imgtk,
-                bg="#091019",
-                bd=0,
-            ).pack(anchor="center", padx=18, pady=(18, 10))
-            rendered = True
+            from PIL import Image, ImageTk, ImageDraw  # type: ignore
         except Exception:
-            rendered = False
-
-        if not rendered:
-            try:
-                self._welcome_brand_imgtk = tk.PhotoImage(file=str(logo_path))
-                tk.Label(
-                    art_frame,
-                    image=self._welcome_brand_imgtk,
-                    bg="#091019",
-                    bd=0,
-                ).pack(anchor="center", padx=18, pady=(18, 10))
-                rendered = True
-            except Exception:
-                rendered = False
-
-        if not rendered:
             tk.Label(
                 art_frame,
-                text="[Welcome art failed to load]",
+                text="[Pillow missing: welcome sprite reel disabled]",
                 bg="#091019",
                 fg="#ff6666",
                 font=("Consolas", 10, "bold"),
             ).pack(anchor="center", expand=True, pady=40)
             return
+
+        def _apply_scanlines(img: "Image.Image", spacing: int = 4, alpha: float = 0.07) -> "Image.Image":
+            try:
+                overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+                draw = ImageDraw.Draw(overlay)
+                a = int(max(0.0, min(1.0, float(alpha))) * 255)
+                for y in range(0, img.height, max(1, int(spacing))):
+                    draw.line((0, y, img.width, y), fill=(0, 0, 0, a))
+                return Image.alpha_composite(img, overlay)
+            except Exception:
+                return img
+
+        try:
+            sheet = Image.open(sprite_path).convert("RGBA")
+            frame_side = max(1, int(sheet.height))
+            frame_count = max(1, int(sheet.width // frame_side))
+            raw_frames = [sheet.crop((i * frame_side, 0, (i + 1) * frame_side, frame_side)) for i in range(frame_count)]
+            target_side = 300
+            self._welcome_sprite_frames = []
+            for fr in raw_frames:
+                fr = fr.resize((target_side, target_side), Image.NEAREST)
+                fr = _apply_scanlines(fr, spacing=4, alpha=0.05)
+                self._welcome_sprite_frames.append(ImageTk.PhotoImage(fr))
+        except Exception:
+            tk.Label(
+                art_frame,
+                text="[Welcome sprite reel failed to load]",
+                bg="#091019",
+                fg="#ff6666",
+                font=("Consolas", 10, "bold"),
+            ).pack(anchor="center", expand=True, pady=40)
+            return
+
+        try:
+            if getattr(self, "_welcome_sprite_after_id", None):
+                self.after_cancel(self._welcome_sprite_after_id)
+        except Exception:
+            pass
+        self._welcome_sprite_after_id = None
+        self._welcome_sprite_idx = 0
+
+        bezel = tk.Frame(art_frame, bg="#091019", highlightbackground="#2d4a62", highlightthickness=1, bd=0)
+        bezel.pack(anchor="center", padx=16, pady=(16, 8))
+        sprite_lbl = tk.Label(bezel, bg="#091019", bd=0, highlightthickness=0)
+        sprite_lbl.pack(padx=8, pady=8)
+
+        try:
+            sprite_lbl.configure(image=self._welcome_sprite_frames[0])
+        except Exception:
+            pass
+
+        def _tick() -> None:
+            if not getattr(self, "_welcome_sprite_frames", None):
+                return
+            if not sprite_lbl.winfo_exists():
+                return
+            self._welcome_sprite_idx = (int(getattr(self, "_welcome_sprite_idx", 0)) + 1) % len(self._welcome_sprite_frames)
+            try:
+                sprite_lbl.configure(image=self._welcome_sprite_frames[self._welcome_sprite_idx])
+            except Exception:
+                return
+            try:
+                self._welcome_sprite_after_id = sprite_lbl.after(80, _tick)
+            except Exception:
+                self._welcome_sprite_after_id = None
+
+        try:
+            self._welcome_sprite_after_id = sprite_lbl.after(80, _tick)
+        except Exception:
+            self._welcome_sprite_after_id = None
 
         tk.Label(
             art_frame,
-            text="Crew chief on duty.",
+            text="Crew chief online.",
             bg="#091019",
             fg=self.ARCADE_YELLOW,
             font=("Consolas", 10, "bold"),
         ).pack(anchor="center", pady=(0, 6))
         tk.Label(
             art_frame,
-            text="Hardhat. Wrench. Same MOLE badge treatment as the shipped branding asset.",
+            text="Animated from the MOLE sprite family with a custom wrench-wave reel for the Welcome screen.",
             bg="#091019",
             fg=self.MUTED,
             wraplength=340,
