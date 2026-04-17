@@ -6473,12 +6473,12 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             except Exception:
                 return
             try:
-                self._welcome_sprite_after_id = sprite_lbl.after(80, _tick)
+                self._welcome_sprite_after_id = sprite_lbl.after(160, _tick)
             except Exception:
                 self._welcome_sprite_after_id = None
 
         try:
-            self._welcome_sprite_after_id = sprite_lbl.after(80, _tick)
+            self._welcome_sprite_after_id = sprite_lbl.after(160, _tick)
         except Exception:
             self._welcome_sprite_after_id = None
 
