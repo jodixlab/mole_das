@@ -6313,6 +6313,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
     def _build_welcome_mascot(self, parent: tk.Widget) -> None:
         panel = tk.Frame(parent, bg=self.PANEL, highlightbackground="#213246", highlightthickness=1, bd=0)
         panel.pack(fill="both", expand=True)
+        base_dir = getattr(self, "base_dir", None) or _app_base_dir()
+        base_dir = Path(base_dir).resolve()
 
         tk.Label(
             panel,
@@ -6339,9 +6341,6 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
 
         art_frame = tk.Frame(panel, bg="#091019", highlightbackground="#1d3144", highlightthickness=2, bd=0)
         art_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-
-        base_dir = getattr(self, "base_dir", None) or _app_base_dir()
-        base_dir = Path(base_dir).resolve()
         candidates = [
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
