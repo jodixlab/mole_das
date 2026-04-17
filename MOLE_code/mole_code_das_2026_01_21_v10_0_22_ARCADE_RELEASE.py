@@ -6305,7 +6305,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         ).pack(anchor="w", padx=14, pady=(12, 2))
         tk.Label(
             panel,
-            text="Runner-style sprite reel. Hardhat mole. Wrench wave. Same arcade palette and pixel treatment.",
+            text="High-resolution branded reel. Hardhat mole. Wrench wave. Same MOLE palette, cleaner presentation.",
             bg=self.PANEL,
             fg=self.MUTED,
             font=("Consolas", 9),
@@ -6317,16 +6317,33 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         base_dir = getattr(self, "base_dir", None) or _app_base_dir()
         base_dir = Path(base_dir).resolve()
         candidates = [
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
+            base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
+            base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_192.png",
             base_dir / "mole_assets" / "sprites" / "mole_idle_wrench_wave_sheet_64.png",
+            base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
+            base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
+            base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
+            base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "assets" / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
+            base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
+            base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
+            base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_256.png",
+            base_dir / "sprites" / "mole_idle_wrench_wave_brand_sheet_192.png",
             base_dir / "sprites" / "mole_idle_wrench_wave_sheet_128.png",
         ]
         sprite_path = next((p for p in candidates if p.exists()), None)
+        is_brand_reel = bool(sprite_path and "brand_sheet" in sprite_path.name)
 
         if not sprite_path:
             tk.Label(
@@ -6366,11 +6383,15 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             frame_side = max(1, int(sheet.height))
             frame_count = max(1, int(sheet.width // frame_side))
             raw_frames = [sheet.crop((i * frame_side, 0, (i + 1) * frame_side, frame_side)) for i in range(frame_count)]
-            target_side = 300
+            target_side = 360 if is_brand_reel else 300
+            resample = Image.LANCZOS if is_brand_reel else Image.NEAREST
             self._welcome_sprite_frames = []
             for fr in raw_frames:
-                fr = fr.resize((target_side, target_side), Image.NEAREST)
-                fr = _apply_scanlines(fr, spacing=4, alpha=0.05)
+                fr = fr.resize((target_side, target_side), resample)
+                if is_brand_reel:
+                    fr = _apply_scanlines(fr, spacing=6, alpha=0.015)
+                else:
+                    fr = _apply_scanlines(fr, spacing=4, alpha=0.05)
                 self._welcome_sprite_frames.append(ImageTk.PhotoImage(fr))
         except Exception:
             tk.Label(
@@ -6432,7 +6453,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             text="Animated from the MOLE sprite family with a custom wrench-wave reel for the Welcome screen.",
             bg="#091019",
             fg=self.MUTED,
-            wraplength=340,
+            wraplength=390,
             justify="center",
             font=("Consolas", 9),
         ).pack(anchor="center", padx=12, pady=(0, 14))

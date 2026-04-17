@@ -3,142 +3,143 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 
-def _draw_wrench_frame(frame: Image.Image, phase: float) -> Image.Image:
-    img = frame.copy().convert("RGBA")
-    draw = ImageDraw.Draw(img)
+def _draw_wrench(canvas: Image.Image, pivot: tuple[float, float], angle_deg: float) -> None:
+    scale = 6
+    big = Image.new("RGBA", (canvas.width * scale, canvas.height * scale), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(big)
 
-    # Anchor around the mole's right-side paw/shoulder in the shipped idle-watch sprite.
-    pivot_x = 80
-    pivot_y = 55
+    px = pivot[0] * scale
+    py = pivot[1] * scale
+    angle = math.radians(angle_deg)
 
-    # Arm / glove colors borrowed from the shipped palette.
-    fur_dark = (44, 54, 66, 255)
-    fur_fill = (71, 83, 95, 255)
-    glove_fill = (226, 155, 108, 255)
-    glove_shadow = (176, 116, 77, 255)
-    wrench_outline = (10, 84, 132, 255)
-    wrench_fill = (52, 163, 226, 255)
-    wrench_highlight = (161, 230, 255, 255)
-    accent = (255, 157, 26, 210)
+    handle_len = 78 * scale
+    head_len = 24 * scale
+    grip_back = 12 * scale
 
-    angle = math.radians(-55.0 + (36.0 * phase))
-    handle_len = 26.0
-    head_len = 10.0
-    tail_len = 5.0
-
-    hx = pivot_x + math.cos(angle) * handle_len
-    hy = pivot_y - math.sin(angle) * handle_len
-
-    tx = pivot_x - math.cos(angle) * tail_len
-    ty = pivot_y + math.sin(angle) * tail_len
+    hx = px + math.cos(angle) * handle_len
+    hy = py - math.sin(angle) * handle_len
+    tx = px - math.cos(angle) * grip_back
+    ty = py + math.sin(angle) * grip_back
 
     def pt(x: float, y: float) -> tuple[int, int]:
         return (int(round(x)), int(round(y)))
 
-    # Forearm
-    arm_end_x = pivot_x + math.cos(angle) * 8.0
-    arm_end_y = pivot_y - math.sin(angle) * 8.0
-    draw.line([pt(pivot_x - 6, pivot_y + 4), pt(arm_end_x, arm_end_y)], fill=fur_dark, width=8)
-    draw.line([pt(pivot_x - 6, pivot_y + 4), pt(arm_end_x, arm_end_y)], fill=fur_fill, width=5)
+    outline = (14, 58, 91, 255)
+    fill = (99, 198, 255, 255)
+    fill2 = (61, 156, 224, 255)
+    hi = (231, 247, 255, 255)
+    glove = (221, 162, 119, 255)
+    glove_shadow = (184, 122, 82, 255)
+    arc1 = (255, 159, 26, 230)
+    arc2 = (255, 204, 51, 210)
 
-    # Glove / paw
-    glove_box = [pivot_x - 5, pivot_y - 4, pivot_x + 8, pivot_y + 8]
-    draw.ellipse(glove_box, fill=glove_fill, outline=glove_shadow, width=1)
-    draw.ellipse([pivot_x - 1, pivot_y - 6, pivot_x + 6, pivot_y + 1], fill=glove_fill, outline=None)
+    # Handle
+    draw.line([pt(tx, ty), pt(hx, hy)], fill=outline, width=30)
+    draw.line([pt(tx, ty), pt(hx, hy)], fill=fill2, width=20)
+    draw.line([pt(tx, ty), pt(hx, hy)], fill=fill, width=14)
+    draw.line([pt(tx, ty), pt(hx, hy)], fill=hi, width=5)
 
-    # Wrench handle
-    draw.line([pt(tx, ty), pt(hx, hy)], fill=wrench_outline, width=7)
-    draw.line([pt(tx, ty), pt(hx, hy)], fill=wrench_fill, width=4)
-    draw.line([pt(tx, ty), pt(hx, hy)], fill=wrench_highlight, width=1)
-
-    # Wrench open head
-    jaw_angle = angle + math.radians(26)
+    # Open-end head
+    jaw_angle_1 = angle + math.radians(26)
     jaw_angle_2 = angle - math.radians(26)
-    hx2 = hx + math.cos(jaw_angle) * head_len
-    hy2 = hy - math.sin(jaw_angle) * head_len
-    hx3 = hx + math.cos(jaw_angle_2) * head_len
-    hy3 = hy - math.sin(jaw_angle_2) * head_len
-    head_back_x = hx - math.cos(angle) * 5.0
-    head_back_y = hy + math.sin(angle) * 5.0
+    j1x = hx + math.cos(jaw_angle_1) * head_len
+    j1y = hy - math.sin(jaw_angle_1) * head_len
+    j2x = hx + math.cos(jaw_angle_2) * head_len
+    j2y = hy - math.sin(jaw_angle_2) * head_len
+    backx = hx - math.cos(angle) * (12 * scale)
+    backy = hy + math.sin(angle) * (12 * scale)
+    draw.line([pt(backx, backy), pt(j1x, j1y)], fill=outline, width=28)
+    draw.line([pt(backx, backy), pt(j2x, j2y)], fill=outline, width=28)
+    draw.line([pt(backx, backy), pt(j1x, j1y)], fill=fill2, width=18)
+    draw.line([pt(backx, backy), pt(j2x, j2y)], fill=fill2, width=18)
+    draw.line([pt(backx, backy), pt(j1x, j1y)], fill=fill, width=10)
+    draw.line([pt(backx, backy), pt(j2x, j2y)], fill=fill, width=10)
+    draw.ellipse([backx - 10 * scale, backy - 10 * scale, backx + 10 * scale, backy + 10 * scale], fill=fill2, outline=outline, width=5)
 
-    draw.line([pt(head_back_x, head_back_y), pt(hx2, hy2)], fill=wrench_outline, width=6)
-    draw.line([pt(head_back_x, head_back_y), pt(hx3, hy3)], fill=wrench_outline, width=6)
-    draw.line([pt(head_back_x, head_back_y), pt(hx2, hy2)], fill=wrench_fill, width=3)
-    draw.line([pt(head_back_x, head_back_y), pt(hx3, hy3)], fill=wrench_fill, width=3)
+    # Grip / paw overlay to make the wrench read as held.
+    glove_box = [px - 16 * scale, py - 13 * scale, px + 14 * scale, py + 14 * scale]
+    glove_outline = (118, 74, 47, 255)
+    draw.ellipse(glove_box, fill=glove_shadow, outline=glove_outline, width=4)
+    draw.ellipse([glove_box[0] + 6, glove_box[1] + 3, glove_box[2] - 3, glove_box[3] - 4], fill=glove, outline=None)
+    # Fingers curling over the handle.
+    for dx, dy in ((-4, -4), (4, 0), (8, 5)):
+        cx = px + dx * scale
+        cy = py + dy * scale
+        draw.ellipse([cx - 6 * scale, cy - 5 * scale, cx + 4 * scale, cy + 5 * scale], fill=glove, outline=glove_outline, width=3)
 
-    # Small jaw notch for readability.
-    notch_x = hx + math.cos(angle) * 4.0
-    notch_y = hy - math.sin(angle) * 4.0
-    draw.line([pt(notch_x, notch_y), pt(hx, hy)], fill=(0, 0, 0, 0), width=3)
+    # Motion accents.
+    if angle_deg < -42 or angle_deg > -16:
+        lift = -1 if angle_deg < -30 else 1
+        ax = hx + math.cos(angle) * 14 * scale
+        ay = hy - math.sin(angle) * 14 * scale
+        draw.arc([ax - 18 * scale, ay - 24 * scale, ax + 18 * scale, ay + 24 * scale], start=220, end=300, fill=arc1, width=8)
+        draw.arc([ax - 30 * scale, ay - 34 * scale, ax + 30 * scale, ay + 34 * scale], start=225, end=295, fill=arc2, width=6)
 
-    # Motion accent lines on the outer arc.
-    if abs(phase) > 0.45:
-        lift = 1 if phase > 0 else -1
-        arc_x = hx + math.cos(angle) * 9.0
-        arc_y = hy - math.sin(angle) * 9.0
-        draw.line([pt(arc_x + 1, arc_y - 6 * lift), pt(arc_x + 6, arc_y - 11 * lift)], fill=accent, width=2)
-        draw.line([pt(arc_x + 8, arc_y - 4 * lift), pt(arc_x + 12, arc_y - 8 * lift)], fill=(255, 204, 51, 220), width=2)
-
-    return img
+    anti = big.resize(canvas.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(0.2))
+    canvas.alpha_composite(anti)
 
 
-def build_sheet(base_sheet: Path, out_dir: Path) -> None:
-    src = Image.open(base_sheet).convert("RGBA")
-    frame_side = src.height
-    frame_count = max(1, src.width // frame_side)
-    frames = [src.crop((i * frame_side, 0, (i + 1) * frame_side, frame_side)) for i in range(frame_count)]
+def build_brand_sheet(logo_path: Path, out_dir: Path) -> None:
+    src = Image.open(logo_path).convert("RGBA")
 
-    normalized: list[Image.Image] = []
-    last_nonblank: Image.Image | None = None
-    for frame in frames:
-        px = frame.load()
-        nonblank = 0
-        for y in range(frame.height):
-            for x in range(frame.width):
-                r, g, b, a = px[x, y]
-                if a > 8 and (r + g + b) > 48:
-                    nonblank += 1
-                    if nonblank > 40:
-                        break
-            if nonblank > 40:
-                break
-        if nonblank <= 250 and last_nonblank is not None:
-            normalized.append(last_nonblank.copy())
-            continue
-        normalized.append(frame)
-        if nonblank > 250:
-            last_nonblank = frame
-    frames = normalized
+    # Crop the mascot area from the branded logo. Tuned to exclude the text block.
+    mascot = src.crop((0, 0, 286, 252))
+    mascot = mascot.resize((438, 386), Image.LANCZOS)
 
-    animated: list[Image.Image] = []
-    for idx, frame in enumerate(frames):
-        phase = math.sin((idx / float(frame_count)) * math.tau)
-        animated.append(_draw_wrench_frame(frame, phase))
+    frame_w = 512
+    frame_h = 512
+    frames: list[Image.Image] = []
+    count = 18
 
-    sheet_128 = Image.new("RGBA", (frame_side * len(animated), frame_side), (0, 0, 0, 0))
-    for idx, frame in enumerate(animated):
-        sheet_128.paste(frame, (idx * frame_side, 0), frame)
+    for idx in range(count):
+        phase = math.sin((idx / float(count)) * math.tau)
+        canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
+
+        bob_y = int(round(4 * math.sin((idx / float(count)) * math.tau)))
+        drift_x = int(round(2 * math.sin((idx / float(count)) * math.tau * 0.5)))
+
+        # Subtle whole-character float for a more polished loop.
+        char = mascot
+        if abs(phase) > 0.45:
+            rot = -1.2 if phase > 0 else 1.2
+            char = mascot.rotate(rot, resample=Image.BICUBIC, expand=False)
+
+        canvas.alpha_composite(char, (34 + drift_x, 56 + bob_y))
+
+        # Wrench pivot tuned to the branded right-hand grip location after resize/composite.
+        pivot = (380 + drift_x, 282 + bob_y)
+        angle = 106 + (28 * ((phase + 1.0) / 2.0))
+        _draw_wrench(canvas, pivot, angle)
+
+        frames.append(canvas)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_128 = out_dir / "mole_idle_wrench_wave_sheet_128.png"
-    out_64 = out_dir / "mole_idle_wrench_wave_sheet_64.png"
-    out_192 = out_dir / "mole_idle_wrench_wave_sheet_192.png"
+    base = Image.new("RGBA", (frame_w * count, frame_h), (0, 0, 0, 0))
+    for idx, frame in enumerate(frames):
+        base.paste(frame, (idx * frame_w, 0), frame)
 
-    sheet_128.save(out_128)
-    sheet_128.resize((sheet_128.width // 2, sheet_128.height // 2), Image.NEAREST).save(out_64)
-    sheet_128.resize((sheet_128.width * 3 // 2, sheet_128.height * 3 // 2), Image.NEAREST).save(out_192)
+    out_512 = out_dir / "mole_idle_wrench_wave_brand_sheet_512.png"
+    out_384 = out_dir / "mole_idle_wrench_wave_brand_sheet_384.png"
+    out_256 = out_dir / "mole_idle_wrench_wave_brand_sheet_256.png"
+    out_192 = out_dir / "mole_idle_wrench_wave_brand_sheet_192.png"
 
-    print(out_128)
-    print(out_64)
+    base.save(out_512)
+    base.resize((384 * count, 384), Image.LANCZOS).save(out_384)
+    base.resize((256 * count, 256), Image.LANCZOS).save(out_256)
+    base.resize((192 * count, 192), Image.LANCZOS).save(out_192)
+
+    print(out_512)
+    print(out_384)
+    print(out_256)
     print(out_192)
 
 
 if __name__ == "__main__":
     root = Path(__file__).resolve().parents[1]
-    build_sheet(
-        root / "mole_assets" / "sprites" / "mole_idle_watch_sheet_128.png",
+    build_brand_sheet(
+        root / "mole_assets" / "branding" / "mole_logo.png",
         root / "mole_assets" / "sprites",
     )
