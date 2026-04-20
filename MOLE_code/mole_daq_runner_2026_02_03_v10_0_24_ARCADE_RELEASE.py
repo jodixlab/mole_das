@@ -4600,6 +4600,60 @@ def main() -> None:
     if cfg_path is None or not cfg_path.exists():
         raise ConfigError(f"Config not found (provide --config or --session): {cfg_path}")
 
+    if bool(getattr(args, 'ui', False)):
+        try:
+            cfg_name_l = str(cfg_path.name).lower()
+            launch_mode = "runner"
+            if "diag_training" in cfg_name_l:
+                launch_mode = "diagnostics_training"
+            elif "diag" in cfg_name_l:
+                launch_mode = "diagnostics"
+            elif "sim" in cfg_name_l:
+                launch_mode = "training"
+            try:
+                build_identity_main = _load_build_identity()
+            except Exception:
+                build_identity_main = {}
+            try:
+                welcome_sheet = _select_welcome_sprite_path()
+            except Exception:
+                welcome_sheet = None
+            startup_payload = {
+                "app": "runner",
+                "launch_mode": launch_mode,
+                "package_label": str((build_identity_main or {}).get("bundle_label") or ""),
+                "build_time": str((build_identity_main or {}).get("built_at") or ""),
+                "git_commit": str((build_identity_main or {}).get("git_commit") or ""),
+                "git_branch": str((build_identity_main or {}).get("git_branch") or ""),
+                "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
+                "runtime_path": str(_app_base_dir().resolve()),
+                "active_config_path": str(cfg_path),
+                "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
+                "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
+            }
+            log_dir = _app_base_dir().parent / "mole_das_data" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+            record = dict(startup_payload)
+            record.setdefault("schema", "mole_startup_diagnostic_v1")
+            record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
+            text = json.dumps(record, indent=2, ensure_ascii=False)
+            stamped = log_dir / f"runner_startup__{ts}.json"
+            latest = log_dir / "runner_startup__latest.json"
+            for target in (stamped, latest):
+                tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{ts}")
+                try:
+                    tmp.write_text(text, encoding="utf-8")
+                    os.replace(tmp, target)
+                finally:
+                    if tmp.exists():
+                        try:
+                            tmp.unlink()
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
     if bool(getattr(args, 'ui', False)) and latest_matching_path is not None:
         try:
             session_dir_for_recovery = None
@@ -4735,6 +4789,34 @@ def main() -> None:
         except Exception:
             pass
 
+    try:
+        cfg_name_l = str(cfg_path.name).lower()
+        launch_mode = "runner"
+        if "diag_training" in cfg_name_l:
+            launch_mode = "diagnostics_training"
+        elif "diag" in cfg_name_l:
+            launch_mode = "diagnostics"
+        elif "sim" in cfg_name_l:
+            launch_mode = "training"
+        build_identity_main = _load_build_identity()
+        welcome_sheet = _select_welcome_sprite_path()
+        startup_payload = {
+            "app": "runner",
+            "launch_mode": launch_mode,
+            "package_label": str((build_identity_main or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity_main or {}).get("built_at") or ""),
+            "git_commit": str((build_identity_main or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity_main or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
+            "runtime_path": str(_app_base_dir().resolve()),
+            "active_config_path": str(cfg_path),
+            "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
+            "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
+        }
+        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+    except Exception:
+        pass
+
 
     # Driver override (CLI convenience for SIM demos and regression runs)
     if getattr(args, "driver", None):
@@ -4794,6 +4876,7 @@ def main() -> None:
             try:
                 ui_cfg_name_l = str(ui_cfg.name).lower()
                 launch_mode = "runner"
+                build_identity_main = _load_build_identity()
                 if "diag_training" in ui_cfg_name_l:
                     launch_mode = "diagnostics_training"
                 elif "diag" in ui_cfg_name_l:
@@ -4804,15 +4887,15 @@ def main() -> None:
                 startup_payload = {
                     "app": "runner",
                     "launch_mode": launch_mode,
-                    "package_label": str((build_identity or {}).get("bundle_label") or ""),
-                    "build_time": str((build_identity or {}).get("built_at") or ""),
-                    "git_commit": str((build_identity or {}).get("git_commit") or ""),
-                    "git_branch": str((build_identity or {}).get("git_branch") or ""),
+                    "package_label": str((build_identity_main or {}).get("bundle_label") or ""),
+                    "build_time": str((build_identity_main or {}).get("built_at") or ""),
+                    "git_commit": str((build_identity_main or {}).get("git_commit") or ""),
+                    "git_branch": str((build_identity_main or {}).get("git_branch") or ""),
                     "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
                     "runtime_path": str(_app_base_dir().resolve()),
                     "active_config_path": str(Path(ui_cfg).resolve()) if Path(ui_cfg).exists() else str(ui_cfg),
                     "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
-                    "window_title": _format_window_title(APP_TITLE, build_identity, training=("training" in launch_mode)),
+                    "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
                 }
                 _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
             except Exception:
