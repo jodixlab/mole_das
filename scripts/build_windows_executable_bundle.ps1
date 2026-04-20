@@ -112,6 +112,38 @@ if (Test-Path -LiteralPath $runtimeRoot) {
 }
 Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtimeRoot -Force
 
+$buildIdentityPath = Join-Path $runtimeConfigRoot "mole_build_identity_v1.json"
+$gitCommit = ""
+$gitBranch = ""
+try {
+    $gitCommit = (git -C $RepoRoot rev-parse --short HEAD 2>$null | Select-Object -First 1).Trim()
+}
+catch {}
+try {
+    $gitBranch = (git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1).Trim()
+}
+catch {}
+$buildManifestGeneratedAt = $null
+try {
+    $repoBuildManifestPath = Join-Path $RepoRoot "BUILD_MANIFEST.json"
+    if (Test-Path -LiteralPath $repoBuildManifestPath) {
+        $repoBuildManifest = Get-Content -LiteralPath $repoBuildManifestPath -Raw | ConvertFrom-Json
+        $buildManifestGeneratedAt = $repoBuildManifest.generated_at
+    }
+}
+catch {}
+$buildIdentity = [ordered]@{
+    schema = "mole_build_identity_v1"
+    bundle_label = $BundleLabel
+    built_at = (Get-Date).ToUniversalTime().ToString("o")
+    git_commit = $gitCommit
+    git_branch = $gitBranch
+    build_manifest_generated_at = $buildManifestGeneratedAt
+    runtime_root = $runtimeRoot
+    runtime_code_root = $runtimeCodeRoot
+}
+$buildIdentity | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $buildIdentityPath -Encoding UTF8
+
 $welcomeManifestPath = Join-Path $runtimeConfigRoot "mole_welcome_asset_manifest_v1.json"
 $welcomeAssetApproved = $false
 if (Test-Path -LiteralPath $welcomeManifestPath) {

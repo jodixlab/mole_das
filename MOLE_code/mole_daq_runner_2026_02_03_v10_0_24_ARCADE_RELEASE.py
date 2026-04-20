@@ -72,6 +72,98 @@ from mole_ui_text_registry import (
 SUPPORTED_Z_MODELS = ("IDEAL", "FIXED_Z")
 
 
+def _app_base_dir() -> Path:
+    try:
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+    except Exception:
+        pass
+    return Path(__file__).resolve().parent
+
+
+def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "config" / "mole_build_identity_v1.json",
+        base / "config" / "mole_build_identity_v1.json",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            continue
+    ident: Dict[str, Any] = {
+        "schema": "mole_build_identity_v1",
+        "bundle_label": base.parent.name,
+        "built_at": None,
+        "git_commit": None,
+        "git_branch": None,
+        "runtime_root": str(base.parent),
+        "runtime_code_root": str(base),
+    }
+    try:
+        manifest_path = base.parent / "BUILD_MANIFEST.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(manifest, dict):
+                ident["built_at"] = manifest.get("generated_at")
+    except Exception:
+        pass
+    try:
+        commit = subprocess.check_output(
+            ["git", "-C", str(base.parent), "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if commit:
+            ident["git_commit"] = commit
+    except Exception:
+        pass
+    try:
+        branch = subprocess.check_output(
+            ["git", "-C", str(base.parent), "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if branch:
+            ident["git_branch"] = branch
+    except Exception:
+        pass
+    return ident
+
+
+def _format_build_identity_line(identity: Dict[str, Any]) -> str:
+    label = str(identity.get("bundle_label") or "unlabeled")
+    built_at = str(identity.get("built_at") or "").strip()
+    if built_at:
+        built_at = built_at.replace("T", " ").replace("+00:00", "Z")
+    commit = str(identity.get("git_commit") or "").strip()
+    parts = [label]
+    if built_at:
+        parts.append(built_at)
+    if commit:
+        parts.append(commit)
+    return "Build: " + " | ".join(parts)
+
+
+def _format_runtime_path_line(identity: Dict[str, Any]) -> str:
+    runtime_code_root = str(identity.get("runtime_code_root") or "").strip()
+    if not runtime_code_root:
+        runtime_code_root = str(_app_base_dir())
+    return "Runtime: " + runtime_code_root
+
+
+def _format_window_title(app_title: str, identity: Dict[str, Any], *, training: bool = False) -> str:
+    label = str(identity.get("bundle_label") or "").strip()
+    title = app_title + (f" [{label}]" if label else "")
+    if training:
+        title += " - TRAINING MODE"
+    return title
+
+
 def _normalize_z_model(value: Any) -> str:
     z_model = str(value or "IDEAL").strip().upper() or "IDEAL"
     return z_model if z_model in SUPPORTED_Z_MODELS else "IDEAL"
@@ -7952,8 +8044,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     # UI build
     # -------------------------------
 
+    build_identity = _load_build_identity()
     root = tk.Tk()
-    root.title("MOLE CONTROL DAS - DAQ Runner v7.7.4" + (" - TRAINING MODE" if _mole_env_mode() == "TRAINING" else ""))
+    root.title(_format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode() == "TRAINING")))
     root.geometry("1600x900")
     root.configure(bg=BG)
     help_mgr = get_ui_help_tooltip_manager(root) if get_ui_help_tooltip_manager is not None else None
@@ -8021,9 +8114,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     shell_brand_lbl.pack(anchor="w", fill="x", padx=12, pady=(12, 2))
     shell_title_lbl = tk.Label(left_header, textvariable=shell_title_var, fg=FG, bg=BG, font=("Consolas", 11), anchor="w", justify="left")
     shell_title_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 10))
+    shell_build_identity_var = tk.StringVar(value=_format_build_identity_line(build_identity))
+    shell_build_identity_lbl = tk.Label(left_header, textvariable=shell_build_identity_var, fg=FG_DIM, bg=BG, font=("Consolas", 8, "bold"), anchor="w", justify="left")
+    shell_build_identity_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     shell_notice_lbl = tk.Label(left_header, textvariable=shell_notice_var, fg=ACC2, bg=BG, font=("Consolas", 10, "bold"), anchor="w", justify="left")
     shell_notice_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 10))
     _bind_safe_wrap(shell_title_lbl, left_header, pad_px=28, min_wrap=180)
+    _bind_safe_wrap(shell_build_identity_lbl, left_header, pad_px=28, min_wrap=180)
     _bind_safe_wrap(shell_notice_lbl, left_header, pad_px=28, min_wrap=180)
 
     def _refresh_shell_notice(sess_local: Optional[Dict[str, Any]] = None) -> None:
@@ -8181,6 +8278,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     recovery_status_lbl = tk.Label(left_inner, textvariable=recovery_status_var, fg=FG_DIM, bg=BG, font=("Consolas", 9), anchor="w", justify="left")
     recovery_status_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 6))
     _bind_safe_wrap(recovery_status_lbl, left, pad_px=32, min_wrap=180)
+    runtime_identity_var = tk.StringVar(value=_format_runtime_path_line(build_identity))
+    runtime_identity_lbl = tk.Label(left_inner, textvariable=runtime_identity_var, fg=FG_DIM, bg=BG, font=("Consolas", 8), anchor="w", justify="left")
+    runtime_identity_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
+    _bind_safe_wrap(runtime_identity_lbl, left, pad_px=32, min_wrap=180)
     recovery_btns = tk.Frame(left_inner, bg=BG)
     recovery_btns.pack(fill="x", padx=12, pady=(0, 8))
     btn_runner_open_recovery_snapshot = tk.Button(
@@ -11407,10 +11508,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     )
     try:
         if diagnostics_training:
-            root.title("MOLE CONTROL DAS - DAQ Runner - Diagnostics - TRAINING MODE")
+            root.title(_format_window_title("MOLE CONTROL DAS - DAQ Runner - Diagnostics", build_identity, training=True))
             shell_title_var.set("DAQ Runner UI (Diagnostics - Training)")
         elif diagnostics_ui:
-            root.title("MOLE CONTROL DAS - DAQ Runner - Diagnostics")
+            root.title(_format_window_title("MOLE CONTROL DAS - DAQ Runner - Diagnostics", build_identity, training=False))
             shell_title_var.set("DAQ Runner UI (Diagnostics)")
         _refresh_shell_notice(sess)
     except Exception:

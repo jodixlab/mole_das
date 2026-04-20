@@ -200,6 +200,89 @@ def _load_welcome_asset_manifest(base_dir: Optional[Path] = None) -> Dict[str, A
     return {}
 
 
+def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "config" / "mole_build_identity_v1.json",
+        base / "config" / "mole_build_identity_v1.json",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            continue
+    ident: Dict[str, Any] = {
+        "schema": "mole_build_identity_v1",
+        "bundle_label": base.parent.name,
+        "built_at": None,
+        "git_commit": None,
+        "git_branch": None,
+        "runtime_root": str(base.parent),
+        "runtime_code_root": str(base),
+    }
+    try:
+        manifest_path = base.parent / "BUILD_MANIFEST.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(manifest, dict):
+                ident["built_at"] = manifest.get("generated_at")
+    except Exception:
+        pass
+    try:
+        commit = subprocess.check_output(
+            ["git", "-C", str(base.parent), "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if commit:
+            ident["git_commit"] = commit
+    except Exception:
+        pass
+    try:
+        branch = subprocess.check_output(
+            ["git", "-C", str(base.parent), "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        if branch:
+            ident["git_branch"] = branch
+    except Exception:
+        pass
+    return ident
+
+
+def _format_build_identity_line(identity: Dict[str, Any]) -> str:
+    label = str(identity.get("bundle_label") or "unlabeled")
+    built_at = str(identity.get("built_at") or "").strip()
+    if built_at:
+        built_at = built_at.replace("T", " ").replace("+00:00", "Z")
+    commit = str(identity.get("git_commit") or "").strip()
+    parts = [label]
+    if built_at:
+        parts.append(built_at)
+    if commit:
+        parts.append(commit)
+    return "Build: " + " | ".join(parts)
+
+
+def _format_runtime_path_line(identity: Dict[str, Any]) -> str:
+    runtime_code_root = str(identity.get("runtime_code_root") or "").strip()
+    if not runtime_code_root:
+        runtime_code_root = str(_app_base_dir())
+    return "Runtime: " + runtime_code_root
+
+
+def _format_window_title(app_title: str, identity: Dict[str, Any], *, training: bool = False) -> str:
+    label = str(identity.get("bundle_label") or "").strip()
+    title = app_title + (f" [{label}]" if label else "")
+    if training:
+        title += " - TRAINING MODE"
+    return title
+
+
 def _script_runner_command(script: Path) -> list[str]:
     script = Path(script).resolve()
     try:
@@ -2044,7 +2127,9 @@ class MoleDASWizard(tk.Tk):
 
     def __init__(self) -> None:
         super().__init__()
-        self.title(APP_TITLE + (" - TRAINING MODE" if _mole_env_mode() == "TRAINING" else ""))
+        self.base_dir = _app_base_dir()
+        self.build_identity = _load_build_identity(self.base_dir)
+        self.title(_format_window_title(APP_TITLE, self.build_identity, training=(_mole_env_mode() == "TRAINING")))
         self.geometry("1360x760")
         self.minsize(1060, 640)
         self.configure(bg=self.BG)
@@ -2057,7 +2142,6 @@ class MoleDASWizard(tk.Tk):
         except Exception:
             pass
 
-        self.base_dir = _app_base_dir()
         self._init_stable_paths_and_config()
 
 
@@ -3158,6 +3242,18 @@ class MoleDASWizard(tk.Tk):
             font=("Consolas", 9),
         )
         self.lbl_recovery_notice.pack(fill="x", padx=12, pady=(0, 10))
+        self.var_build_identity = tk.StringVar(value=_format_build_identity_line(getattr(self, "build_identity", {})))
+        self.lbl_build_identity = tk.Label(
+            self.left_header,
+            textvariable=self.var_build_identity,
+            fg="#9fb0c0",
+            bg=self.BG,
+            justify="left",
+            anchor="w",
+            wraplength=280,
+            font=("Consolas", 8, "bold"),
+        )
+        self.lbl_build_identity.pack(fill="x", padx=12, pady=(0, 6))
 
         # Footer (always visible)
         self.left_footer = tk.Frame(self.left, bg=self.BG)
@@ -3230,6 +3326,18 @@ class MoleDASWizard(tk.Tk):
         self.lbl_status = tk.Label(self.left_footer, text="", bg=self.BG, fg="#9fb0c0",
                                    justify="left", font=("Consolas", 9))
         self.lbl_status.pack(fill="x", padx=12, pady=(12, 6))
+        self.var_runtime_identity = tk.StringVar(value=_format_runtime_path_line(getattr(self, "build_identity", {})))
+        self.lbl_runtime_identity = tk.Label(
+            self.left_footer,
+            textvariable=self.var_runtime_identity,
+            bg=self.BG,
+            fg="#7f94a8",
+            justify="left",
+            anchor="w",
+            wraplength=280,
+            font=("Consolas", 8),
+        )
+        self.lbl_runtime_identity.pack(fill="x", padx=12, pady=(0, 8))
 
         # Scrollable Nav area (expands between header and footer)
         self.nav_container = tk.Frame(self.left, bg=self.BG)
