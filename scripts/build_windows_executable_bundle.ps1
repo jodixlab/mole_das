@@ -142,7 +142,11 @@ $buildIdentity = [ordered]@{
     runtime_root = $runtimeRoot
     runtime_code_root = $runtimeCodeRoot
 }
-$buildIdentity | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $buildIdentityPath -Encoding UTF8
+[System.IO.File]::WriteAllText(
+    $buildIdentityPath,
+    ($buildIdentity | ConvertTo-Json -Depth 4),
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 $welcomeManifestPath = Join-Path $runtimeConfigRoot "mole_welcome_asset_manifest_v1.json"
 $welcomeAssetApproved = $false
@@ -152,7 +156,11 @@ if (Test-Path -LiteralPath $welcomeManifestPath) {
         $welcomeAssetApproved = [bool]$welcomeManifest.approved
         $welcomeManifest.packaged_build_version = $BundleLabel
         $welcomeManifest.packaged_build_at = (Get-Date).ToUniversalTime().ToString("o")
-        $welcomeManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $welcomeManifestPath -Encoding UTF8
+        [System.IO.File]::WriteAllText(
+            $welcomeManifestPath,
+            ($welcomeManifest | ConvertTo-Json -Depth 8),
+            (New-Object System.Text.UTF8Encoding($false))
+        )
     }
     catch {
         $welcomeAssetApproved = $false

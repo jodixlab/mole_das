@@ -99,7 +99,7 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
@@ -109,6 +109,7 @@ except Exception:
     load_recent_health_history = None
     record_health_journal = None
     write_recovery_snapshot = None
+    write_startup_diagnostic = None
 
 try:
     from mole_ui_help_tooltips_v1 import get_ui_help_tooltip_manager
@@ -192,7 +193,7 @@ def _load_welcome_asset_manifest(base_dir: Optional[Path] = None) -> Dict[str, A
     for path in candidates:
         try:
             if path.exists():
-                data = json.loads(path.read_text(encoding="utf-8"))
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
                 if isinstance(data, dict):
                     return data
         except Exception:
@@ -209,7 +210,7 @@ def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     for path in candidates:
         try:
             if path.exists():
-                data = json.loads(path.read_text(encoding="utf-8"))
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
                 if isinstance(data, dict):
                     return data
         except Exception:
@@ -226,7 +227,7 @@ def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     try:
         manifest_path = base.parent / "BUILD_MANIFEST.json"
         if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
             if isinstance(manifest, dict):
                 ident["built_at"] = manifest.get("generated_at")
     except Exception:
@@ -281,6 +282,63 @@ def _format_window_title(app_title: str, identity: Dict[str, Any], *, training: 
     if training:
         title += " - TRAINING MODE"
     return title
+
+
+def _select_welcome_sprite_path(base_dir: Optional[Path] = None) -> Optional[Path]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "sprites" / "mole_welcome_master_sheet_192.png",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[str, Any], keep: int = 20) -> Dict[str, Path]:
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or "startup")).strip("._-") or "startup"
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamped = log_dir / f"{base}__{ts}.json"
+    latest = log_dir / f"{base}__latest.json"
+    record = dict(payload or {})
+    record.setdefault("schema", "mole_startup_diagnostic_v1")
+    record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
+    text = json.dumps(record, indent=2, ensure_ascii=False)
+    for target in (stamped, latest):
+        tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{ts}")
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, target)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+    extras = sorted(log_dir.glob(f"{base}__*.json"), key=lambda p: p.name.lower(), reverse=True)
+    for old in extras[max(int(keep), 2):]:
+        try:
+            old.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return {"latest": latest, "stamped": stamped}
 
 
 def _script_runner_command(script: Path) -> list[str]:
@@ -2148,6 +2206,10 @@ class MoleDASWizard(tk.Tk):
         self._init_option_lists()
         self._load_asset_databases()
         self._init_session_state()
+        try:
+            self._write_startup_diagnostic()
+        except Exception:
+            pass
         self._init_source_catalog_db()
         self._build_shell()
         self.bind_all("<MouseWheel>", self._on_global_mousewheel, add="+")
@@ -6441,24 +6503,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
 
         art_frame = tk.Frame(panel, bg="#091019", highlightbackground="#1d3144", highlightthickness=2, bd=0)
         art_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        master_candidates = [
-            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_512.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_384.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_256.png",
-            base_dir / "sprites" / "mole_welcome_master_sheet_192.png",
-        ]
+        master_candidates = [p for p in [_select_welcome_sprite_path(base_dir)] if p is not None]
         legacy_candidates = [
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_512.png",
             base_dir.parent / "mole_assets" / "sprites" / "mole_idle_wrench_wave_brand_sheet_384.png",
@@ -7056,6 +7101,24 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "latest": latest if latest.exists() else None,
             "history": history if history.exists() else None,
         }
+
+    def _write_startup_diagnostic(self) -> Optional[Dict[str, Path]]:
+        cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
+        sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
+        payload = {
+            "app": "wizard",
+            "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
+            "package_label": str((self.build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((self.build_identity or {}).get("built_at") or ""),
+            "git_commit": str((self.build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((self.build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(getattr(self, "base_dir", _app_base_dir())),
+            "active_config_path": cfg_path,
+            "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
+            "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
+        }
+        return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
 
     def _show_wizard_recovery_history(self) -> None:
         rows = []

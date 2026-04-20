@@ -90,7 +90,7 @@ def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     for path in candidates:
         try:
             if path.exists():
-                data = json.loads(path.read_text(encoding="utf-8"))
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
                 if isinstance(data, dict):
                     return data
         except Exception:
@@ -107,7 +107,7 @@ def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     try:
         manifest_path = base.parent / "BUILD_MANIFEST.json"
         if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
             if isinstance(manifest, dict):
                 ident["built_at"] = manifest.get("generated_at")
     except Exception:
@@ -164,6 +164,63 @@ def _format_window_title(app_title: str, identity: Dict[str, Any], *, training: 
     return title
 
 
+def _select_welcome_sprite_path(base_dir: Optional[Path] = None) -> Optional[Path]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base.parent / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "mole_assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "assets" / "sprites" / "mole_welcome_master_sheet_192.png",
+        base / "sprites" / "mole_welcome_master_sheet_512.png",
+        base / "sprites" / "mole_welcome_master_sheet_384.png",
+        base / "sprites" / "mole_welcome_master_sheet_256.png",
+        base / "sprites" / "mole_welcome_master_sheet_192.png",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[str, Any], keep: int = 20) -> Dict[str, Path]:
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or "startup")).strip("._-") or "startup"
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamped = log_dir / f"{base}__{ts}.json"
+    latest = log_dir / f"{base}__latest.json"
+    record = dict(payload or {})
+    record.setdefault("schema", "mole_startup_diagnostic_v1")
+    record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
+    text = json.dumps(record, indent=2, ensure_ascii=False)
+    for target in (stamped, latest):
+        tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{ts}")
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, target)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+    extras = sorted(log_dir.glob(f"{base}__*.json"), key=lambda p: p.name.lower(), reverse=True)
+    for old in extras[max(int(keep), 2):]:
+        try:
+            old.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return {"latest": latest, "stamped": stamped}
+
+
 def _normalize_z_model(value: Any) -> str:
     z_model = str(value or "IDEAL").strip().upper() or "IDEAL"
     return z_model if z_model in SUPPORTED_Z_MODELS else "IDEAL"
@@ -204,7 +261,7 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
@@ -213,6 +270,7 @@ except Exception:
     load_recent_health_history = None
     record_health_journal = None
     write_recovery_snapshot = None
+    write_startup_diagnostic = None
 
 try:
     from mole_ui_help_tooltips_v1 import get_ui_help_tooltip_manager
@@ -4733,6 +4791,32 @@ def main() -> None:
                     ui_cfg.write_text(json.dumps(ensure_session_schema(session, actor="runner_ui_bootstrap"), indent=2), encoding="utf-8")
                 except Exception:
                     ui_cfg = cfg_path
+            try:
+                ui_cfg_name_l = str(ui_cfg.name).lower()
+                launch_mode = "runner"
+                if "diag_training" in ui_cfg_name_l:
+                    launch_mode = "diagnostics_training"
+                elif "diag" in ui_cfg_name_l:
+                    launch_mode = "diagnostics"
+                elif "sim" in ui_cfg_name_l:
+                    launch_mode = "training"
+                welcome_sheet = _select_welcome_sprite_path()
+                startup_payload = {
+                    "app": "runner",
+                    "launch_mode": launch_mode,
+                    "package_label": str((build_identity or {}).get("bundle_label") or ""),
+                    "build_time": str((build_identity or {}).get("built_at") or ""),
+                    "git_commit": str((build_identity or {}).get("git_commit") or ""),
+                    "git_branch": str((build_identity or {}).get("git_branch") or ""),
+                    "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
+                    "runtime_path": str(_app_base_dir().resolve()),
+                    "active_config_path": str(Path(ui_cfg).resolve()) if Path(ui_cfg).exists() else str(ui_cfg),
+                    "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
+                    "window_title": _format_window_title(APP_TITLE, build_identity, training=("training" in launch_mode)),
+                }
+                _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+            except Exception:
+                pass
             run_ui_shell(str(ui_cfg), auto_start=bool(args.run))
         except Exception:
             try:
@@ -5491,6 +5575,32 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     cfg_path = Path(config_path).resolve() if config_path else None
     if cfg_path is None or (not cfg_path.exists()):
         raise ConfigError(f"Config not found: {cfg_path}")
+    try:
+        cfg_name_l = cfg_path.name.lower()
+        early_launch_mode = "runner"
+        if "diag_training" in cfg_name_l:
+            early_launch_mode = "diagnostics_training"
+        elif "diag" in cfg_name_l:
+            early_launch_mode = "diagnostics"
+        elif "sim" in cfg_name_l:
+            early_launch_mode = "training"
+        welcome_sheet = _select_welcome_sprite_path()
+        early_payload = {
+            "app": "runner",
+            "launch_mode": early_launch_mode,
+            "package_label": str((build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity or {}).get("built_at") or ""),
+            "git_commit": str((build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
+            "runtime_path": str(_app_base_dir().resolve()),
+            "active_config_path": str(cfg_path),
+            "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=("training" in early_launch_mode)),
+        }
+        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=early_payload, keep=20)
+    except Exception:
+        pass
 
     # -------------------------------
     # Session IO + schema helpers
@@ -11501,6 +11611,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     _ensure_daq_schema(sess)
     diagnostics_ui = _diagnostics_ui_active(sess)
     diagnostics_training = diagnostics_ui and (_mole_env_mode(sess) == "TRAINING")
+    try:
+        launch_mode = "runner"
+        if diagnostics_training:
+            launch_mode = "diagnostics_training"
+        elif diagnostics_ui:
+            launch_mode = "diagnostics"
+        elif _mole_env_mode(sess) == "TRAINING":
+            launch_mode = "training"
+        welcome_sheet = _select_welcome_sprite_path()
+        startup_payload = {
+            "app": "runner",
+            "launch_mode": str(launch_mode or "runner").strip().lower() or "runner",
+            "package_label": str((build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity or {}).get("built_at") or ""),
+            "git_commit": str((build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()) if getattr(sys, "frozen", False) else str(Path(__file__).resolve()),
+            "runtime_path": str(_app_base_dir().resolve()),
+            "active_config_path": str(cfg_path.resolve()) if cfg_path.exists() else str(cfg_path),
+            "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess) == "TRAINING")),
+        }
+        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+    except Exception:
+        pass
     DIAG_CAL_VERIFICATION_NOTICE = (
         "Operator / technician responsibility: complete and document pre-test and post-test "
         "linearity assessments (calibration verification). This diagnostics output is predicated "
@@ -15975,10 +16110,34 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 pass
 
     def _runner_logs_dir(sess_local: Dict[str, Any]) -> Path:
+        runtime_logs_dir = _app_base_dir().parent / "mole_das_data" / "logs"
+        try:
+            if _is_frozen():
+                runtime_logs_dir.mkdir(parents=True, exist_ok=True)
+                return runtime_logs_dir.resolve()
+        except Exception:
+            pass
         try:
             return Path(str(((sess_local.get("paths") or {}).get("logs_dir") or (cfg_path.parent / "mole_das_logs")))).expanduser().resolve()
         except Exception:
             return cfg_path.parent.resolve()
+
+    def _write_runner_startup_diagnostic(sess_local: Dict[str, Any], launch_mode: str) -> Optional[Dict[str, Path]]:
+        welcome_sheet = _select_welcome_sprite_path()
+        payload = {
+            "app": "runner",
+            "launch_mode": str(launch_mode or "runner").strip().lower() or "runner",
+            "package_label": str((build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity or {}).get("built_at") or ""),
+            "git_commit": str((build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(_app_base_dir()),
+            "active_config_path": str(cfg_path),
+            "welcome_asset_sheet": str(welcome_sheet) if welcome_sheet is not None else "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess_local) == "TRAINING")),
+        }
+        return _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=payload, keep=20)
 
     def _runner_crash_log_path(sess_local: Dict[str, Any]) -> Optional[Path]:
         log_dir = _runner_logs_dir(sess_local)

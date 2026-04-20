@@ -239,3 +239,27 @@ def load_recent_health_history(journal_dir: Path, *, label: str, limit: int = 10
         return rows[-max(int(limit), 1):]
     except Exception:
         return []
+
+
+def write_startup_diagnostic(
+    log_dir: Path,
+    *,
+    label: str,
+    payload: Dict[str, Any],
+    keep: int = 20,
+) -> Dict[str, Path]:
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    base = _slug(label, default="startup_diagnostic")
+    ts = _utc_stamp()
+    stamped_path = log_dir / f"{base}__{ts}.json"
+    latest_path = log_dir / f"{base}__latest.json"
+
+    record = dict(payload or {})
+    record.setdefault("schema", "mole_startup_diagnostic_v1")
+    record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
+
+    atomic_write_json(stamped_path, record)
+    atomic_write_json(latest_path, record)
+    rotate_dir_entries(log_dir, f"{base}__*.json", keep=max(int(keep), 2))
+    return {"latest": latest_path, "stamped": stamped_path}
