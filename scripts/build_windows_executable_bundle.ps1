@@ -508,7 +508,8 @@ if (-not $NoLaunch) {
 $uninstallerPs1 = @'
 param(
     [string]$InstallRoot = "",
-    [switch]$Quiet
+    [switch]$Quiet,
+    [switch]$FromTemp
 )
 
 $ErrorActionPreference = "Stop"
@@ -550,11 +551,29 @@ if (-not $InstallRoot) {
 }
 $InstallRoot = [System.IO.Path]::GetFullPath($InstallRoot)
 
+if (-not $FromTemp) {
+    $tempScript = Join-Path $env:TEMP ("mole_uninstall_runner_" + [guid]::NewGuid().ToString("N") + ".ps1")
+    Copy-Item -LiteralPath $MyInvocation.MyCommand.Path -Destination $tempScript -Force
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $tempScript,
+        "-InstallRoot", $InstallRoot,
+        "-FromTemp"
+    )
+    if ($Quiet) {
+        $arguments += "-Quiet"
+    }
+    Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -WorkingDirectory $env:TEMP -WindowStyle Hidden
+    return
+}
+
 Write-Status ""
 Write-Status "Uninstalling MOLE-DAS"
 Write-Status "  Install root: $InstallRoot"
 
 Assert-ProcessesClosed -TargetRoot $InstallRoot
+Start-Sleep -Seconds 2
 
 $StartMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\MOLE-DAS"
 $DesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "MOLE-DAS.lnk"
@@ -570,22 +589,14 @@ Remove-ShortcutIfExists -Path $DesktopShortcut
 
 Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MOLE_DAS" -Recurse -Force -ErrorAction SilentlyContinue
 
-$cleanupScript = Join-Path $env:TEMP ("mole_uninstall_cleanup_" + [guid]::NewGuid().ToString("N") + ".cmd")
-$cleanupBody = @(
-    "@echo off",
-    "ping 127.0.0.1 -n 4 >nul",
-    'rmdir /s /q "' + $InstallRoot + '"',
-    'del /f /q "%~f0"'
-) -join "`r`n"
-[System.IO.File]::WriteAllText(
-    $cleanupScript,
-    $cleanupBody,
-    (New-Object System.Text.ASCIIEncoding)
-)
-Start-Process -FilePath "cmd.exe" -ArgumentList ('/c "' + $cleanupScript + '"') -WorkingDirectory $env:TEMP -WindowStyle Hidden
+if (Test-Path -LiteralPath $InstallRoot) {
+    $deleteArgs = '/d /c rmdir /s /q "' + $InstallRoot + '"'
+    $deleteProc = Start-Process -FilePath "cmd.exe" -ArgumentList $deleteArgs -WorkingDirectory $env:TEMP -WindowStyle Hidden -PassThru
+    $deleteProc.WaitForExit()
+}
 
-Write-Status "Uninstall scheduled."
-Write-Status "  Root removal: $InstallRoot"
+Write-Status "Uninstall complete."
+Write-Status "  Root removed: $InstallRoot"
 '@
 
 foreach ($targetRoot in @($OutputRoot, $installRoot)) {
