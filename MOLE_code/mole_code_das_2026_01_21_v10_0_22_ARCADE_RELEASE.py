@@ -341,6 +341,50 @@ def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[st
     return {"latest": latest, "stamped": stamped}
 
 
+def _latest_startup_diagnostic_path(log_dir: Path, label: str) -> Optional[Path]:
+    try:
+        base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or "startup")).strip("._-") or "startup"
+        latest = Path(log_dir) / f"{base}__latest.json"
+        return latest if latest.exists() else None
+    except Exception:
+        return None
+
+
+def _load_startup_diagnostic_record(path: Optional[Path]) -> Dict[str, Any]:
+    try:
+        if isinstance(path, Path) and path.exists():
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _format_build_info_text(record: Dict[str, Any]) -> str:
+    pairs = [
+        ("App", record.get("app") or ""),
+        ("Launch mode", record.get("launch_mode") or ""),
+        ("Package label", record.get("package_label") or ""),
+        ("Build time", record.get("build_time") or ""),
+        ("Git branch", record.get("git_branch") or ""),
+        ("Git commit", record.get("git_commit") or ""),
+        ("Executable path", record.get("executable_path") or ""),
+        ("Runtime path", record.get("runtime_path") or ""),
+        ("Active config path", record.get("active_config_path") or ""),
+        ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
+        ("Window title", record.get("window_title") or ""),
+        ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
+        ("Logs dir", record.get("logs_dir") or ""),
+        ("Recorded UTC", record.get("recorded_utc") or ""),
+    ]
+    lines = []
+    for key, value in pairs:
+        text = str(value or "").strip()
+        lines.append(f"{key}: {text or '(n/a)'}")
+    return "\n".join(lines)
+
+
 def _script_runner_command(script: Path) -> list[str]:
     script = Path(script).resolve()
     try:
@@ -3364,7 +3408,16 @@ class MoleDASWizard(tk.Tk):
             fg=self.BTN_FG,
             relief="flat",
         )
-        btn_view_recovery_history.pack(fill="x")
+        btn_view_recovery_history.pack(fill="x", pady=(0, 4))
+        btn_show_build_info = tk.Button(
+            recovery_actions,
+            text="About / Build Info",
+            command=self._show_wizard_build_info,
+            bg="#14202d",
+            fg=self.BTN_FG,
+            relief="flat",
+        )
+        btn_show_build_info.pack(fill="x")
 
         # CSV export (tab + full package)
         btn_export_tab_csv = tk.Button(self.left_footer, text="Export Tab CSV...", command=self.export_current_tab_csv,
@@ -7120,6 +7173,62 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         }
         return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
 
+    def _wizard_startup_diagnostic_path(self) -> Optional[Path]:
+        return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_startup")
+
+    def _wizard_build_info_record(self) -> Dict[str, Any]:
+        cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
+        sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
+        latest_path = self._wizard_startup_diagnostic_path()
+        record = _load_startup_diagnostic_record(latest_path)
+        merged = {
+            "app": "wizard",
+            "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
+            "package_label": str((self.build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((self.build_identity or {}).get("built_at") or ""),
+            "git_commit": str((self.build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((self.build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(getattr(self, "base_dir", _app_base_dir())),
+            "active_config_path": cfg_path,
+            "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
+            "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
+            "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
+            "logs_dir": str(self.logs_dir),
+        }
+        if isinstance(record, dict):
+            for key, value in record.items():
+                if value not in (None, ""):
+                    merged[key] = value
+        return merged
+
+    def _copy_wizard_build_info(self, text: str) -> None:
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.update_idletasks()
+            messagebox.showinfo("Build Info", "Build information copied to the clipboard.")
+        except Exception as e:
+            messagebox.showerror("Build Info", str(e))
+
+    def _show_wizard_build_info(self) -> None:
+        record = self._wizard_build_info_record()
+        text = _format_build_info_text(record)
+        win = tk.Toplevel(self)
+        win.title("Wizard About / Build Info")
+        win.configure(bg=self.BG)
+        win.geometry("920x460")
+        body = tk.Frame(win, bg=self.BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        txt = tk.Text(body, bg="#0a0f16", fg="#c7d0d9", insertbackground="#c7d0d9", font=("Consolas", 9), wrap="word")
+        txt.pack(fill="both", expand=True)
+        txt.insert("1.0", text + "\n")
+        txt.configure(state="disabled")
+        btns = tk.Frame(body, bg=self.BG)
+        btns.pack(fill="x", pady=(10, 0))
+        tk.Button(btns, text="Copy Build Info", command=lambda: self._copy_wizard_build_info(text), bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").pack(side="left")
+        tk.Button(btns, text="Close", command=win.destroy, bg="#14202d", fg=self.BTN_FG, relief="flat").pack(side="right")
+
     def _show_wizard_recovery_history(self) -> None:
         rows = []
         if load_recent_health_history is not None:
@@ -7188,10 +7297,12 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "job_id": str((self.session.get("project") or {}).get("job_id") or ""),
                 "session_schema_version": SESSION_SCHEMA_VERSION,
                 "python": sys.version,
+                "build_info": self._wizard_build_info_record(),
             },
             artifacts={
                 "wizard_config": mole_cfg_path(self.base_dir),
                 "session_config": Path(session_cfg) if session_cfg else None,
+                "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
                 "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
                 "wizard_crash_log": self._latest_wizard_crash_log_path(),

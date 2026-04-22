@@ -221,6 +221,50 @@ def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[st
     return {"latest": latest, "stamped": stamped}
 
 
+def _latest_startup_diagnostic_path(log_dir: Path, label: str) -> Optional[Path]:
+    try:
+        base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or "startup")).strip("._-") or "startup"
+        latest = Path(log_dir) / f"{base}__latest.json"
+        return latest if latest.exists() else None
+    except Exception:
+        return None
+
+
+def _load_startup_diagnostic_record(path: Optional[Path]) -> Dict[str, Any]:
+    try:
+        if isinstance(path, Path) and path.exists():
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _format_build_info_text(record: Dict[str, Any]) -> str:
+    pairs = [
+        ("App", record.get("app") or ""),
+        ("Launch mode", record.get("launch_mode") or ""),
+        ("Package label", record.get("package_label") or ""),
+        ("Build time", record.get("build_time") or ""),
+        ("Git branch", record.get("git_branch") or ""),
+        ("Git commit", record.get("git_commit") or ""),
+        ("Executable path", record.get("executable_path") or ""),
+        ("Runtime path", record.get("runtime_path") or ""),
+        ("Active config path", record.get("active_config_path") or ""),
+        ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
+        ("Window title", record.get("window_title") or ""),
+        ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
+        ("Logs dir", record.get("logs_dir") or ""),
+        ("Recorded UTC", record.get("recorded_utc") or ""),
+    ]
+    lines = []
+    for key, value in pairs:
+        text = str(value or "").strip()
+        lines.append(f"{key}: {text or '(n/a)'}")
+    return "\n".join(lines)
+
+
 def _normalize_z_model(value: Any) -> str:
     z_model = str(value or "IDEAL").strip().upper() or "IDEAL"
     return z_model if z_model in SUPPORTED_Z_MODELS else "IDEAL"
@@ -8512,7 +8556,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         fg=FG,
         relief="flat",
     )
-    btn_runner_view_recovery_history.pack(fill="x")
+    btn_runner_view_recovery_history.pack(fill="x", pady=(0, 4))
+    btn_runner_build_info = tk.Button(
+        recovery_btns,
+        text="About / Build Info",
+        command=lambda: _show_runner_build_info(_load_session()),
+        bg=BTN_BG,
+        fg=FG,
+        relief="flat",
+    )
+    btn_runner_build_info.pack(fill="x")
     if help_mgr is not None:
         help_mgr.bind(btn_runner_open_recovery_snapshot, "runner.recovery.open_snapshot")
         help_mgr.bind(btn_runner_open_recovery_folder, "runner.recovery.open_folder")
@@ -16222,6 +16275,62 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         }
         return _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=payload, keep=20)
 
+    def _runner_startup_diagnostic_path(sess_local: Dict[str, Any]) -> Optional[Path]:
+        return _latest_startup_diagnostic_path(_runner_logs_dir(sess_local), "runner_startup")
+
+    def _runner_build_info_record(sess_local: Dict[str, Any]) -> Dict[str, Any]:
+        latest_path = _runner_startup_diagnostic_path(sess_local)
+        record = _load_startup_diagnostic_record(latest_path)
+        welcome_sheet = _select_welcome_sprite_path()
+        training = (_mole_env_mode(sess_local) == "TRAINING")
+        merged = {
+            "app": "runner",
+            "launch_mode": "training" if training else "runner",
+            "package_label": str((build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity or {}).get("built_at") or ""),
+            "git_commit": str((build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(_app_base_dir()),
+            "active_config_path": str(cfg_path),
+            "welcome_asset_sheet": str(welcome_sheet) if welcome_sheet is not None else "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=training),
+            "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
+            "logs_dir": str(_runner_logs_dir(sess_local)),
+        }
+        if isinstance(record, dict):
+            for key, value in record.items():
+                if value not in (None, ""):
+                    merged[key] = value
+        return merged
+
+    def _copy_runner_build_info(text: str) -> None:
+        try:
+            root.clipboard_clear()
+            root.clipboard_append(text)
+            root.update_idletasks()
+            messagebox.showinfo("Build Info", "Build information copied to the clipboard.")
+        except Exception as e:
+            messagebox.showerror("Build Info", str(e))
+
+    def _show_runner_build_info(sess_local: Dict[str, Any]) -> None:
+        record = _runner_build_info_record(sess_local)
+        text = _format_build_info_text(record)
+        w = tk.Toplevel(root)
+        w.title("Runner About / Build Info")
+        w.configure(bg=BG)
+        w.geometry("940x460")
+        body = tk.Frame(w, bg=BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        txt = tk.Text(body, bg=PANEL_BG, fg=FG, insertbackground=FG, font=("Consolas", 9), wrap="word")
+        txt.pack(fill="both", expand=True)
+        txt.insert("1.0", text + "\n")
+        txt.configure(state="disabled")
+        btns_local = tk.Frame(body, bg=BG)
+        btns_local.pack(fill="x", pady=(10, 0))
+        tk.Button(btns_local, text="Copy Build Info", command=lambda: _copy_runner_build_info(text), bg=BTN_BG, fg=FG, relief="flat").pack(side="left")
+        tk.Button(btns_local, text="Close", command=w.destroy, bg="#14202d", fg=FG, relief="flat").pack(side="right")
+
     def _runner_crash_log_path(sess_local: Dict[str, Any]) -> Optional[Path]:
         log_dir = _runner_logs_dir(sess_local)
         if latest_matching_path is not None:
@@ -16319,9 +16428,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "job_id": str(_job_id(sess_local)),
                     "session_schema_version": SESSION_SCHEMA_VERSION,
                     "python": sys.version,
+                    "build_info": _runner_build_info_record(sess_local),
                 },
                 artifacts={
                     "runner_config": cfg_path,
+                    "runner_startup_diagnostic": _runner_startup_diagnostic_path(sess_local),
                     "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
                     "runner_ui_crash_log": _runner_crash_log_path(sess_local),
                     "runner_health_latest": journal.get("latest"),

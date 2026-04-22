@@ -257,7 +257,7 @@ if not exist "%ROOT%\MOLE_DAS_Wizard.exe" (
   pause
   exit /b 1
 )
-start "" "%ROOT%\MOLE_DAS_Wizard.exe"
+start "" /D "%ROOT%" "%ROOT%\MOLE_DAS_Wizard.exe"
 '@
 Set-Content -LiteralPath (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat") -Value $launcher -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $installRoot "LAUNCH_MOLE_DAS_EXE.bat") -Value $launcher -Encoding ASCII
@@ -280,7 +280,7 @@ xcopy "%SRC%\*" "%DEST%\" /E /I /Y >nul
 echo.
 echo Installed.
 echo Launching Wizard...
-start "" "%DEST%\MOLE_code\MOLE_DAS_Wizard.exe"
+start "" /D "%DEST%\MOLE_code" "%DEST%\MOLE_code\MOLE_DAS_Wizard.exe"
 '@
 Set-Content -LiteralPath (Join-Path $installRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.bat") -Value $installer -Encoding ASCII
 
