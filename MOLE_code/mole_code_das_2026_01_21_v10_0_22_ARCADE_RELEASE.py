@@ -201,6 +201,22 @@ def _load_welcome_asset_manifest(base_dir: Optional[Path] = None) -> Dict[str, A
     return {}
 
 
+def _welcome_asset_manifest_path(base_dir: Optional[Path] = None) -> Optional[Path]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "config" / "mole_welcome_asset_manifest_v1.json",
+        base / "config" / "mole_welcome_asset_manifest_v1.json",
+        base / "mole_assets" / "config" / "mole_welcome_asset_manifest_v1.json",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                return path
+        except Exception:
+            continue
+    return None
+
+
 def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     base = Path(base_dir or _app_base_dir()).resolve()
     candidates = [
@@ -253,6 +269,21 @@ def _load_build_identity(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     except Exception:
         pass
     return ident
+
+
+def _build_identity_manifest_path(base_dir: Optional[Path] = None) -> Optional[Path]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    candidates = [
+        base.parent / "config" / "mole_build_identity_v1.json",
+        base / "config" / "mole_build_identity_v1.json",
+    ]
+    for path in candidates:
+        try:
+            if path.exists():
+                return path
+        except Exception:
+            continue
+    return None
 
 
 def _format_build_identity_line(identity: Dict[str, Any]) -> str:
@@ -361,6 +392,21 @@ def _load_startup_diagnostic_record(path: Optional[Path]) -> Dict[str, Any]:
     return {}
 
 
+def _latest_bundle_path(bundle_root: Path, label: str) -> Optional[Path]:
+    try:
+        base = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or "support_bundle")).strip("._-") or "support_bundle"
+        root = Path(bundle_root)
+        if latest_matching_path is not None:
+            try:
+                return latest_matching_path(root, f"{base}__*.zip")
+            except Exception:
+                pass
+        matches = sorted(root.glob(f"{base}__*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return matches[0] if matches else None
+    except Exception:
+        return None
+
+
 def _format_build_info_text(record: Dict[str, Any]) -> str:
     pairs = [
         ("App", record.get("app") or ""),
@@ -373,9 +419,13 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Runtime path", record.get("runtime_path") or ""),
         ("Active config path", record.get("active_config_path") or ""),
         ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
+        ("Welcome asset manifest", record.get("welcome_asset_manifest_path") or ""),
+        ("Build identity manifest", record.get("build_identity_manifest_path") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
+        ("Support bundle root", record.get("support_bundle_root") or ""),
+        ("Latest support bundle", record.get("latest_support_bundle_path") or ""),
         ("Recorded UTC", record.get("recorded_utc") or ""),
     ]
     lines = []
@@ -7176,10 +7226,19 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
     def _wizard_startup_diagnostic_path(self) -> Optional[Path]:
         return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_startup")
 
+    def _wizard_support_bundle_root(self) -> Path:
+        return Path(self.logs_dir) / "support_bundles"
+
+    def _wizard_latest_support_bundle_path(self) -> Optional[Path]:
+        return _latest_bundle_path(self._wizard_support_bundle_root(), "wizard_support_bundle")
+
     def _wizard_build_info_record(self) -> Dict[str, Any]:
         cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
         sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
+        sprite_manifest_path = _welcome_asset_manifest_path(getattr(self, "base_dir", None))
+        build_manifest_path = _build_identity_manifest_path(getattr(self, "base_dir", None))
         latest_path = self._wizard_startup_diagnostic_path()
+        latest_bundle = self._wizard_latest_support_bundle_path()
         record = _load_startup_diagnostic_record(latest_path)
         merged = {
             "app": "wizard",
@@ -7192,9 +7251,13 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "runtime_path": str(getattr(self, "base_dir", _app_base_dir())),
             "active_config_path": cfg_path,
             "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
+            "welcome_asset_manifest_path": str(sprite_manifest_path) if isinstance(sprite_manifest_path, Path) else "",
+            "build_identity_manifest_path": str(build_manifest_path) if isinstance(build_manifest_path, Path) else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
             "logs_dir": str(self.logs_dir),
+            "support_bundle_root": str(self._wizard_support_bundle_root()),
+            "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
         }
         if isinstance(record, dict):
             for key, value in record.items():
@@ -7217,16 +7280,40 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         win = tk.Toplevel(self)
         win.title("Wizard About / Build Info")
         win.configure(bg=self.BG)
-        win.geometry("920x460")
+        win.geometry("980x560")
         body = tk.Frame(win, bg=self.BG)
         body.pack(fill="both", expand=True, padx=12, pady=12)
+        actions = tk.Frame(body, bg=self.BG)
+        actions.pack(fill="x", pady=(0, 10))
+        action_specs = [
+            ("Copy Build Info", lambda: self._copy_wizard_build_info(text), True),
+            ("Open Runtime", lambda: self._dbpaths_open_path(record.get("runtime_path") or ""), bool(record.get("runtime_path"))),
+            ("Open Logs", lambda: self._dbpaths_open_path(record.get("logs_dir") or ""), bool(record.get("logs_dir"))),
+            ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
+            ("Open Build Identity", lambda: self._dbpaths_open_path(record.get("build_identity_manifest_path") or ""), bool(record.get("build_identity_manifest_path"))),
+            ("Open Welcome Asset", lambda: self._dbpaths_open_path(record.get("welcome_asset_sheet") or ""), bool(record.get("welcome_asset_sheet"))),
+            ("Open Active Config", lambda: self._dbpaths_open_path(record.get("active_config_path") or ""), bool(record.get("active_config_path"))),
+            ("Open Latest Bundle", lambda: self._dbpaths_open_path(record.get("latest_support_bundle_path") or ""), bool(record.get("latest_support_bundle_path"))),
+            ("Export Support Bundle", self._export_wizard_support_bundle, True),
+        ]
+        for col in range(3):
+            actions.grid_columnconfigure(col, weight=1)
+        for idx, (label, cmd, enabled) in enumerate(action_specs):
+            tk.Button(
+                actions,
+                text=label,
+                command=cmd,
+                bg=self.BTN_BG,
+                fg=self.BTN_FG,
+                relief="flat",
+                state=("normal" if enabled else "disabled"),
+            ).grid(row=idx // 3, column=idx % 3, sticky="ew", padx=4, pady=4)
         txt = tk.Text(body, bg="#0a0f16", fg="#c7d0d9", insertbackground="#c7d0d9", font=("Consolas", 9), wrap="word")
         txt.pack(fill="both", expand=True)
         txt.insert("1.0", text + "\n")
         txt.configure(state="disabled")
         btns = tk.Frame(body, bg=self.BG)
         btns.pack(fill="x", pady=(10, 0))
-        tk.Button(btns, text="Copy Build Info", command=lambda: self._copy_wizard_build_info(text), bg=self.BTN_BG, fg=self.BTN_FG, relief="flat").pack(side="left")
         tk.Button(btns, text="Close", command=win.destroy, bg="#14202d", fg=self.BTN_FG, relief="flat").pack(side="right")
 
     def _show_wizard_recovery_history(self) -> None:
@@ -7302,6 +7389,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             artifacts={
                 "wizard_config": mole_cfg_path(self.base_dir),
                 "session_config": Path(session_cfg) if session_cfg else None,
+                "build_identity_manifest": _build_identity_manifest_path(getattr(self, "base_dir", None)),
+                "welcome_asset_manifest": _welcome_asset_manifest_path(getattr(self, "base_dir", None)),
                 "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
                 "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
