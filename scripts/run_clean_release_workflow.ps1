@@ -61,6 +61,10 @@ $summary = [ordered]@{
     status = "RUNNING"
 }
 
+$bundleLabel = "MOLE_DAS_REL_$stamp"
+$bundleRoot = Join-Path $scratch "bundle"
+$releaseOutDir = Join-Path $workspace "RELEASES\clean_release_workflow"
+
 function Add-StepResult {
     param(
         [string]$Name,
@@ -121,7 +125,6 @@ try {
     }
 
     Invoke-Step "Run UI help registry audit" {
-        $releaseOutDir = Join-Path $workspace "RELEASES\clean_release_workflow"
         New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
         $uiHelpAuditJson = Join-Path $releaseOutDir "ui_help_audit.json"
         $uiHelpAuditTxt = Join-Path $releaseOutDir "ui_help_audit.txt"
@@ -156,8 +159,75 @@ try {
         Add-StepResult -Name "release_gate" -Status "PASS" -Detail "Release gate completed with strict hashes."
     }
 
+    Invoke-Step "Build Windows executable bundle" {
+        Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", "scripts\build_windows_executable_bundle.ps1",
+            "-RepoRoot", ".",
+            "-OutputRoot", $bundleRoot,
+            "-BundleLabel", $bundleLabel
+        ) -WorkingDirectory $workspace
+
+        $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")
+        $portableZip = Join-Path $bundleRoot ($bundleLabel + "_portable_exe_bundle.zip")
+        if (-not (Test-Path -LiteralPath $installerZip)) {
+            throw "Installer ZIP missing after bundle build: $installerZip"
+        }
+        if (-not (Test-Path -LiteralPath $portableZip)) {
+            throw "Portable ZIP missing after bundle build: $portableZip"
+        }
+
+        New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
+        Copy-Item -LiteralPath $installerZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($installerZip))) -Force
+        Copy-Item -LiteralPath $portableZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($portableZip))) -Force
+
+        Add-StepResult -Name "build_windows_executable_bundle" -Status "PASS" -Detail "Windows executable bundle built in clean workspace."
+    }
+
+    Invoke-Step "Run packaged acceptance gate" {
+        $acceptanceScript = Join-Path $workspace "scripts\run_packaged_acceptance.ps1"
+        if (-not (Test-Path -LiteralPath $acceptanceScript)) {
+            throw "Packaged acceptance script missing in clean workspace: $acceptanceScript"
+        }
+
+        Push-Location $workspace
+        try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $acceptanceScript -PackageRoot $bundleRoot
+            $acceptanceExit = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+
+        $acceptanceArtifacts = Join-Path $bundleRoot "_acceptance_artifacts"
+        $acceptanceJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
+        $acceptanceTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
+        if (Test-Path -LiteralPath $acceptanceJson) {
+            Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
+        }
+        if (Test-Path -LiteralPath $acceptanceTxt) {
+            Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
+        }
+        $supportBundleDir = Join-Path $acceptanceArtifacts "support_bundles"
+        if (Test-Path -LiteralPath $supportBundleDir) {
+            Get-ChildItem -LiteralPath $supportBundleDir -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object {
+                Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $releaseOutDir $_.Name) -Force
+            }
+        }
+
+        if ($acceptanceExit -ne 0) {
+            throw "Packaged acceptance gate failed with exit code $acceptanceExit"
+        }
+        if (-not (Test-Path -LiteralPath $acceptanceJson)) {
+            throw "Packaged acceptance summary missing: $acceptanceJson"
+        }
+
+        Add-StepResult -Name "packaged_acceptance_gate" -Status "PASS" -Detail "Installed-package acceptance gate passed for the clean-workspace executable bundle."
+    }
+
     Invoke-Step "Collect release artifacts" {
-        $sourceArtifacts = Join-Path $workspace "RELEASES\clean_release_workflow"
+        $sourceArtifacts = $releaseOutDir
         if (-not (Test-Path $sourceArtifacts)) {
             throw "Expected release artifact directory not found: $sourceArtifacts"
         }

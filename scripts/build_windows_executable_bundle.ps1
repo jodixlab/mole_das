@@ -111,7 +111,22 @@ Write-Host "==> Extract runtime ZIP"
 if (Test-Path -LiteralPath $runtimeRoot) {
     Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
 }
-Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtimeRoot -Force
+Invoke-Native -FilePath $python -ArgumentList @(
+    "-c",
+    @"
+from pathlib import Path
+import shutil
+import zipfile
+
+zip_path = Path(r'''$runtimeZip''')
+dst = Path(r'''$runtimeRoot''')
+if dst.exists():
+    shutil.rmtree(dst)
+dst.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(zip_path, 'r') as zf:
+    zf.extractall(dst)
+"@
+) -WorkingDirectory $RepoRoot
 
 $buildIdentityPath = Join-Path $runtimeConfigRoot "mole_build_identity_v1.json"
 $gitCommit = ""

@@ -5,14 +5,28 @@ import os
 import re
 import sqlite3
 import shutil
+import threading
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
 
+_UTC_STAMP_LOCK = threading.Lock()
+_UTC_STAMP_LAST_BASE = ""
+_UTC_STAMP_SEQ = 0
+
+
 def _utc_stamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    global _UTC_STAMP_LAST_BASE, _UTC_STAMP_SEQ
+    base = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    with _UTC_STAMP_LOCK:
+        if base == _UTC_STAMP_LAST_BASE:
+            _UTC_STAMP_SEQ += 1
+        else:
+            _UTC_STAMP_LAST_BASE = base
+            _UTC_STAMP_SEQ = 0
+        return f"{base}{_UTC_STAMP_SEQ:03d}Z"
 
 
 def _slug(value: str, default: str = "snapshot") -> str:

@@ -4,6 +4,7 @@ MOLE-DAS Data Acquisition System
 ## Release validation
 - Local clean-workspace validation: [RUN_CLEAN_RELEASE_WORKFLOW.bat](RUN_CLEAN_RELEASE_WORKFLOW.bat)
 - PowerShell entrypoint: [scripts/run_clean_release_workflow.ps1](scripts/run_clean_release_workflow.ps1)
+- Packaged installer acceptance runner: [scripts/run_packaged_acceptance.ps1](scripts/run_packaged_acceptance.ps1)
 - UI help coverage audit: [scripts/audit_ui_help_registry.py](scripts/audit_ui_help_registry.py)
 - UI help doc update pack: [scripts/build_ui_help_doc_update_pack.py](scripts/build_ui_help_doc_update_pack.py)
 - UI help doc source manifest: [config/mole_ui_help_doc_sources_v1.json](config/mole_ui_help_doc_sources_v1.json)
@@ -14,6 +15,7 @@ MOLE-DAS Data Acquisition System
 - Final release gate entrypoint: [RUN_RELEASE_DECISION_GATE.bat](RUN_RELEASE_DECISION_GATE.bat)
 - Generated release checklist artifacts appear under `RELEASES/clean_release_workflow/`
 - Generated clean-workspace ZIP, release cert, and package hygiene reports also appear under `RELEASES/clean_release_workflow/`
+- Generated executable bundle ZIPs and packaged-acceptance summaries also appear under `RELEASES/clean_release_workflow/`
 - Dependency manifests, release bundle summary, and release artifact contract are also emitted under `RELEASES/clean_release_workflow/`
 - Final go/no-go decision artifacts are emitted under `RELEASES/clean_release_workflow/`
 - UI help release artifacts now also include a coverage audit and a documentation update review pack under `RELEASES/clean_release_workflow/`

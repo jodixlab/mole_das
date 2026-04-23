@@ -50,6 +50,39 @@ def _build_preview_gif(frames: list[Image.Image], out_path: Path) -> None:
     resized[0].save(out_path, save_all=True, append_images=resized[1:], duration=130, loop=0, disposal=2)
 
 
+def _load_frames_from_master_sheet(manifest: dict, root: Path) -> list[Image.Image]:
+    frame_count = max(int(manifest.get("frame_count") or 0), 0)
+    if frame_count <= 0:
+        raise FileNotFoundError("Welcome asset manifest does not declare a positive frame_count.")
+
+    sheet_specs = []
+    for item in manifest.get("assembled_sheets", []) or []:
+        if not isinstance(item, dict):
+            continue
+        candidate = _rooted(root, str(item.get("path") or ""))
+        if not candidate.exists():
+            continue
+        match = str(item.get("file_name") or candidate.name)
+        digits = "".join(ch for ch in match if ch.isdigit())
+        resolution = int(digits) if digits else 0
+        sheet_specs.append((resolution, candidate))
+    if not sheet_specs:
+        raise FileNotFoundError("No assembled welcome master sheet found for review-pack fallback.")
+
+    sheet_specs.sort(key=lambda item: item[0], reverse=True)
+    sheet_path = sheet_specs[0][1]
+    sheet = Image.open(sheet_path).convert("RGBA")
+    frame_width = sheet.width // frame_count
+    if frame_width <= 0 or (frame_width * frame_count) != sheet.width:
+        raise ValueError(f"Master sheet width {sheet.width} is not divisible by frame_count {frame_count}.")
+
+    frames: list[Image.Image] = []
+    for idx in range(frame_count):
+        left = idx * frame_width
+        frames.append(sheet.crop((left, 0, left + frame_width, sheet.height)).copy())
+    return frames
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[1]))
@@ -63,11 +96,13 @@ def main() -> int:
     manifest = _load_json(manifest_path)
 
     frames_dir = _rooted(root, manifest["frames_dir"])
-    frame_paths = sorted(frames_dir.glob("frame_*.png"))
-    if not frame_paths:
-        raise FileNotFoundError(f"No frame_*.png files found in {frames_dir}")
-
-    frames = [Image.open(path).convert("RGBA") for path in frame_paths]
+    frame_paths = sorted(frames_dir.glob("frame_*.png")) if frames_dir.exists() else []
+    if frame_paths:
+        frames = [Image.open(path).convert("RGBA") for path in frame_paths]
+        frame_source = "frame_dir"
+    else:
+        frames = _load_frames_from_master_sheet(manifest, root)
+        frame_source = "master_sheet"
     contact_path = output_dir / "welcome_asset_contact_sheet.png"
     preview_path = output_dir / "welcome_asset_preview.gif"
     manifest_copy_path = output_dir / "welcome_asset_manifest.json"
@@ -88,7 +123,8 @@ def main() -> int:
         "approved": bool(manifest.get("approved")),
         "approved_version_label": manifest.get("approved_version_label"),
         "prompt_version": manifest.get("prompt_version"),
-        "frame_count": len(frame_paths),
+        "frame_count": len(frames),
+        "frame_source": frame_source,
         "source_key_art": manifest.get("source_key_art", {}),
         "assembled_sheets": manifest.get("assembled_sheets", []),
     }
@@ -101,7 +137,8 @@ def main() -> int:
         f"- Approved: `{bool(manifest.get('approved'))}`",
         f"- Approved version: `{manifest.get('approved_version_label')}`",
         f"- Prompt version: `{manifest.get('prompt_version')}`",
-        f"- Frame count: `{len(frame_paths)}`",
+        f"- Frame count: `{len(frames)}`",
+        f"- Frame source: `{frame_source}`",
         f"- Source key art: `{manifest.get('source_key_art', {}).get('path', '')}`",
         "",
         "Artifacts:",

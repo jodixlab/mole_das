@@ -37,6 +37,20 @@
       "description": "Human-readable package hygiene audit for the runtime ZIP."
     },
     {
+      "id": "installer_exe_bundle_zip",
+      "required": true,
+      "match": "glob",
+      "pattern": "*_installer_exe_bundle.zip",
+      "description": "Installer-grade Windows executable bundle ZIP produced by the clean release workflow."
+    },
+    {
+      "id": "portable_exe_bundle_zip",
+      "required": true,
+      "match": "glob",
+      "pattern": "*_portable_exe_bundle.zip",
+      "description": "Portable Windows executable bundle ZIP produced by the clean release workflow."
+    },
+    {
       "id": "clean_release_summary_json",
       "required": true,
       "match": "exact",
@@ -49,6 +63,20 @@
       "match": "exact",
       "pattern": "clean_release_summary.txt",
       "description": "Human-readable clean-workspace workflow summary."
+    },
+    {
+      "id": "packaged_acceptance_summary_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "packaged_acceptance_summary.json",
+      "description": "Structured installed-package acceptance summary for the executable bundle."
+    },
+    {
+      "id": "packaged_acceptance_summary_txt",
+      "required": true,
+      "match": "exact",
+      "pattern": "packaged_acceptance_summary.txt",
+      "description": "Human-readable installed-package acceptance summary for the executable bundle."
     },
     {
       "id": "ui_help_audit_json",
