@@ -99,11 +99,12 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
     create_support_bundle = None
+    evaluate_runtime_package_status = None
     latest_matching_path = None
     load_latest_health_summary = None
     load_recent_health_history = None
@@ -316,6 +317,68 @@ def _packaged_acceptance_summary_paths(base_dir: Optional[Path] = None) -> Dict[
     }
 
 
+def _runtime_package_status_record(
+    *,
+    base_dir: Optional[Path] = None,
+    build_identity: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    acceptance_paths = _packaged_acceptance_summary_paths(base_dir)
+    runtime_root = Path(base_dir or _app_base_dir()).resolve().parent
+    if evaluate_runtime_package_status is None:
+        return {
+            "package_status": "UNVERIFIED",
+            "package_status_summary": "Package verification helper is unavailable.",
+            "package_status_detail": "Package verification helper is unavailable.",
+            "package_status_details": ["Package verification helper is unavailable."],
+            "packaged_acceptance_status": "",
+            "packaged_acceptance_generated_at": "",
+            "install_root_path": "",
+            "install_manifest_path": "",
+            "installed_runtime_path": "",
+            "installed_bundle_label": "",
+            "local_accepted_package_marker_path": "",
+            "local_accepted_package_label": "",
+            "uninstall_registry_install_location": "",
+            "uninstall_registry_display_version": "",
+            "uninstall_registry_key": "",
+        }
+    try:
+        return evaluate_runtime_package_status(
+            current_runtime_root=runtime_root,
+            current_build_identity=(build_identity or _load_build_identity(base_dir)),
+            current_acceptance_summary_path=acceptance_paths.get("json"),
+        )
+    except Exception:
+        return {
+            "package_status": "UNVERIFIED",
+            "package_status_summary": "Package verification check failed.",
+            "package_status_detail": "Package verification check failed.",
+            "package_status_details": ["Package verification check failed."],
+            "packaged_acceptance_status": "",
+            "packaged_acceptance_generated_at": "",
+            "install_root_path": "",
+            "install_manifest_path": "",
+            "installed_runtime_path": "",
+            "installed_bundle_label": "",
+            "local_accepted_package_marker_path": "",
+            "local_accepted_package_label": "",
+            "uninstall_registry_install_location": "",
+            "uninstall_registry_display_version": "",
+            "uninstall_registry_key": "",
+        }
+
+
+def _build_status_banner_style(status: Any) -> tuple[str, str]:
+    value = str(status or "").strip().upper()
+    if value == "CURRENT":
+        return ("#15361c", "#c8ffd4")
+    if value == "STALE":
+        return ("#4a2600", "#ffd7b0")
+    if value == "PORTABLE":
+        return ("#20374c", "#d2ebff")
+    return ("#4a1111", "#ffd3d3")
+
+
 def _format_build_identity_line(identity: Dict[str, Any]) -> str:
     label = str(identity.get("bundle_label") or "unlabeled")
     built_at = str(identity.get("built_at") or "").strip()
@@ -441,18 +504,30 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
     pairs = [
         ("App", record.get("app") or ""),
         ("Launch mode", record.get("launch_mode") or ""),
+        ("Package status", record.get("package_status") or ""),
+        ("Package status detail", record.get("package_status_detail") or ""),
         ("Package label", record.get("package_label") or ""),
         ("Build time", record.get("build_time") or ""),
         ("Git branch", record.get("git_branch") or ""),
         ("Git commit", record.get("git_commit") or ""),
         ("Executable path", record.get("executable_path") or ""),
         ("Runtime path", record.get("runtime_path") or ""),
+        ("Install root", record.get("install_root_path") or ""),
+        ("Install manifest", record.get("install_manifest_path") or ""),
+        ("Installed runtime", record.get("installed_runtime_path") or ""),
+        ("Installed bundle label", record.get("installed_bundle_label") or ""),
+        ("Accepted package marker", record.get("local_accepted_package_marker_path") or ""),
+        ("Accepted package label", record.get("local_accepted_package_label") or ""),
+        ("Registry install location", record.get("uninstall_registry_install_location") or ""),
+        ("Registry display version", record.get("uninstall_registry_display_version") or ""),
         ("Active config path", record.get("active_config_path") or ""),
         ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
         ("Welcome asset manifest", record.get("welcome_asset_manifest_path") or ""),
         ("Build identity manifest", record.get("build_identity_manifest_path") or ""),
         ("Packaged acceptance summary", record.get("packaged_acceptance_summary_path") or ""),
         ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
+        ("Packaged acceptance status", record.get("packaged_acceptance_status") or ""),
+        ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
@@ -7240,6 +7315,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
     def _write_startup_diagnostic(self) -> Optional[Dict[str, Path]]:
         cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
         sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
+        status_record = _runtime_package_status_record(base_dir=getattr(self, "base_dir", None), build_identity=self.build_identity)
         payload = {
             "app": "wizard",
             "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
@@ -7253,6 +7329,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
         }
+        payload.update(status_record)
         return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
 
     def _wizard_startup_diagnostic_path(self) -> Optional[Path]:
@@ -7270,6 +7347,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         sprite_manifest_path = _welcome_asset_manifest_path(getattr(self, "base_dir", None))
         build_manifest_path = _build_identity_manifest_path(getattr(self, "base_dir", None))
         acceptance_paths = _packaged_acceptance_summary_paths(getattr(self, "base_dir", None))
+        status_record = _runtime_package_status_record(base_dir=getattr(self, "base_dir", None), build_identity=self.build_identity)
         latest_path = self._wizard_startup_diagnostic_path()
         latest_bundle = self._wizard_latest_support_bundle_path()
         record = _load_startup_diagnostic_record(latest_path)
@@ -7294,6 +7372,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "support_bundle_root": str(self._wizard_support_bundle_root()),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
         }
+        merged.update(status_record)
         if isinstance(record, dict):
             for key, value in record.items():
                 if value not in (None, ""):
@@ -7318,16 +7397,31 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         win.geometry("980x560")
         body = tk.Frame(win, bg=self.BG)
         body.pack(fill="both", expand=True, padx=12, pady=12)
+        banner_bg, banner_fg = _build_status_banner_style(record.get("package_status"))
+        tk.Label(
+            body,
+            text=f"{record.get('package_status') or 'UNVERIFIED'}: {record.get('package_status_summary') or ''}",
+            bg=banner_bg,
+            fg=banner_fg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+            padx=10,
+            pady=8,
+        ).pack(fill="x", pady=(0, 10))
         actions = tk.Frame(body, bg=self.BG)
         actions.pack(fill="x", pady=(0, 10))
         action_specs = [
             ("Copy Build Info", lambda: self._copy_wizard_build_info(text), True),
             ("Open Runtime", lambda: self._dbpaths_open_path(record.get("runtime_path") or ""), bool(record.get("runtime_path"))),
+            ("Open Install Root", lambda: self._dbpaths_open_path(record.get("install_root_path") or ""), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: self._dbpaths_open_path(record.get("logs_dir") or ""), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
             ("Open Build Identity", lambda: self._dbpaths_open_path(record.get("build_identity_manifest_path") or ""), bool(record.get("build_identity_manifest_path"))),
+            ("Open Install Manifest", lambda: self._dbpaths_open_path(record.get("install_manifest_path") or ""), bool(record.get("install_manifest_path"))),
             ("Open Acceptance Summary", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_path") or ""), bool(record.get("packaged_acceptance_summary_path"))),
             ("Open Acceptance JSON", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_json_path") or ""), bool(record.get("packaged_acceptance_summary_json_path"))),
+            ("Open Accepted Marker", lambda: self._dbpaths_open_path(record.get("local_accepted_package_marker_path") or ""), bool(record.get("local_accepted_package_marker_path"))),
             ("Open Welcome Asset", lambda: self._dbpaths_open_path(record.get("welcome_asset_sheet") or ""), bool(record.get("welcome_asset_sheet"))),
             ("Open Active Config", lambda: self._dbpaths_open_path(record.get("active_config_path") or ""), bool(record.get("active_config_path"))),
             ("Open Latest Bundle", lambda: self._dbpaths_open_path(record.get("latest_support_bundle_path") or ""), bool(record.get("latest_support_bundle_path"))),
@@ -7407,6 +7501,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         active_session_dir = str(self.var_active_session_dir.get() or "").strip() if hasattr(self, "var_active_session_dir") else ""
         journal = self._wizard_health_journal_paths()
         acceptance_paths = _packaged_acceptance_summary_paths(getattr(self, "base_dir", None))
+        build_info = self._wizard_build_info_record()
         return create_support_bundle(
             Path(self.logs_dir) / "support_bundles",
             label="wizard_support_bundle",
@@ -7422,13 +7517,15 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "job_id": str((self.session.get("project") or {}).get("job_id") or ""),
                 "session_schema_version": SESSION_SCHEMA_VERSION,
                 "python": sys.version,
-                "build_info": self._wizard_build_info_record(),
+                "build_info": build_info,
             },
             artifacts={
                 "wizard_config": mole_cfg_path(self.base_dir),
                 "session_config": Path(session_cfg) if session_cfg else None,
                 "build_identity_manifest": _build_identity_manifest_path(getattr(self, "base_dir", None)),
                 "welcome_asset_manifest": _welcome_asset_manifest_path(getattr(self, "base_dir", None)),
+                "install_manifest": Path(build_info.get("install_manifest_path")) if str(build_info.get("install_manifest_path") or "").strip() else None,
+                "local_accepted_package_marker": Path(build_info.get("local_accepted_package_marker_path")) if str(build_info.get("local_accepted_package_marker_path") or "").strip() else None,
                 "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                 "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                 "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),

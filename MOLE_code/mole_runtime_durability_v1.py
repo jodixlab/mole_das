@@ -11,6 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
+try:
+    import winreg
+except Exception:
+    winreg = None
+
 
 _UTC_STAMP_LOCK = threading.Lock()
 _UTC_STAMP_LAST_BASE = ""
@@ -253,6 +258,231 @@ def load_recent_health_history(journal_dir: Path, *, label: str, limit: int = 10
         return rows[-max(int(limit), 1):]
     except Exception:
         return []
+
+
+def _safe_path(path_value: Any) -> Optional[Path]:
+    text = str(path_value or "").strip()
+    if not text:
+        return None
+    try:
+        return Path(text).expanduser().resolve()
+    except Exception:
+        try:
+            return Path(text).expanduser()
+        except Exception:
+            return None
+
+
+def _load_json_dict(path_value: Any) -> Dict[str, Any]:
+    path = path_value if isinstance(path_value, Path) else _safe_path(path_value)
+    if not isinstance(path, Path) or not path.exists() or not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _path_is_same_or_child(path: Path, root: Path) -> bool:
+    try:
+        path_r = path.resolve()
+        root_r = root.resolve()
+        return path_r == root_r or path_r.is_relative_to(root_r)
+    except Exception:
+        return False
+
+
+def _parse_iso_datetime(value: Any) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        return datetime.fromisoformat(text)
+    except Exception:
+        return None
+
+
+def load_uninstall_registration() -> Dict[str, Any]:
+    if winreg is None:
+        return {}
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\MOLE_DAS"
+    fields = {
+        "DisplayName": "display_name",
+        "DisplayVersion": "display_version",
+        "InstallLocation": "install_location",
+        "Publisher": "publisher",
+        "DisplayIcon": "display_icon",
+        "UninstallString": "uninstall_string",
+        "QuietUninstallString": "quiet_uninstall_string",
+        "InstallDate": "install_date",
+    }
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            record: Dict[str, Any] = {"registry_key": f"HKCU\\{key_path}"}
+            for src, dest in fields.items():
+                try:
+                    value, _ = winreg.QueryValueEx(key, src)
+                except Exception:
+                    continue
+                text = str(value or "").strip()
+                if text:
+                    record[dest] = text
+            return record
+    except Exception:
+        return {}
+
+
+def evaluate_runtime_package_status(
+    *,
+    current_runtime_root: Path,
+    current_build_identity: Optional[Mapping[str, Any]] = None,
+    current_acceptance_summary_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    runtime_root = Path(current_runtime_root).resolve()
+    build_identity = dict(current_build_identity or {})
+    current_acceptance_path = _safe_path(current_acceptance_summary_path)
+    current_acceptance = _load_json_dict(current_acceptance_path)
+    current_acceptance_status = str(current_acceptance.get("status") or "").strip().upper()
+    current_bundle_label = str(
+        build_identity.get("bundle_label")
+        or current_acceptance.get("package_label")
+        or ""
+    ).strip()
+    current_built_at = _parse_iso_datetime(build_identity.get("built_at"))
+    current_identity_runtime_root = _safe_path(build_identity.get("runtime_root"))
+
+    current_install_manifest_path = runtime_root.parent / "mole_install_manifest_v1.json"
+    current_install_manifest = _load_json_dict(
+        current_install_manifest_path if current_install_manifest_path.exists() else None
+    )
+    current_install_root = None
+    if current_install_manifest:
+        current_install_root = _safe_path(current_install_manifest.get("install_root")) or runtime_root.parent.resolve()
+
+    uninstall_registration = load_uninstall_registration()
+    registry_install_root = _safe_path(uninstall_registration.get("install_location"))
+    local_install_root = registry_install_root or current_install_root
+
+    install_manifest_path = None
+    if isinstance(local_install_root, Path):
+        candidate = local_install_root / "mole_install_manifest_v1.json"
+        if candidate.exists():
+            install_manifest_path = candidate.resolve()
+    elif current_install_manifest:
+        install_manifest_path = current_install_manifest_path.resolve()
+
+    install_manifest = _load_json_dict(install_manifest_path)
+    installed_runtime_root = _safe_path(install_manifest.get("runtime_root"))
+    if installed_runtime_root is None and isinstance(local_install_root, Path):
+        candidate = local_install_root / "runtime"
+        if candidate.exists():
+            installed_runtime_root = candidate.resolve()
+
+    installed_identity_path = None
+    if isinstance(installed_runtime_root, Path):
+        candidate = installed_runtime_root / "config" / "mole_build_identity_v1.json"
+        if candidate.exists():
+            installed_identity_path = candidate.resolve()
+    installed_identity = _load_json_dict(installed_identity_path)
+    installed_built_at = _parse_iso_datetime(installed_identity.get("built_at"))
+
+    accepted_marker_path = None
+    if isinstance(local_install_root, Path):
+        for candidate in (
+            local_install_root / "PACKAGED_ACCEPTANCE_SUMMARY.json",
+            local_install_root / "_acceptance_artifacts" / "packaged_acceptance_summary.json",
+        ):
+            if candidate.exists():
+                accepted_marker_path = candidate.resolve()
+                break
+    if accepted_marker_path is None and isinstance(current_acceptance_path, Path) and current_acceptance_path.exists():
+        accepted_marker_path = current_acceptance_path.resolve()
+    accepted_marker = _load_json_dict(accepted_marker_path)
+    accepted_bundle_label = str(
+        accepted_marker.get("package_label")
+        or install_manifest.get("bundle_label")
+        or uninstall_registration.get("display_version")
+        or ""
+    ).strip()
+
+    current_is_installed = bool(isinstance(local_install_root, Path) and _path_is_same_or_child(runtime_root, local_install_root))
+    portable_launch = not current_is_installed
+    build_identity_runtime_mismatch = bool(
+        isinstance(current_identity_runtime_root, Path) and current_identity_runtime_root != runtime_root
+    )
+    install_manifest_runtime_mismatch = bool(
+        current_is_installed and isinstance(installed_runtime_root, Path) and installed_runtime_root != runtime_root
+    )
+    installed_label_mismatch = bool(
+        current_is_installed and accepted_bundle_label and current_bundle_label and accepted_bundle_label != current_bundle_label
+    )
+    acceptance_missing = not (isinstance(current_acceptance_path, Path) and current_acceptance_path.exists())
+    acceptance_failed = bool(current_acceptance and current_acceptance_status and current_acceptance_status != "PASS")
+
+    stale_launch = False
+    if portable_launch and isinstance(local_install_root, Path):
+        if accepted_bundle_label and current_bundle_label and accepted_bundle_label != current_bundle_label:
+            stale_launch = True
+        elif current_built_at is not None and installed_built_at is not None and current_built_at < installed_built_at:
+            stale_launch = True
+
+    details: list[str] = []
+    if acceptance_missing:
+        details.append("Packaged acceptance summary is missing.")
+    elif acceptance_failed:
+        details.append(f"Packaged acceptance summary is {current_acceptance_status}, not PASS.")
+    if build_identity_runtime_mismatch:
+        details.append("Build identity runtime path does not match the running runtime path.")
+    if install_manifest_runtime_mismatch:
+        details.append("Installed runtime manifest does not match the running runtime path.")
+    if installed_label_mismatch:
+        details.append("Installed package label does not match the running package label.")
+    if stale_launch:
+        details.append("Running package differs from the locally installed accepted package.")
+    elif portable_launch:
+        details.append("Running from a portable folder instead of the installed root.")
+    elif current_is_installed:
+        details.append("Running from the installed root.")
+    else:
+        details.append("No installed root was detected on this machine.")
+
+    if acceptance_missing or acceptance_failed or build_identity_runtime_mismatch or install_manifest_runtime_mismatch or installed_label_mismatch:
+        status = "UNVERIFIED"
+        summary = "Package verification or runtime identity is incomplete."
+    elif stale_launch:
+        status = "STALE"
+        summary = "Running package is older or different than the locally accepted install."
+    elif portable_launch:
+        status = "PORTABLE"
+        summary = "Running from a portable folder instead of the installed root."
+    else:
+        status = "CURRENT"
+        summary = "Installed and verified package matches the local accepted install."
+
+    return {
+        "package_status": status,
+        "package_status_summary": summary,
+        "package_status_detail": details[0] if details else summary,
+        "package_status_details": details,
+        "portable_launch": portable_launch,
+        "build_identity_runtime_mismatch": build_identity_runtime_mismatch,
+        "install_manifest_runtime_mismatch": install_manifest_runtime_mismatch,
+        "installed_label_mismatch": installed_label_mismatch,
+        "packaged_acceptance_status": current_acceptance_status,
+        "packaged_acceptance_generated_at": str(current_acceptance.get("generated_at") or "").strip(),
+        "install_root_path": str(local_install_root) if isinstance(local_install_root, Path) else "",
+        "install_manifest_path": str(install_manifest_path) if isinstance(install_manifest_path, Path) else "",
+        "installed_runtime_path": str(installed_runtime_root) if isinstance(installed_runtime_root, Path) else "",
+        "installed_bundle_label": accepted_bundle_label,
+        "local_accepted_package_marker_path": str(accepted_marker_path) if isinstance(accepted_marker_path, Path) else "",
+        "local_accepted_package_label": accepted_bundle_label,
+        "uninstall_registry_install_location": str(uninstall_registration.get("install_location") or "").strip(),
+        "uninstall_registry_display_version": str(uninstall_registration.get("display_version") or "").strip(),
+        "uninstall_registry_key": str(uninstall_registration.get("registry_key") or "").strip(),
+    }
 
 
 def write_startup_diagnostic(

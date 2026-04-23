@@ -196,6 +196,68 @@ def _packaged_acceptance_summary_paths(base_dir: Optional[Path] = None) -> Dict[
     }
 
 
+def _runtime_package_status_record(
+    current_build_identity: Optional[Dict[str, Any]] = None,
+    *,
+    base_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    acceptance_paths = _packaged_acceptance_summary_paths(base_dir)
+    runtime_root = Path(base_dir or _app_base_dir()).resolve().parent
+    if evaluate_runtime_package_status is None:
+        return {
+            "package_status": "UNVERIFIED",
+            "package_status_summary": "Package verification helper is unavailable.",
+            "package_status_detail": "Package verification helper is unavailable.",
+            "package_status_details": ["Package verification helper is unavailable."],
+            "packaged_acceptance_status": "",
+            "packaged_acceptance_generated_at": "",
+            "install_root_path": "",
+            "install_manifest_path": "",
+            "installed_runtime_path": "",
+            "installed_bundle_label": "",
+            "local_accepted_package_marker_path": "",
+            "local_accepted_package_label": "",
+            "uninstall_registry_install_location": "",
+            "uninstall_registry_display_version": "",
+            "uninstall_registry_key": "",
+        }
+    try:
+        return evaluate_runtime_package_status(
+            current_runtime_root=runtime_root,
+            current_build_identity=(current_build_identity or _load_build_identity(base_dir)),
+            current_acceptance_summary_path=acceptance_paths.get("json"),
+        )
+    except Exception:
+        return {
+            "package_status": "UNVERIFIED",
+            "package_status_summary": "Package verification check failed.",
+            "package_status_detail": "Package verification check failed.",
+            "package_status_details": ["Package verification check failed."],
+            "packaged_acceptance_status": "",
+            "packaged_acceptance_generated_at": "",
+            "install_root_path": "",
+            "install_manifest_path": "",
+            "installed_runtime_path": "",
+            "installed_bundle_label": "",
+            "local_accepted_package_marker_path": "",
+            "local_accepted_package_label": "",
+            "uninstall_registry_install_location": "",
+            "uninstall_registry_display_version": "",
+            "uninstall_registry_key": "",
+        }
+
+
+def _build_status_banner_style(status: Any) -> tuple[str, str]:
+    value = str(status or "").strip().upper()
+    if value == "CURRENT":
+        return ("#15361c", "#c8ffd4")
+    if value == "STALE":
+        return ("#4a2600", "#ffd7b0")
+    if value == "PORTABLE":
+        return ("#20374c", "#d2ebff")
+    return ("#4a1111", "#ffd3d3")
+
+
 def _format_build_identity_line(identity: Dict[str, Any]) -> str:
     label = str(identity.get("bundle_label") or "unlabeled")
     built_at = str(identity.get("built_at") or "").strip()
@@ -321,18 +383,30 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
     pairs = [
         ("App", record.get("app") or ""),
         ("Launch mode", record.get("launch_mode") or ""),
+        ("Package status", record.get("package_status") or ""),
+        ("Package status detail", record.get("package_status_detail") or ""),
         ("Package label", record.get("package_label") or ""),
         ("Build time", record.get("build_time") or ""),
         ("Git branch", record.get("git_branch") or ""),
         ("Git commit", record.get("git_commit") or ""),
         ("Executable path", record.get("executable_path") or ""),
         ("Runtime path", record.get("runtime_path") or ""),
+        ("Install root", record.get("install_root_path") or ""),
+        ("Install manifest", record.get("install_manifest_path") or ""),
+        ("Installed runtime", record.get("installed_runtime_path") or ""),
+        ("Installed bundle label", record.get("installed_bundle_label") or ""),
+        ("Accepted package marker", record.get("local_accepted_package_marker_path") or ""),
+        ("Accepted package label", record.get("local_accepted_package_label") or ""),
+        ("Registry install location", record.get("uninstall_registry_install_location") or ""),
+        ("Registry display version", record.get("uninstall_registry_display_version") or ""),
         ("Active config path", record.get("active_config_path") or ""),
         ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
         ("Welcome asset manifest", record.get("welcome_asset_manifest_path") or ""),
         ("Build identity manifest", record.get("build_identity_manifest_path") or ""),
         ("Packaged acceptance summary", record.get("packaged_acceptance_summary_path") or ""),
         ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
+        ("Packaged acceptance status", record.get("packaged_acceptance_status") or ""),
+        ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
@@ -387,10 +461,11 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
+    evaluate_runtime_package_status = None
     latest_matching_path = None
     load_latest_health_summary = None
     load_recent_health_history = None
@@ -4757,6 +4832,7 @@ def main() -> None:
                 "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
                 "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
             }
+            startup_payload.update(_runtime_package_status_record(build_identity_main))
             log_dir = _app_base_dir().parent / "mole_das_data" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -4939,6 +5015,7 @@ def main() -> None:
             "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
             "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
         }
+        startup_payload.update(_runtime_package_status_record(build_identity_main))
         _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
     except Exception:
         pass
@@ -5023,6 +5100,7 @@ def main() -> None:
                     "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
                     "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
                 }
+                startup_payload.update(_runtime_package_status_record(build_identity_main))
                 _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
             except Exception:
                 pass
@@ -5807,6 +5885,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=("training" in early_launch_mode)),
         }
+        early_payload.update(_runtime_package_status_record(build_identity))
         _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=early_payload, keep=20)
     except Exception:
         pass
@@ -11851,6 +11930,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "welcome_asset_sheet": str(welcome_sheet.resolve()) if isinstance(welcome_sheet, Path) and welcome_sheet.exists() else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess) == "TRAINING")),
         }
+        startup_payload.update(_runtime_package_status_record(build_identity))
         _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
     except Exception:
         pass
@@ -16355,6 +16435,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "welcome_asset_sheet": str(welcome_sheet) if welcome_sheet is not None else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess_local) == "TRAINING")),
         }
+        payload.update(_runtime_package_status_record(build_identity))
         return _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=payload, keep=20)
 
     def _runner_startup_diagnostic_path(sess_local: Dict[str, Any]) -> Optional[Path]:
@@ -16374,6 +16455,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         welcome_manifest = _welcome_asset_manifest_path()
         build_manifest = _build_identity_manifest_path()
         acceptance_paths = _packaged_acceptance_summary_paths()
+        status_record = _runtime_package_status_record(build_identity)
         latest_bundle = _runner_latest_support_bundle_path(sess_local)
         training = (_mole_env_mode(sess_local) == "TRAINING")
         merged = {
@@ -16397,6 +16479,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "support_bundle_root": str(_runner_support_bundle_root(sess_local)),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
         }
+        merged.update(status_record)
         if isinstance(record, dict):
             for key, value in record.items():
                 if value not in (None, ""):
@@ -16421,16 +16504,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         w.geometry("980x560")
         body = tk.Frame(w, bg=BG)
         body.pack(fill="both", expand=True, padx=12, pady=12)
+        banner_bg, banner_fg = _build_status_banner_style(record.get("package_status"))
+        tk.Label(
+            body,
+            text=f"{record.get('package_status') or 'UNVERIFIED'}: {record.get('package_status_summary') or ''}",
+            bg=banner_bg,
+            fg=banner_fg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+            padx=10,
+            pady=8,
+        ).pack(fill="x", pady=(0, 10))
         actions = tk.Frame(body, bg=BG)
         actions.pack(fill="x", pady=(0, 10))
         action_specs = [
             ("Copy Build Info", lambda: _copy_runner_build_info(text), True),
             ("Open Runtime", lambda: _open_fs_target(record.get("runtime_path") or "", title="Open Runtime Failed"), bool(record.get("runtime_path"))),
+            ("Open Install Root", lambda: _open_fs_target(record.get("install_root_path") or "", title="Open Install Root Failed"), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: _open_fs_target(record.get("logs_dir") or "", title="Open Logs Failed"), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: _open_fs_target(record.get("startup_diagnostic_path") or "", title="Open Startup Diagnostic Failed"), bool(record.get("startup_diagnostic_path"))),
             ("Open Build Identity", lambda: _open_fs_target(record.get("build_identity_manifest_path") or "", title="Open Build Identity Failed"), bool(record.get("build_identity_manifest_path"))),
+            ("Open Install Manifest", lambda: _open_fs_target(record.get("install_manifest_path") or "", title="Open Install Manifest Failed"), bool(record.get("install_manifest_path"))),
             ("Open Acceptance Summary", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
             ("Open Acceptance JSON", lambda: _open_fs_target(record.get("packaged_acceptance_summary_json_path") or "", title="Open Acceptance Summary JSON Failed"), bool(record.get("packaged_acceptance_summary_json_path"))),
+            ("Open Accepted Marker", lambda: _open_fs_target(record.get("local_accepted_package_marker_path") or "", title="Open Accepted Marker Failed"), bool(record.get("local_accepted_package_marker_path"))),
             ("Open Welcome Asset", lambda: _open_fs_target(record.get("welcome_asset_sheet") or "", title="Open Welcome Asset Failed"), bool(record.get("welcome_asset_sheet"))),
             ("Open Active Config", lambda: _open_fs_target(record.get("active_config_path") or "", title="Open Config Failed"), bool(record.get("active_config_path"))),
             ("Open Latest Bundle", lambda: _open_fs_target(record.get("latest_support_bundle_path") or "", title="Open Latest Support Bundle Failed"), bool(record.get("latest_support_bundle_path"))),
@@ -16540,6 +16638,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             outputs = init_outputs(sess_local, cfg_path, None)
             journal = _runner_health_journal_paths(sess_local)
             acceptance_paths = _packaged_acceptance_summary_paths()
+            build_info = _runner_build_info_record(sess_local)
             bundle = create_support_bundle(
                 outputs.exports_dir / "support_bundles",
                 label="runner_support_bundle",
@@ -16554,12 +16653,14 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "job_id": str(_job_id(sess_local)),
                     "session_schema_version": SESSION_SCHEMA_VERSION,
                     "python": sys.version,
-                    "build_info": _runner_build_info_record(sess_local),
+                    "build_info": build_info,
                 },
                 artifacts={
                     "runner_config": cfg_path,
                     "build_identity_manifest": _build_identity_manifest_path(),
                     "welcome_asset_manifest": _welcome_asset_manifest_path(),
+                    "install_manifest": Path(build_info.get("install_manifest_path")) if str(build_info.get("install_manifest_path") or "").strip() else None,
+                    "local_accepted_package_marker": Path(build_info.get("local_accepted_package_marker_path")) if str(build_info.get("local_accepted_package_marker_path") or "").strip() else None,
                     "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                     "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                     "runner_startup_diagnostic": _runner_startup_diagnostic_path(sess_local),
