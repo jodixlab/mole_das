@@ -166,6 +166,36 @@ def _welcome_asset_manifest_path(base_dir: Optional[Path] = None) -> Optional[Pa
     return None
 
 
+def _packaged_acceptance_summary_paths(base_dir: Optional[Path] = None) -> Dict[str, Optional[Path]]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    roots = [base.parent.parent, base.parent]
+
+    def _first_existing(paths: list[Path]) -> Optional[Path]:
+        for path in paths:
+            try:
+                if path.exists():
+                    return path
+            except Exception:
+                continue
+        return None
+
+    txt_candidates: list[Path] = []
+    json_candidates: list[Path] = []
+    for root in roots:
+        txt_candidates.extend([
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.txt",
+        ])
+        json_candidates.extend([
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.json",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.json",
+        ])
+    return {
+        "text": _first_existing(txt_candidates),
+        "json": _first_existing(json_candidates),
+    }
+
+
 def _format_build_identity_line(identity: Dict[str, Any]) -> str:
     label = str(identity.get("bundle_label") or "unlabeled")
     built_at = str(identity.get("built_at") or "").strip()
@@ -301,6 +331,8 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
         ("Welcome asset manifest", record.get("welcome_asset_manifest_path") or ""),
         ("Build identity manifest", record.get("build_identity_manifest_path") or ""),
+        ("Packaged acceptance summary", record.get("packaged_acceptance_summary_path") or ""),
+        ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
@@ -16341,6 +16373,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         welcome_sheet = _select_welcome_sprite_path()
         welcome_manifest = _welcome_asset_manifest_path()
         build_manifest = _build_identity_manifest_path()
+        acceptance_paths = _packaged_acceptance_summary_paths()
         latest_bundle = _runner_latest_support_bundle_path(sess_local)
         training = (_mole_env_mode(sess_local) == "TRAINING")
         merged = {
@@ -16356,6 +16389,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "welcome_asset_sheet": str(welcome_sheet) if welcome_sheet is not None else "",
             "welcome_asset_manifest_path": str(welcome_manifest) if isinstance(welcome_manifest, Path) else "",
             "build_identity_manifest_path": str(build_manifest) if isinstance(build_manifest, Path) else "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=training),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
             "logs_dir": str(_runner_logs_dir(sess_local)),
@@ -16394,6 +16429,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ("Open Logs", lambda: _open_fs_target(record.get("logs_dir") or "", title="Open Logs Failed"), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: _open_fs_target(record.get("startup_diagnostic_path") or "", title="Open Startup Diagnostic Failed"), bool(record.get("startup_diagnostic_path"))),
             ("Open Build Identity", lambda: _open_fs_target(record.get("build_identity_manifest_path") or "", title="Open Build Identity Failed"), bool(record.get("build_identity_manifest_path"))),
+            ("Open Acceptance Summary", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
+            ("Open Acceptance JSON", lambda: _open_fs_target(record.get("packaged_acceptance_summary_json_path") or "", title="Open Acceptance Summary JSON Failed"), bool(record.get("packaged_acceptance_summary_json_path"))),
             ("Open Welcome Asset", lambda: _open_fs_target(record.get("welcome_asset_sheet") or "", title="Open Welcome Asset Failed"), bool(record.get("welcome_asset_sheet"))),
             ("Open Active Config", lambda: _open_fs_target(record.get("active_config_path") or "", title="Open Config Failed"), bool(record.get("active_config_path"))),
             ("Open Latest Bundle", lambda: _open_fs_target(record.get("latest_support_bundle_path") or "", title="Open Latest Support Bundle Failed"), bool(record.get("latest_support_bundle_path"))),
@@ -16502,6 +16539,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             outputs = init_outputs(sess_local, cfg_path, None)
             journal = _runner_health_journal_paths(sess_local)
+            acceptance_paths = _packaged_acceptance_summary_paths()
             bundle = create_support_bundle(
                 outputs.exports_dir / "support_bundles",
                 label="runner_support_bundle",
@@ -16522,6 +16560,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "runner_config": cfg_path,
                     "build_identity_manifest": _build_identity_manifest_path(),
                     "welcome_asset_manifest": _welcome_asset_manifest_path(),
+                    "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
+                    "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                     "runner_startup_diagnostic": _runner_startup_diagnostic_path(sess_local),
                     "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
                     "runner_ui_crash_log": _runner_crash_log_path(sess_local),

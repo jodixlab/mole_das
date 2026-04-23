@@ -286,6 +286,36 @@ def _build_identity_manifest_path(base_dir: Optional[Path] = None) -> Optional[P
     return None
 
 
+def _packaged_acceptance_summary_paths(base_dir: Optional[Path] = None) -> Dict[str, Optional[Path]]:
+    base = Path(base_dir or _app_base_dir()).resolve()
+    roots = [base.parent.parent, base.parent]
+
+    def _first_existing(paths: list[Path]) -> Optional[Path]:
+        for path in paths:
+            try:
+                if path.exists():
+                    return path
+            except Exception:
+                continue
+        return None
+
+    txt_candidates: list[Path] = []
+    json_candidates: list[Path] = []
+    for root in roots:
+        txt_candidates.extend([
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.txt",
+        ])
+        json_candidates.extend([
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.json",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.json",
+        ])
+    return {
+        "text": _first_existing(txt_candidates),
+        "json": _first_existing(json_candidates),
+    }
+
+
 def _format_build_identity_line(identity: Dict[str, Any]) -> str:
     label = str(identity.get("bundle_label") or "unlabeled")
     built_at = str(identity.get("built_at") or "").strip()
@@ -421,6 +451,8 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Welcome asset sheet", record.get("welcome_asset_sheet") or ""),
         ("Welcome asset manifest", record.get("welcome_asset_manifest_path") or ""),
         ("Build identity manifest", record.get("build_identity_manifest_path") or ""),
+        ("Packaged acceptance summary", record.get("packaged_acceptance_summary_path") or ""),
+        ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
@@ -7237,6 +7269,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
         sprite_manifest_path = _welcome_asset_manifest_path(getattr(self, "base_dir", None))
         build_manifest_path = _build_identity_manifest_path(getattr(self, "base_dir", None))
+        acceptance_paths = _packaged_acceptance_summary_paths(getattr(self, "base_dir", None))
         latest_path = self._wizard_startup_diagnostic_path()
         latest_bundle = self._wizard_latest_support_bundle_path()
         record = _load_startup_diagnostic_record(latest_path)
@@ -7253,6 +7286,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
             "welcome_asset_manifest_path": str(sprite_manifest_path) if isinstance(sprite_manifest_path, Path) else "",
             "build_identity_manifest_path": str(build_manifest_path) if isinstance(build_manifest_path, Path) else "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
             "logs_dir": str(self.logs_dir),
@@ -7291,6 +7326,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             ("Open Logs", lambda: self._dbpaths_open_path(record.get("logs_dir") or ""), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
             ("Open Build Identity", lambda: self._dbpaths_open_path(record.get("build_identity_manifest_path") or ""), bool(record.get("build_identity_manifest_path"))),
+            ("Open Acceptance Summary", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_path") or ""), bool(record.get("packaged_acceptance_summary_path"))),
+            ("Open Acceptance JSON", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_json_path") or ""), bool(record.get("packaged_acceptance_summary_json_path"))),
             ("Open Welcome Asset", lambda: self._dbpaths_open_path(record.get("welcome_asset_sheet") or ""), bool(record.get("welcome_asset_sheet"))),
             ("Open Active Config", lambda: self._dbpaths_open_path(record.get("active_config_path") or ""), bool(record.get("active_config_path"))),
             ("Open Latest Bundle", lambda: self._dbpaths_open_path(record.get("latest_support_bundle_path") or ""), bool(record.get("latest_support_bundle_path"))),
@@ -7369,6 +7406,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         session_cfg = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
         active_session_dir = str(self.var_active_session_dir.get() or "").strip() if hasattr(self, "var_active_session_dir") else ""
         journal = self._wizard_health_journal_paths()
+        acceptance_paths = _packaged_acceptance_summary_paths(getattr(self, "base_dir", None))
         return create_support_bundle(
             Path(self.logs_dir) / "support_bundles",
             label="wizard_support_bundle",
@@ -7391,6 +7429,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "session_config": Path(session_cfg) if session_cfg else None,
                 "build_identity_manifest": _build_identity_manifest_path(getattr(self, "base_dir", None)),
                 "welcome_asset_manifest": _welcome_asset_manifest_path(getattr(self, "base_dir", None)),
+                "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
+                "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                 "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
                 "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
