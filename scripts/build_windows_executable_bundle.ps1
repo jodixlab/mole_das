@@ -96,6 +96,22 @@ $installerZip = Join-Path $OutputRoot "$BundleLabel`_installer_exe_bundle.zip"
 $acceptanceArtifacts = Join-Path $OutputRoot "_acceptance_artifacts"
 $acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
 $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
+$publishedAcceptanceJsonName = "PACKAGED_ACCEPTANCE_SUMMARY.json"
+$publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+
+function Publish-PackagedAcceptanceSummary {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceJson,
+        [Parameter(Mandatory = $true)][string]$SourceTxt,
+        [Parameter(Mandatory = $true)][string[]]$TargetRoots
+    )
+
+    foreach ($targetRoot in $TargetRoots) {
+        New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
+        Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedAcceptanceJsonName) -Force
+        Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedAcceptanceTxtName) -Force
+    }
+}
 
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 if (Test-Path -LiteralPath $buildRoot) {
@@ -394,7 +410,9 @@ $SourceSupportFiles = @(
     "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
     "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat",
     "README_EXECUTABLE_BUNDLE.txt",
-    "MOLE_DAS.ico"
+    "MOLE_DAS.ico",
+    "PACKAGED_ACCEPTANCE_SUMMARY.json",
+    "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 )
 
 $IncomingRuntime = Join-Path $InstallRoot "_incoming_runtime"
@@ -662,6 +680,10 @@ Included executables:
 - MOLE_DAQ_Runner.exe
 - MOLE_ScriptRunner.exe
 
+Packaged acceptance:
+- PACKAGED_ACCEPTANCE_SUMMARY.txt
+- PACKAGED_ACCEPTANCE_SUMMARY.json
+
 Layout requirement:
 - Keep the runtime folder structure intact.
 - The executables depend on sibling runtime content in runtime\MOLE_code and the package root data/assets/docs folders.
@@ -710,6 +732,25 @@ foreach ($targetRoot in @($OutputRoot, $installRoot)) {
     $installShortcut.Save()
 }
 
+if (-not $SkipPackagedAcceptance) {
+    $acceptanceScript = Join-Path $RepoRoot "scripts\run_packaged_acceptance.ps1"
+    Require-Path $acceptanceScript "Packaged acceptance runner"
+
+    Write-Host ""
+    Write-Host "==> Run packaged acceptance"
+    Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $acceptanceScript,
+        "-PackageRoot", $OutputRoot,
+        "-ArtifactOutDir", $acceptanceArtifacts
+    ) -WorkingDirectory $RepoRoot
+
+    Require-Path $acceptanceSummaryJson "Packaged acceptance summary JSON"
+    Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
+    Publish-PackagedAcceptanceSummary -SourceJson $acceptanceSummaryJson -SourceTxt $acceptanceSummaryTxt -TargetRoots @($OutputRoot, $installRoot)
+}
+
 if (Test-Path -LiteralPath $shareZip) {
     Remove-Item -LiteralPath $shareZip -Force
 }
@@ -733,24 +774,6 @@ for dst in targets:
                 zf.write(path, path.relative_to(src))
 "@
 ) -WorkingDirectory $RepoRoot
-
-if (-not $SkipPackagedAcceptance) {
-    $acceptanceScript = Join-Path $RepoRoot "scripts\run_packaged_acceptance.ps1"
-    Require-Path $acceptanceScript "Packaged acceptance runner"
-
-    Write-Host ""
-    Write-Host "==> Run packaged acceptance"
-    Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", $acceptanceScript,
-        "-PackageRoot", $OutputRoot,
-        "-ArtifactOutDir", $acceptanceArtifacts
-    ) -WorkingDirectory $RepoRoot
-
-    Require-Path $acceptanceSummaryJson "Packaged acceptance summary JSON"
-    Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
-}
 
 Write-Host ""
 Write-Host "Executable bundle ready:"
