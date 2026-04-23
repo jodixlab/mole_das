@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputRoot,
 
-    [string]$BundleLabel = "MOLE_DAS_WINDOWS_EXE_BUNDLE"
+    [string]$BundleLabel = "MOLE_DAS_WINDOWS_EXE_BUNDLE",
+
+    [switch]$SkipPackagedAcceptance
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,6 +93,9 @@ $shareRoot = Join-Path $OutputRoot "shareable"
 $installRoot = Join-Path $shareRoot $BundleLabel
 $shareZip = Join-Path $OutputRoot "$BundleLabel`_portable_exe_bundle.zip"
 $installerZip = Join-Path $OutputRoot "$BundleLabel`_installer_exe_bundle.zip"
+$acceptanceArtifacts = Join-Path $OutputRoot "_acceptance_artifacts"
+$acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
+$acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
 
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 if (Test-Path -LiteralPath $buildRoot) {
@@ -728,6 +733,24 @@ for dst in targets:
                 zf.write(path, path.relative_to(src))
 "@
 ) -WorkingDirectory $RepoRoot
+
+if (-not $SkipPackagedAcceptance) {
+    $acceptanceScript = Join-Path $RepoRoot "scripts\run_packaged_acceptance.ps1"
+    Require-Path $acceptanceScript "Packaged acceptance runner"
+
+    Write-Host ""
+    Write-Host "==> Run packaged acceptance"
+    Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $acceptanceScript,
+        "-PackageRoot", $OutputRoot,
+        "-ArtifactOutDir", $acceptanceArtifacts
+    ) -WorkingDirectory $RepoRoot
+
+    Require-Path $acceptanceSummaryJson "Packaged acceptance summary JSON"
+    Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
+}
 
 Write-Host ""
 Write-Host "Executable bundle ready:"

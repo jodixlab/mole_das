@@ -5,6 +5,7 @@ MOLE-DAS Data Acquisition System
 - Local clean-workspace validation: [RUN_CLEAN_RELEASE_WORKFLOW.bat](RUN_CLEAN_RELEASE_WORKFLOW.bat)
 - PowerShell entrypoint: [scripts/run_clean_release_workflow.ps1](scripts/run_clean_release_workflow.ps1)
 - Packaged installer acceptance runner: [scripts/run_packaged_acceptance.ps1](scripts/run_packaged_acceptance.ps1)
+- Executable bundle builder now runs packaged acceptance by default: [scripts/build_windows_executable_bundle.ps1](scripts/build_windows_executable_bundle.ps1)
 - UI help coverage audit: [scripts/audit_ui_help_registry.py](scripts/audit_ui_help_registry.py)
 - UI help doc update pack: [scripts/build_ui_help_doc_update_pack.py](scripts/build_ui_help_doc_update_pack.py)
 - UI help doc source manifest: [config/mole_ui_help_doc_sources_v1.json](config/mole_ui_help_doc_sources_v1.json)

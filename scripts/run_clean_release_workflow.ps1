@@ -178,37 +178,21 @@ try {
             throw "Portable ZIP missing after bundle build: $portableZip"
         }
 
-        New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
-        Copy-Item -LiteralPath $installerZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($installerZip))) -Force
-        Copy-Item -LiteralPath $portableZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($portableZip))) -Force
-
-        Add-StepResult -Name "build_windows_executable_bundle" -Status "PASS" -Detail "Windows executable bundle built in clean workspace."
-    }
-
-    Invoke-Step "Run packaged acceptance gate" {
-        $acceptanceScript = Join-Path $workspace "scripts\run_packaged_acceptance.ps1"
-        if (-not (Test-Path -LiteralPath $acceptanceScript)) {
-            throw "Packaged acceptance script missing in clean workspace: $acceptanceScript"
-        }
-
-        Push-Location $workspace
-        try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $acceptanceScript -PackageRoot $bundleRoot
-            $acceptanceExit = $LASTEXITCODE
-        }
-        finally {
-            Pop-Location
-        }
-
         $acceptanceArtifacts = Join-Path $bundleRoot "_acceptance_artifacts"
         $acceptanceJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
         $acceptanceTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
-        if (Test-Path -LiteralPath $acceptanceJson) {
-            Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
+        if (-not (Test-Path -LiteralPath $acceptanceJson)) {
+            throw "Packaged acceptance summary missing after bundle build: $acceptanceJson"
         }
-        if (Test-Path -LiteralPath $acceptanceTxt) {
-            Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
+        if (-not (Test-Path -LiteralPath $acceptanceTxt)) {
+            throw "Packaged acceptance text summary missing after bundle build: $acceptanceTxt"
         }
+
+        New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
+        Copy-Item -LiteralPath $installerZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($installerZip))) -Force
+        Copy-Item -LiteralPath $portableZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($portableZip))) -Force
+        Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
+        Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
         $supportBundleDir = Join-Path $acceptanceArtifacts "support_bundles"
         if (Test-Path -LiteralPath $supportBundleDir) {
             Get-ChildItem -LiteralPath $supportBundleDir -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object {
@@ -216,14 +200,7 @@ try {
             }
         }
 
-        if ($acceptanceExit -ne 0) {
-            throw "Packaged acceptance gate failed with exit code $acceptanceExit"
-        }
-        if (-not (Test-Path -LiteralPath $acceptanceJson)) {
-            throw "Packaged acceptance summary missing: $acceptanceJson"
-        }
-
-        Add-StepResult -Name "packaged_acceptance_gate" -Status "PASS" -Detail "Installed-package acceptance gate passed for the clean-workspace executable bundle."
+        Add-StepResult -Name "build_windows_executable_bundle" -Status "PASS" -Detail "Windows executable bundle built and packaged acceptance passed in clean workspace."
     }
 
     Invoke-Step "Collect release artifacts" {
