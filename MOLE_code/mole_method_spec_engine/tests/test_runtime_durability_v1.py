@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import mole_runtime_durability_v1 as durability
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
@@ -230,6 +230,59 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 durability.load_uninstall_registration = original
 
             self.assertEqual(result["package_status"], "STALE")
+
+    def test_runtime_action_policy_blocks_unverified_compliance(self) -> None:
+        result = evaluate_runtime_action_policy(
+            package_status_record={
+                "package_status": "UNVERIFIED",
+                "package_status_summary": "Package verification or runtime identity is incomplete.",
+                "package_status_detail": "Packaged acceptance summary is missing.",
+            },
+            action_scope="COMPLIANCE",
+            action_label="Formal report build",
+        )
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertEqual(result["package_status"], "UNVERIFIED")
+
+    def test_runtime_action_policy_requires_ack_for_stale(self) -> None:
+        result = evaluate_runtime_action_policy(
+            package_status_record={
+                "package_status": "STALE",
+                "package_status_summary": "Running package is older or different than the locally accepted install.",
+                "package_status_detail": "Running package differs from the locally installed accepted package.",
+            },
+            action_scope="COMPLIANCE",
+            action_label="DAQ Runner production launch",
+        )
+        self.assertEqual(result["decision"], "ACK")
+        self.assertEqual(result["package_status"], "STALE")
+
+    def test_runtime_action_policy_warns_for_portable_training(self) -> None:
+        result = evaluate_runtime_action_policy(
+            package_status_record={
+                "package_status": "PORTABLE",
+                "package_status_summary": "Running from a portable folder instead of the installed root.",
+                "package_status_detail": "Running from a portable folder instead of the installed root.",
+            },
+            action_scope="TRAINING",
+            action_label="DAQ Runner training launch",
+        )
+        self.assertEqual(result["decision"], "WARN")
+        self.assertEqual(result["package_status"], "PORTABLE")
+
+    def test_runtime_action_policy_allows_current_compliance(self) -> None:
+        result = evaluate_runtime_action_policy(
+            package_status_record={
+                "package_status": "CURRENT",
+                "package_status_summary": "Installed and verified package matches the local accepted install.",
+                "package_status_detail": "Running from the installed root.",
+                "packaged_acceptance_status": "PASS",
+            },
+            action_scope="COMPLIANCE",
+            action_label="Session review signoff",
+        )
+        self.assertEqual(result["decision"], "ALLOW")
+        self.assertEqual(result["package_status"], "CURRENT")
 
     def test_recovery_snapshot_rotates(self) -> None:
         with tempfile.TemporaryDirectory() as td:

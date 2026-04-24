@@ -485,6 +485,91 @@ def evaluate_runtime_package_status(
     }
 
 
+def evaluate_runtime_action_policy(
+    *,
+    package_status_record: Optional[Mapping[str, Any]] = None,
+    package_status: Any = None,
+    action_scope: str = "GENERAL",
+    action_label: str = "This action",
+) -> Dict[str, Any]:
+    record = dict(package_status_record or {})
+    status = str(package_status or record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+    scope = str(action_scope or "GENERAL").strip().upper() or "GENERAL"
+    if scope not in {"COMPLIANCE", "DIAGNOSTICS", "TRAINING", "GENERAL"}:
+        scope = "GENERAL"
+    label = str(action_label or "This action").strip() or "This action"
+    summary = str(record.get("package_status_summary") or "").strip()
+    detail = str(record.get("package_status_detail") or "").strip()
+    acceptance_status = str(record.get("packaged_acceptance_status") or "").strip().upper()
+
+    lines = []
+    if summary:
+        lines.append(f"Summary: {summary}")
+    if detail and detail != summary:
+        lines.append(f"Detail: {detail}")
+    if acceptance_status:
+        lines.append(f"Acceptance: {acceptance_status}")
+    detail_block = "\n".join(lines).strip()
+
+    decision = "ALLOW"
+    title = f"{label} - Package Status"
+    message = f"{label} can continue."
+
+    if status == "CURRENT":
+        decision = "ALLOW"
+        message = f"{label} can continue.\n\nInstalled and verified package is current."
+    elif status == "STALE":
+        decision = "ACK"
+        message = (
+            f"{label} is running from a stale package.\n\n"
+            "Explicit acknowledgment is required before continuing."
+        )
+    elif status == "PORTABLE":
+        if scope == "COMPLIANCE":
+            decision = "BLOCK"
+            message = (
+                f"{label} is blocked from a portable runtime.\n\n"
+                "Portable packages are allowed only for diagnostics or training workflows."
+            )
+        else:
+            decision = "WARN"
+            message = (
+                f"{label} is running from a portable runtime.\n\n"
+                "Portable packages are allowed for diagnostics and training workflows with warning only."
+            )
+    elif status == "UNVERIFIED":
+        if scope == "COMPLIANCE":
+            decision = "BLOCK"
+            message = (
+                f"{label} is blocked because package verification is incomplete.\n\n"
+                "Field/compliance workflows require a verified installed package."
+            )
+        else:
+            decision = "WARN"
+            message = (
+                f"{label} is running from an unverified package.\n\n"
+                "This non-compliance workflow is being allowed with warning only."
+            )
+    else:
+        decision = "WARN"
+        message = (
+            f"{label} is running with an unknown package status ({status}).\n\n"
+            "This workflow is being allowed with warning only."
+        )
+
+    if detail_block:
+        message = f"{message}\n\n{detail_block}"
+
+    return {
+        "decision": decision,
+        "title": title,
+        "message": message,
+        "package_status": status,
+        "action_scope": scope,
+        "action_label": label,
+    }
+
+
 def write_startup_diagnostic(
     log_dir: Path,
     *,

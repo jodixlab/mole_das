@@ -468,10 +468,11 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
+    evaluate_runtime_action_policy = None
     evaluate_runtime_package_status = None
     latest_matching_path = None
     load_latest_health_summary = None
@@ -16547,6 +16548,62 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     merged[key] = value
         return merged
 
+    def _runner_runtime_action_policy_record(
+        sess_local: Dict[str, Any],
+        *,
+        action_label: str,
+        action_scope: str = "COMPLIANCE",
+    ) -> Dict[str, Any]:
+        record = _runner_build_info_record(sess_local)
+        if evaluate_runtime_action_policy is None:
+            return {
+                "decision": "ALLOW",
+                "title": f"{action_label} - Package Status",
+                "message": f"{action_label} can continue.",
+                "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
+                "action_scope": str(action_scope or "COMPLIANCE").strip().upper() or "COMPLIANCE",
+                "action_label": str(action_label or "This action").strip() or "This action",
+            }
+        try:
+            return evaluate_runtime_action_policy(
+                package_status_record=record,
+                action_scope=action_scope,
+                action_label=action_label,
+            )
+        except Exception:
+            return {
+                "decision": "ALLOW",
+                "title": f"{action_label} - Package Status",
+                "message": f"{action_label} can continue.",
+                "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
+                "action_scope": str(action_scope or "COMPLIANCE").strip().upper() or "COMPLIANCE",
+                "action_label": str(action_label or "This action").strip() or "This action",
+            }
+
+    def _enforce_runner_runtime_action_policy(
+        sess_local: Dict[str, Any],
+        *,
+        action_label: str,
+        action_scope: str = "COMPLIANCE",
+    ) -> bool:
+        policy = _runner_runtime_action_policy_record(
+            sess_local,
+            action_label=action_label,
+            action_scope=action_scope,
+        )
+        decision = str(policy.get("decision") or "ALLOW").strip().upper() or "ALLOW"
+        title = str(policy.get("title") or f"{action_label} - Package Status").strip() or f"{action_label} - Package Status"
+        message = str(policy.get("message") or f"{action_label} can continue.").strip() or f"{action_label} can continue."
+        if decision == "BLOCK":
+            messagebox.showerror(title, message)
+            return False
+        if decision == "ACK":
+            return bool(messagebox.askyesno(title, message))
+        if decision == "WARN":
+            messagebox.showwarning(title, message)
+            return True
+        return True
+
     def _copy_runner_build_info(text: str) -> None:
         try:
             root.clipboard_clear()
@@ -18572,6 +18629,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             sess = _report_builder_save_to_session(show_message=False)
             _ensure_daq_schema(sess)
+            if not _enforce_runner_runtime_action_policy(sess, action_label="Session review lock", action_scope="COMPLIANCE"):
+                return
             review = _session_review_block(sess)
             if not bool(review.get("enabled")):
                 raise ValueError("Session review is not active for this session.")
@@ -18623,6 +18682,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             sess = _report_builder_save_to_session(show_message=False)
             _ensure_daq_schema(sess)
+            if not _enforce_runner_runtime_action_policy(sess, action_label="Session review signoff", action_scope="COMPLIANCE"):
+                return
             review = _session_review_block(sess)
             if not bool(review.get("enabled")):
                 raise ValueError("Session review is not active for this session.")
@@ -18691,6 +18752,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             sess = _report_builder_save_to_session(show_message=False)
             _ensure_daq_schema(sess)
+            if not _enforce_runner_runtime_action_policy(sess, action_label="FTIR validation review lock", action_scope="COMPLIANCE"):
+                return
             blk = _ftir_validation_block(sess)
             if _ftir_validation_is_locked(blk):
                 _apply_ftir_validation_lock_state(sess)
@@ -18739,6 +18802,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         try:
             sess = _load_session()
             _ensure_daq_schema(sess)
+            if not _enforce_runner_runtime_action_policy(sess, action_label="FTIR validation signoff", action_scope="COMPLIANCE"):
+                return
             blk = _ftir_validation_block(sess)
             if not _ftir_validation_is_locked(blk):
                 raise ValueError("Lock FTIR validation review before signing off.")
@@ -18902,6 +18967,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return
         try:
             sess = _report_builder_save_to_session(show_message=False)
+            if not _enforce_runner_runtime_action_policy(sess, action_label="Formal report build", action_scope="COMPLIANCE"):
+                return
             completeness = _report_builder_completeness(sess)
             warn_rows = list(completeness.get("warn_sections") or [])
             session_review = _session_review_block(sess)

@@ -99,11 +99,12 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
     create_support_bundle = None
+    evaluate_runtime_action_policy = None
     evaluate_runtime_package_status = None
     latest_matching_path = None
     load_latest_health_summary = None
@@ -7439,6 +7440,57 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 if value not in (None, ""):
                     merged[key] = value
         return merged
+
+    def _runtime_action_policy_record(self, *, action_label: str, action_scope: str) -> Dict[str, Any]:
+        record = self._wizard_build_info_record()
+        if evaluate_runtime_action_policy is None:
+            return {
+                "decision": "ALLOW",
+                "title": f"{action_label} - Package Status",
+                "message": f"{action_label} can continue.",
+                "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
+                "action_scope": str(action_scope or "GENERAL").strip().upper() or "GENERAL",
+                "action_label": str(action_label or "This action").strip() or "This action",
+            }
+        try:
+            return evaluate_runtime_action_policy(
+                package_status_record=record,
+                action_scope=action_scope,
+                action_label=action_label,
+            )
+        except Exception:
+            return {
+                "decision": "ALLOW",
+                "title": f"{action_label} - Package Status",
+                "message": f"{action_label} can continue.",
+                "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
+                "action_scope": str(action_scope or "GENERAL").strip().upper() or "GENERAL",
+                "action_label": str(action_label or "This action").strip() or "This action",
+            }
+
+    def _enforce_runtime_action_policy(self, *, action_label: str, action_scope: str) -> bool:
+        policy = self._runtime_action_policy_record(action_label=action_label, action_scope=action_scope)
+        decision = str(policy.get("decision") or "ALLOW").strip().upper() or "ALLOW"
+        title = str(policy.get("title") or f"{action_label} - Package Status").strip() or f"{action_label} - Package Status"
+        message = str(policy.get("message") or f"{action_label} can continue.").strip() or f"{action_label} can continue."
+        if decision == "BLOCK":
+            messagebox.showerror(title, message)
+            return False
+        if decision == "ACK":
+            return bool(messagebox.askyesno(title, message))
+        if decision == "WARN":
+            messagebox.showwarning(title, message)
+            return True
+        return True
+
+    @staticmethod
+    def _runner_launch_policy_scope(launch_mode: Optional[str]) -> str:
+        mode_u = str(launch_mode or "").strip().upper()
+        if mode_u in ("DIAG", "DIAGNOSTIC", "DIAGNOSTICS", "DIAG_TEST", "DIAG_SIM", "DIAG_TRAINING", "DIAGNOSTICS_SIM", "DIAGNOSTICS_TRAINING"):
+            return "DIAGNOSTICS"
+        if mode_u in ("SIM", "TRAINING", "SIM_TRAINING", "SIMTRAINING"):
+            return "TRAINING"
+        return "COMPLIANCE"
 
     def _copy_wizard_build_info(self, text: str) -> None:
         try:
@@ -19219,6 +19271,16 @@ def _build_intake(self) -> None:
         if cfg_p is None:
             cfg_p = self._ensure_applied_config_silent()
         if cfg_p is None:
+            return
+
+        action_scope = self._runner_launch_policy_scope(launch_mode)
+        if action_scope == "DIAGNOSTICS":
+            action_label = "DAQ Runner diagnostics launch"
+        elif action_scope == "TRAINING":
+            action_label = "DAQ Runner training launch"
+        else:
+            action_label = "DAQ Runner production/test launch"
+        if not self._enforce_runtime_action_policy(action_label=action_label, action_scope=action_scope):
             return
 
         # Ensure deterministic artifacts exist
