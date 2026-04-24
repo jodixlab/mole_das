@@ -332,6 +332,8 @@ def _runtime_package_status_record(
             "package_status_details": ["Package verification helper is unavailable."],
             "packaged_acceptance_status": "",
             "packaged_acceptance_generated_at": "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "install_root_path": "",
             "install_manifest_path": "",
             "installed_runtime_path": "",
@@ -343,11 +345,14 @@ def _runtime_package_status_record(
             "uninstall_registry_key": "",
         }
     try:
-        return evaluate_runtime_package_status(
+        result = evaluate_runtime_package_status(
             current_runtime_root=runtime_root,
             current_build_identity=(build_identity or _load_build_identity(base_dir)),
             current_acceptance_summary_path=acceptance_paths.get("json"),
         )
+        result["packaged_acceptance_summary_path"] = str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else ""
+        result["packaged_acceptance_summary_json_path"] = str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else ""
+        return result
     except Exception:
         return {
             "package_status": "UNVERIFIED",
@@ -356,6 +361,8 @@ def _runtime_package_status_record(
             "package_status_details": ["Package verification check failed."],
             "packaged_acceptance_status": "",
             "packaged_acceptance_generated_at": "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "install_root_path": "",
             "install_manifest_path": "",
             "installed_runtime_path": "",
@@ -6895,6 +6902,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             wraplength=620,
             font=("Consolas", 10),
         ).pack(anchor="w", pady=(0, 14))
+        self._render_wizard_startup_status_banner(copy_box)
         tk.Button(
             copy_box,
             text="Go to Project Configs",
@@ -6925,6 +6933,59 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         art_box = tk.Frame(hero, bg=self.BG)
         art_box.grid(row=0, column=1, sticky="nsew")
         self._build_welcome_mascot(art_box)
+
+    def _render_wizard_startup_status_banner(self, parent: tk.Widget) -> None:
+        record = self._wizard_build_info_record()
+        status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+        summary = str(record.get("package_status_summary") or "").strip()
+        detail = str(record.get("package_status_detail") or "").strip()
+        banner_bg, banner_fg = _build_status_banner_style(status)
+        frame = tk.Frame(parent, bg=banner_bg, highlightbackground=banner_fg, highlightthickness=1, bd=0)
+        frame.pack(anchor="nw", fill="x", pady=(0, 14))
+        tk.Label(
+            frame,
+            text=f"{status}: {summary}",
+            fg=banner_fg,
+            bg=banner_bg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+        ).pack(fill="x", padx=12, pady=(10, 4))
+        if detail and detail != summary:
+            tk.Label(
+                frame,
+                text=detail,
+                fg=banner_fg,
+                bg=banner_bg,
+                anchor="w",
+                justify="left",
+                wraplength=620,
+                font=("Consolas", 9),
+            ).pack(fill="x", padx=12, pady=(0, 6))
+        actions = tk.Frame(frame, bg=banner_bg)
+        actions.pack(fill="x", padx=8, pady=(0, 8))
+        action_specs = [
+            ("Open Build Info", self._show_wizard_build_info, True),
+        ]
+        if status != "CURRENT":
+            action_specs.extend(
+                [
+                    ("Open Acceptance Summary", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_path") or ""), bool(record.get("packaged_acceptance_summary_path"))),
+                    ("Open Install Root", lambda: self._dbpaths_open_path(record.get("install_root_path") or ""), bool(record.get("install_root_path"))),
+                    ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
+                ]
+            )
+        for idx, (label, cmd, enabled) in enumerate(action_specs):
+            tk.Button(
+                actions,
+                text=label,
+                command=cmd,
+                bg=self.BTN_BG,
+                fg=self.BTN_FG,
+                relief="flat",
+                state=("normal" if enabled else "disabled"),
+            ).grid(row=0, column=idx, sticky="ew", padx=4, pady=2)
+            actions.grid_columnconfigure(idx, weight=1)
 
     def _build_project(self) -> None:
         self._header("Project Configurations (Hub)", "Identifiers + session intent + fuel selection.")

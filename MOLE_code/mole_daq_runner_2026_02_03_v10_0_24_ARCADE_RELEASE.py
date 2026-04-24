@@ -211,6 +211,8 @@ def _runtime_package_status_record(
             "package_status_details": ["Package verification helper is unavailable."],
             "packaged_acceptance_status": "",
             "packaged_acceptance_generated_at": "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "install_root_path": "",
             "install_manifest_path": "",
             "installed_runtime_path": "",
@@ -222,11 +224,14 @@ def _runtime_package_status_record(
             "uninstall_registry_key": "",
         }
     try:
-        return evaluate_runtime_package_status(
+        result = evaluate_runtime_package_status(
             current_runtime_root=runtime_root,
             current_build_identity=(current_build_identity or _load_build_identity(base_dir)),
             current_acceptance_summary_path=acceptance_paths.get("json"),
         )
+        result["packaged_acceptance_summary_path"] = str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else ""
+        result["packaged_acceptance_summary_json_path"] = str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else ""
+        return result
     except Exception:
         return {
             "package_status": "UNVERIFIED",
@@ -235,6 +240,8 @@ def _runtime_package_status_record(
             "package_status_details": ["Package verification check failed."],
             "packaged_acceptance_status": "",
             "packaged_acceptance_generated_at": "",
+            "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
+            "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "install_root_path": "",
             "install_manifest_path": "",
             "installed_runtime_path": "",
@@ -8680,6 +8687,60 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     runtime_identity_lbl = tk.Label(left_inner, textvariable=runtime_identity_var, fg=FG_DIM, bg=BG, font=("Consolas", 8), anchor="w", justify="left")
     runtime_identity_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     _bind_safe_wrap(runtime_identity_lbl, left, pad_px=32, min_wrap=180)
+    def _render_runner_startup_status_banner(parent: tk.Widget) -> None:
+        record = _runtime_package_status_record(build_identity)
+        status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+        summary = str(record.get("package_status_summary") or "").strip()
+        detail = str(record.get("package_status_detail") or "").strip()
+        banner_bg, banner_fg = _build_status_banner_style(status)
+        frame = tk.Frame(parent, bg=banner_bg, highlightbackground=banner_fg, highlightthickness=1, bd=0)
+        frame.pack(fill="x", padx=12, pady=(0, 8))
+        tk.Label(
+            frame,
+            text=f"{status}: {summary}",
+            fg=banner_fg,
+            bg=banner_bg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 9, "bold"),
+        ).pack(fill="x", padx=10, pady=(8, 4))
+        if detail and detail != summary:
+            tk.Label(
+                frame,
+                text=detail,
+                fg=banner_fg,
+                bg=banner_bg,
+                anchor="w",
+                justify="left",
+                wraplength=240,
+                font=("Consolas", 8),
+            ).pack(fill="x", padx=10, pady=(0, 6))
+        actions = tk.Frame(frame, bg=banner_bg)
+        actions.pack(fill="x", padx=6, pady=(0, 6))
+        startup_path = _latest_startup_diagnostic_path(_app_base_dir().parent / "mole_das_data" / "logs", "runner_startup")
+        action_specs = [
+            ("Build Info", lambda: _show_runner_build_info(_load_session()), True),
+        ]
+        if status != "CURRENT":
+            action_specs.extend(
+                [
+                    ("Acceptance", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
+                    ("Install Root", lambda: _open_fs_target(record.get("install_root_path") or "", title="Open Install Root Failed"), bool(record.get("install_root_path"))),
+                    ("Startup Stamp", lambda: _open_fs_target(startup_path or "", title="Open Startup Diagnostic Failed"), bool(startup_path)),
+                ]
+            )
+        for idx, (label, cmd, enabled) in enumerate(action_specs):
+            tk.Button(
+                actions,
+                text=label,
+                command=cmd,
+                bg=BTN_BG,
+                fg=FG,
+                relief="flat",
+                state=("normal" if enabled else "disabled"),
+            ).grid(row=0, column=idx, sticky="ew", padx=3, pady=2)
+            actions.grid_columnconfigure(idx, weight=1)
+    _render_runner_startup_status_banner(left_inner)
     recovery_btns = tk.Frame(left_inner, bg=BG)
     recovery_btns.pack(fill="x", padx=12, pady=(0, 8))
     btn_runner_open_recovery_snapshot = tk.Button(
