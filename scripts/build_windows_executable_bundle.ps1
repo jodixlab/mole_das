@@ -296,9 +296,9 @@ function Write-VerifiedReleaseManifest {
             acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
             installer_script_sha256 = Get-FileHashValue (Join-Path $OutputRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1")
             launcher_batch_sha256 = Get-FileHashValue (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat")
-            wizard_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_DAS_Wizard.exe")
-            runner_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_DAQ_Runner.exe")
-            script_runner_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_ScriptRunner.exe")
+            wizard_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAS_Wizard.exe")
+            runner_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAQ_Runner.exe")
+            script_runner_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_ScriptRunner.exe")
             installer_bundle_sha256 = ""
             portable_bundle_sha256 = ""
         }
@@ -529,6 +529,7 @@ param(
     [switch]$NoDesktopShortcut,
     [switch]$NoStartMenuShortcut,
     [switch]$NoUninstallRegistration,
+    [switch]$BootstrapPackageVerification,
     [switch]$Quiet
 )
 
@@ -758,7 +759,9 @@ Write-Status "Installing MOLE-DAS executable bundle"
 Write-Status "  Package root: $PackageRoot"
 Write-Status "  Install root: $InstallRoot"
 
-Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
+if (-not $BootstrapPackageVerification) {
+    Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
+}
 
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 Assert-ProcessesClosed -TargetRoot $InstallRoot

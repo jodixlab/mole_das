@@ -285,6 +285,7 @@ try {
             "-NoStartMenuShortcut",
             "-NoDesktopShortcut",
             "-NoUninstallRegistration",
+            "-BootstrapPackageVerification",
             "-NoLaunch",
             "-Quiet"
         ) `
