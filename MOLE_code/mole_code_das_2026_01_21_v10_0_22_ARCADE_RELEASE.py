@@ -520,12 +520,23 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Git commit", record.get("git_commit") or ""),
         ("Executable path", record.get("executable_path") or ""),
         ("Runtime path", record.get("runtime_path") or ""),
+        ("Current package root", record.get("current_package_root_path") or ""),
         ("Install root", record.get("install_root_path") or ""),
         ("Install manifest", record.get("install_manifest_path") or ""),
         ("Installed runtime", record.get("installed_runtime_path") or ""),
+        ("Installed Wizard executable", record.get("installed_wizard_executable_path") or ""),
+        ("Installed Runner executable", record.get("installed_runner_executable_path") or ""),
         ("Installed bundle label", record.get("installed_bundle_label") or ""),
         ("Accepted package marker", record.get("local_accepted_package_marker_path") or ""),
         ("Accepted package label", record.get("local_accepted_package_label") or ""),
+        ("Current installer bundle", record.get("current_installer_bundle_path") or ""),
+        ("Current installer script", record.get("current_installer_script_path") or ""),
+        ("Latest verified package root", record.get("latest_verified_package_root_path") or ""),
+        ("Latest verified package label", record.get("latest_verified_package_label") or ""),
+        ("Latest verified acceptance summary", record.get("latest_verified_package_acceptance_summary_path") or ""),
+        ("Latest verified acceptance JSON", record.get("latest_verified_package_acceptance_summary_json_path") or ""),
+        ("Latest verified installer bundle", record.get("latest_verified_installer_bundle_path") or ""),
+        ("Latest verified installer script", record.get("latest_verified_installer_script_path") or ""),
         ("Registry install location", record.get("uninstall_registry_install_location") or ""),
         ("Registry display version", record.get("uninstall_registry_display_version") or ""),
         ("Active config path", record.get("active_config_path") or ""),
@@ -6975,6 +6986,19 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 wraplength=620,
                 font=("Consolas", 9, "bold"),
             ).pack(fill="x", padx=12, pady=(0, 6))
+        running_label = str(record.get("package_label") or "").strip()
+        accepted_label = str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        if status == "STALE" and (running_label or accepted_label):
+            tk.Label(
+                frame,
+                text=f"Running package: {running_label or '(n/a)'} | Accepted install: {accepted_label or '(n/a)'}",
+                fg=banner_fg,
+                bg=banner_bg,
+                anchor="w",
+                justify="left",
+                wraplength=620,
+                font=("Consolas", 9, "bold"),
+            ).pack(fill="x", padx=12, pady=(0, 6))
         actions = tk.Frame(frame, bg=banner_bg)
         actions.pack(fill="x", padx=8, pady=(0, 8))
         action_specs = [
@@ -6985,6 +7009,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         if status != "CURRENT":
             action_specs.extend(
                 [
+                    ("Resolve Package Status", self._show_wizard_package_resolution, True),
                     ("Open Acceptance Summary", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_path") or ""), bool(record.get("packaged_acceptance_summary_path"))),
                     ("Open Install Root", lambda: self._dbpaths_open_path(record.get("install_root_path") or ""), bool(record.get("install_root_path"))),
                     ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
@@ -7556,6 +7581,130 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         except Exception as e:
             messagebox.showerror("Build Info", str(e))
 
+    @staticmethod
+    def _wizard_resolution_installer_target(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_installer_bundle_path")
+            or record.get("latest_verified_installer_script_path")
+            or record.get("current_installer_bundle_path")
+            or record.get("current_installer_script_path")
+            or ""
+        ).strip()
+
+    @staticmethod
+    def _wizard_resolution_acceptance_target(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_package_acceptance_summary_path")
+            or record.get("packaged_acceptance_summary_path")
+            or record.get("latest_verified_package_acceptance_summary_json_path")
+            or record.get("packaged_acceptance_summary_json_path")
+            or ""
+        ).strip()
+
+    def _relaunch_wizard_from_installed_root(self) -> None:
+        record = self._wizard_build_info_record()
+        exe_text = str(record.get("installed_wizard_executable_path") or "").strip()
+        if not exe_text:
+            messagebox.showwarning("Resolve Package Status", "No installed Wizard executable was found for relaunch.")
+            return
+        exe_path = Path(exe_text)
+        if not exe_path.exists():
+            messagebox.showwarning("Resolve Package Status", f"Installed Wizard executable was not found:\n{exe_path}")
+            return
+        try:
+            subprocess.Popen([str(exe_path)], cwd=str(exe_path.parent))
+            self.after(250, self.destroy)
+        except Exception as e:
+            messagebox.showerror("Resolve Package Status", f"Failed to relaunch installed Wizard:\n{e}")
+
+    def _show_wizard_package_resolution(self) -> None:
+        record = self._wizard_build_info_record()
+        status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+        summary = str(record.get("package_status_summary") or "").strip()
+        detail = str(record.get("package_status_detail") or "").strip()
+        running_label = str(record.get("package_label") or "").strip()
+        accepted_label = str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        install_root = str(record.get("install_root_path") or "").strip()
+        latest_verified_root = str(record.get("latest_verified_package_root_path") or "").strip()
+        installer_target = self._wizard_resolution_installer_target(record)
+        acceptance_target = self._wizard_resolution_acceptance_target(record)
+
+        win = tk.Toplevel(self)
+        win.title("Resolve Wizard Package Status")
+        win.configure(bg=self.BG)
+        win.geometry("880x420")
+        body = tk.Frame(win, bg=self.BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        banner_bg, banner_fg = _build_status_banner_style(status)
+        tk.Label(
+            body,
+            text=f"{status}: {summary}",
+            bg=banner_bg,
+            fg=banner_fg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+            padx=10,
+            pady=8,
+        ).pack(fill="x", pady=(0, 10))
+        if detail and detail != summary:
+            tk.Label(
+                body,
+                text=detail,
+                bg=self.BG,
+                fg=self.FG,
+                anchor="w",
+                justify="left",
+                wraplength=820,
+                font=("Consolas", 9),
+            ).pack(fill="x", pady=(0, 8))
+        if status == "STALE" and (running_label or accepted_label):
+            tk.Label(
+                body,
+                text=f"Running package: {running_label or '(n/a)'}\nAccepted install: {accepted_label or '(n/a)'}",
+                bg=self.BG,
+                fg=self.ACC,
+                anchor="w",
+                justify="left",
+                font=("Consolas", 9, "bold"),
+            ).pack(fill="x", pady=(0, 8))
+        info = tk.Text(body, bg="#0a0f16", fg="#c7d0d9", insertbackground="#c7d0d9", font=("Consolas", 9), height=8, wrap="word")
+        info.pack(fill="both", expand=True, pady=(0, 10))
+        info.insert(
+            "1.0",
+            "\n".join([
+                f"Current package root: {str(record.get('current_package_root_path') or '(n/a)')}",
+                f"Install root: {install_root or '(n/a)'}",
+                f"Latest verified package: {str(record.get('latest_verified_package_label') or '(n/a)')}",
+                f"Latest verified package root: {latest_verified_root or '(n/a)'}",
+                f"Installer target: {installer_target or '(n/a)'}",
+                f"Acceptance summary: {acceptance_target or '(n/a)'}",
+            ]) + "\n",
+        )
+        info.configure(state="disabled")
+        actions = tk.Frame(body, bg=self.BG)
+        actions.pack(fill="x")
+        action_specs = [
+            ("Open Installed Root", lambda: self._dbpaths_open_path(install_root), bool(install_root)),
+            ("Open Latest Verified Package", lambda: self._dbpaths_open_path(latest_verified_root), bool(latest_verified_root)),
+            ("Open Installer Bundle", lambda: self._dbpaths_open_path(installer_target), bool(installer_target)),
+            ("Open Acceptance Summary", lambda: self._dbpaths_open_path(acceptance_target), bool(acceptance_target)),
+            ("Relaunch From Installed Root", self._relaunch_wizard_from_installed_root, bool(str(record.get("installed_wizard_executable_path") or "").strip())),
+        ]
+        for col in range(len(action_specs)):
+            actions.grid_columnconfigure(col, weight=1)
+        for idx, (label, cmd, enabled) in enumerate(action_specs):
+            tk.Button(
+                actions,
+                text=label,
+                command=cmd,
+                bg=self.BTN_BG,
+                fg=self.BTN_FG,
+                relief="flat",
+                state=("normal" if enabled else "disabled"),
+            ).grid(row=0, column=idx, sticky="ew", padx=4, pady=4)
+        tk.Button(body, text="Close", command=win.destroy, bg="#14202d", fg=self.BTN_FG, relief="flat").pack(anchor="e", pady=(10, 0))
+
     def _show_wizard_build_info(self) -> None:
         record = self._wizard_build_info_record()
         text = _format_build_info_text(record)
@@ -7581,6 +7730,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         actions.pack(fill="x", pady=(0, 10))
         action_specs = [
             ("Copy Build Info", lambda: self._copy_wizard_build_info(text), True),
+            ("Resolve Package Status", self._show_wizard_package_resolution, True),
             ("Open Runtime", lambda: self._dbpaths_open_path(record.get("runtime_path") or ""), bool(record.get("runtime_path"))),
             ("Open Install Root", lambda: self._dbpaths_open_path(record.get("install_root_path") or ""), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: self._dbpaths_open_path(record.get("logs_dir") or ""), bool(record.get("logs_dir"))),

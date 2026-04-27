@@ -335,6 +335,135 @@ def load_uninstall_registration() -> Dict[str, Any]:
         return {}
 
 
+def _package_root_from_runtime_root(runtime_root: Path) -> Path:
+    runtime_root = Path(runtime_root).resolve()
+    if runtime_root.name.strip().lower() == "runtime":
+        return runtime_root.parent.resolve()
+    return runtime_root
+
+
+def _first_existing_path(*paths: Path) -> Optional[Path]:
+    for path in paths:
+        try:
+            if isinstance(path, Path) and path.exists():
+                return path.resolve()
+        except Exception:
+            continue
+    return None
+
+
+def _package_acceptance_paths(package_root: Optional[Path]) -> Dict[str, Optional[Path]]:
+    root = _safe_path(package_root)
+    if not isinstance(root, Path):
+        return {"text": None, "json": None}
+    return {
+        "text": _first_existing_path(
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.txt",
+        ),
+        "json": _first_existing_path(
+            root / "PACKAGED_ACCEPTANCE_SUMMARY.json",
+            root / "_acceptance_artifacts" / "packaged_acceptance_summary.json",
+        ),
+    }
+
+
+def _package_build_identity_path(package_root: Optional[Path]) -> Optional[Path]:
+    root = _safe_path(package_root)
+    if not isinstance(root, Path):
+        return None
+    return _first_existing_path(
+        root / "runtime" / "config" / "mole_build_identity_v1.json",
+        root / "config" / "mole_build_identity_v1.json",
+    )
+
+
+def _package_installer_targets(package_root: Optional[Path]) -> Dict[str, Optional[Path]]:
+    root = _safe_path(package_root)
+    if not isinstance(root, Path):
+        return {"script": None, "bundle": None}
+    script = _first_existing_path(
+        root / "INSTALL_MOLE_DAS_EXE_BUNDLE.bat",
+        root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+    )
+    bundle = None
+    try:
+        bundle_candidates = sorted(root.glob("*_installer_exe_bundle.zip"), key=lambda p: p.name.lower(), reverse=True)
+        bundle = bundle_candidates[0].resolve() if bundle_candidates else None
+    except Exception:
+        bundle = None
+    return {"script": script, "bundle": bundle}
+
+
+def _runtime_executable_targets(runtime_root: Optional[Path]) -> Dict[str, Optional[Path]]:
+    root = _safe_path(runtime_root)
+    if not isinstance(root, Path):
+        return {"wizard": None, "runner": None}
+    code_root = root / "MOLE_code"
+    return {
+        "wizard": _first_existing_path(code_root / "MOLE_DAS_Wizard.exe"),
+        "runner": _first_existing_path(code_root / "MOLE_DAQ_Runner.exe"),
+    }
+
+
+def _package_sort_ts(identity: Mapping[str, Any], acceptance: Mapping[str, Any]) -> Optional[datetime]:
+    return (
+        _parse_iso_datetime(identity.get("built_at"))
+        or _parse_iso_datetime(acceptance.get("generated_at"))
+        or _parse_iso_datetime(acceptance.get("built_at"))
+    )
+
+
+def _find_latest_verified_package(search_root: Optional[Path]) -> Dict[str, Any]:
+    root = _safe_path(search_root)
+    result: Dict[str, Any] = {
+        "package_root": None,
+        "package_label": "",
+        "acceptance_text_path": None,
+        "acceptance_json_path": None,
+        "acceptance_status": "",
+        "installer_script_path": None,
+        "installer_bundle_path": None,
+    }
+    if not isinstance(root, Path) or not root.exists() or not root.is_dir():
+        return result
+
+    best_key: tuple[str, str] | None = None
+    for child in root.iterdir():
+        try:
+            if not child.is_dir():
+                continue
+            child_name = child.name.strip()
+            if not child_name or "mole_das" not in child_name.lower():
+                continue
+            acceptance_paths = _package_acceptance_paths(child)
+            acceptance_json = acceptance_paths.get("json")
+            acceptance = _load_json_dict(acceptance_json)
+            if str(acceptance.get("status") or "").strip().upper() != "PASS":
+                continue
+            identity = _load_json_dict(_package_build_identity_path(child))
+            ts = _package_sort_ts(identity, acceptance)
+            ts_key = ts.isoformat() if isinstance(ts, datetime) else ""
+            label = str(identity.get("bundle_label") or acceptance.get("package_label") or child.name).strip()
+            sort_key = (ts_key, label.lower())
+            if best_key is not None and sort_key <= best_key:
+                continue
+            installers = _package_installer_targets(child)
+            result = {
+                "package_root": child.resolve(),
+                "package_label": label,
+                "acceptance_text_path": acceptance_paths.get("text"),
+                "acceptance_json_path": acceptance_json,
+                "acceptance_status": "PASS",
+                "installer_script_path": installers.get("script"),
+                "installer_bundle_path": installers.get("bundle"),
+            }
+            best_key = sort_key
+        except Exception:
+            continue
+    return result
+
+
 def evaluate_runtime_package_status(
     *,
     current_runtime_root: Path,
@@ -342,6 +471,7 @@ def evaluate_runtime_package_status(
     current_acceptance_summary_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     runtime_root = Path(current_runtime_root).resolve()
+    current_package_root = _package_root_from_runtime_root(runtime_root)
     build_identity = dict(current_build_identity or {})
     current_acceptance_path = _safe_path(current_acceptance_summary_path)
     current_acceptance = _load_json_dict(current_acceptance_path)
@@ -462,6 +592,11 @@ def evaluate_runtime_package_status(
         status = "CURRENT"
         summary = "Installed and verified package matches the local accepted install."
 
+    current_installers = _package_installer_targets(current_package_root)
+    latest_verified_search_root = current_package_root.parent if isinstance(current_package_root, Path) else None
+    latest_verified = _find_latest_verified_package(latest_verified_search_root)
+    installed_executables = _runtime_executable_targets(installed_runtime_root)
+
     return {
         "package_status": status,
         "package_status_summary": summary,
@@ -482,6 +617,18 @@ def evaluate_runtime_package_status(
         "uninstall_registry_install_location": str(uninstall_registration.get("install_location") or "").strip(),
         "uninstall_registry_display_version": str(uninstall_registration.get("display_version") or "").strip(),
         "uninstall_registry_key": str(uninstall_registration.get("registry_key") or "").strip(),
+        "current_package_root_path": str(current_package_root) if isinstance(current_package_root, Path) else "",
+        "current_installer_script_path": str(current_installers.get("script")) if isinstance(current_installers.get("script"), Path) else "",
+        "current_installer_bundle_path": str(current_installers.get("bundle")) if isinstance(current_installers.get("bundle"), Path) else "",
+        "latest_verified_package_root_path": str(latest_verified.get("package_root")) if isinstance(latest_verified.get("package_root"), Path) else "",
+        "latest_verified_package_label": str(latest_verified.get("package_label") or "").strip(),
+        "latest_verified_package_acceptance_summary_path": str(latest_verified.get("acceptance_text_path")) if isinstance(latest_verified.get("acceptance_text_path"), Path) else "",
+        "latest_verified_package_acceptance_summary_json_path": str(latest_verified.get("acceptance_json_path")) if isinstance(latest_verified.get("acceptance_json_path"), Path) else "",
+        "latest_verified_package_acceptance_status": str(latest_verified.get("acceptance_status") or "").strip(),
+        "latest_verified_installer_script_path": str(latest_verified.get("installer_script_path")) if isinstance(latest_verified.get("installer_script_path"), Path) else "",
+        "latest_verified_installer_bundle_path": str(latest_verified.get("installer_bundle_path")) if isinstance(latest_verified.get("installer_bundle_path"), Path) else "",
+        "installed_wizard_executable_path": str(installed_executables.get("wizard")) if isinstance(installed_executables.get("wizard"), Path) else "",
+        "installed_runner_executable_path": str(installed_executables.get("runner")) if isinstance(installed_executables.get("runner"), Path) else "",
     }
 
 

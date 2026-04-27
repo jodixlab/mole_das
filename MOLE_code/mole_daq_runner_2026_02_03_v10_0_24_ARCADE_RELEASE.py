@@ -398,12 +398,23 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Git commit", record.get("git_commit") or ""),
         ("Executable path", record.get("executable_path") or ""),
         ("Runtime path", record.get("runtime_path") or ""),
+        ("Current package root", record.get("current_package_root_path") or ""),
         ("Install root", record.get("install_root_path") or ""),
         ("Install manifest", record.get("install_manifest_path") or ""),
         ("Installed runtime", record.get("installed_runtime_path") or ""),
+        ("Installed Wizard executable", record.get("installed_wizard_executable_path") or ""),
+        ("Installed Runner executable", record.get("installed_runner_executable_path") or ""),
         ("Installed bundle label", record.get("installed_bundle_label") or ""),
         ("Accepted package marker", record.get("local_accepted_package_marker_path") or ""),
         ("Accepted package label", record.get("local_accepted_package_label") or ""),
+        ("Current installer bundle", record.get("current_installer_bundle_path") or ""),
+        ("Current installer script", record.get("current_installer_script_path") or ""),
+        ("Latest verified package root", record.get("latest_verified_package_root_path") or ""),
+        ("Latest verified package label", record.get("latest_verified_package_label") or ""),
+        ("Latest verified acceptance summary", record.get("latest_verified_package_acceptance_summary_path") or ""),
+        ("Latest verified acceptance JSON", record.get("latest_verified_package_acceptance_summary_json_path") or ""),
+        ("Latest verified installer bundle", record.get("latest_verified_installer_bundle_path") or ""),
+        ("Latest verified installer script", record.get("latest_verified_installer_script_path") or ""),
         ("Registry install location", record.get("uninstall_registry_install_location") or ""),
         ("Registry display version", record.get("uninstall_registry_display_version") or ""),
         ("Active config path", record.get("active_config_path") or ""),
@@ -8695,6 +8706,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     def _render_runner_startup_status_banner(parent: tk.Widget) -> None:
         status_var = tk.StringVar(value="")
         detail_var = tk.StringVar(value="")
+        compare_var = tk.StringVar(value="")
         stale_ack_var = tk.StringVar(value="")
         frame = tk.Frame(parent, bg=BG, highlightbackground=FG_DIM, highlightthickness=1, bd=0)
         frame.pack(fill="x", padx=12, pady=(0, 8))
@@ -8718,6 +8730,17 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             font=("Consolas", 8),
         )
         detail_lbl.pack(fill="x", padx=10, pady=(0, 6))
+        compare_lbl = tk.Label(
+            frame,
+            textvariable=compare_var,
+            fg=FG,
+            bg=BG,
+            anchor="w",
+            justify="left",
+            wraplength=240,
+            font=("Consolas", 8, "bold"),
+        )
+        compare_lbl.pack(fill="x", padx=10, pady=(0, 6))
         stale_ack_lbl = tk.Label(
             frame,
             textvariable=stale_ack_var,
@@ -8735,6 +8758,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         action_buttons: Dict[str, Any] = {}
         for label, cmd in [
             ("Build Info", lambda: _show_runner_build_info(_load_session())),
+            ("Resolve Package Status", lambda: _show_runner_package_resolution(_load_session())),
             ("Acceptance", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed")),
             ("Install Root", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("install_root_path") or "", title="Open Install Root Failed")),
             ("Startup Stamp", lambda: _open_fs_target(startup_path or "", title="Open Startup Diagnostic Failed")),
@@ -8754,6 +8778,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
             summary = str(record.get("package_status_summary") or "").strip()
             detail = str(record.get("package_status_detail") or "").strip()
+            running_label = str(record.get("package_label") or "").strip()
+            accepted_label = str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
             stale_ack = bool(record.get("stale_package_acknowledged"))
             banner_bg, banner_fg = _build_status_banner_style(status)
             frame.configure(bg=banner_bg, highlightbackground=banner_fg)
@@ -8762,14 +8788,21 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             for widget in frame.winfo_children():
                 if isinstance(widget, tk.Label):
                     widget.configure(bg=banner_bg, fg=banner_fg if widget is not stale_ack_lbl else banner_fg)
+            compare_lbl.configure(fg=banner_fg)
             stale_ack_lbl.configure(fg=banner_fg)
             status_var.set(f"{status}: {summary}")
             detail_var.set(detail if detail and detail != summary else "")
+            compare_var.set(
+                f"Running package: {running_label or '(n/a)'} | Accepted install: {accepted_label or '(n/a)'}"
+                if status == "STALE" and (running_label or accepted_label)
+                else ""
+            )
             stale_ack_var.set("Stale package acknowledged for this Runner session." if status == "STALE" and stale_ack else "")
             specs = [("Build Info", True)]
             if status != "CURRENT":
                 specs.extend(
                     [
+                        ("Resolve Package Status", True),
                         ("Acceptance", bool(record.get("packaged_acceptance_summary_path"))),
                         ("Install Root", bool(record.get("install_root_path"))),
                         ("Startup Stamp", bool(startup_path)),
@@ -16711,6 +16744,129 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         except Exception as e:
             messagebox.showerror("Build Info", str(e))
 
+    def _runner_resolution_installer_target(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_installer_bundle_path")
+            or record.get("latest_verified_installer_script_path")
+            or record.get("current_installer_bundle_path")
+            or record.get("current_installer_script_path")
+            or ""
+        ).strip()
+
+    def _runner_resolution_acceptance_target(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_package_acceptance_summary_path")
+            or record.get("packaged_acceptance_summary_path")
+            or record.get("latest_verified_package_acceptance_summary_json_path")
+            or record.get("packaged_acceptance_summary_json_path")
+            or ""
+        ).strip()
+
+    def _relaunch_runner_from_installed_root(sess_local: Dict[str, Any]) -> None:
+        record = _runner_build_info_record(sess_local)
+        exe_text = str(record.get("installed_runner_executable_path") or "").strip()
+        if not exe_text:
+            messagebox.showwarning("Resolve Package Status", "No installed Runner executable was found for relaunch.")
+            return
+        exe_path = Path(exe_text)
+        if not exe_path.exists():
+            messagebox.showwarning("Resolve Package Status", f"Installed Runner executable was not found:\n{exe_path}")
+            return
+        try:
+            cmd = [str(exe_path), "--config", str(cfg_path), "--ui"]
+            subprocess.Popen(cmd, cwd=str(exe_path.parent), creationflags=_win_creationflags())
+            root.after(250, root.destroy)
+        except Exception as e:
+            messagebox.showerror("Resolve Package Status", f"Failed to relaunch installed Runner:\n{e}")
+
+    def _show_runner_package_resolution(sess_local: Dict[str, Any]) -> None:
+        record = _runner_build_info_record(sess_local)
+        status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+        summary = str(record.get("package_status_summary") or "").strip()
+        detail = str(record.get("package_status_detail") or "").strip()
+        running_label = str(record.get("package_label") or "").strip()
+        accepted_label = str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        install_root = str(record.get("install_root_path") or "").strip()
+        latest_verified_root = str(record.get("latest_verified_package_root_path") or "").strip()
+        installer_target = _runner_resolution_installer_target(record)
+        acceptance_target = _runner_resolution_acceptance_target(record)
+
+        w = tk.Toplevel(root)
+        w.title("Resolve Runner Package Status")
+        w.configure(bg=BG)
+        w.geometry("880x420")
+        body = tk.Frame(w, bg=BG)
+        body.pack(fill="both", expand=True, padx=12, pady=12)
+        banner_bg, banner_fg = _build_status_banner_style(status)
+        tk.Label(
+            body,
+            text=f"{status}: {summary}",
+            bg=banner_bg,
+            fg=banner_fg,
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+            padx=10,
+            pady=8,
+        ).pack(fill="x", pady=(0, 10))
+        if detail and detail != summary:
+            tk.Label(
+                body,
+                text=detail,
+                bg=BG,
+                fg=FG,
+                anchor="w",
+                justify="left",
+                wraplength=820,
+                font=("Consolas", 9),
+            ).pack(fill="x", pady=(0, 8))
+        if status == "STALE" and (running_label or accepted_label):
+            tk.Label(
+                body,
+                text=f"Running package: {running_label or '(n/a)'}\nAccepted install: {accepted_label or '(n/a)'}",
+                bg=BG,
+                fg=ACC,
+                anchor="w",
+                justify="left",
+                font=("Consolas", 9, "bold"),
+            ).pack(fill="x", pady=(0, 8))
+        info = tk.Text(body, bg=PANEL_BG, fg=FG, insertbackground=FG, font=("Consolas", 9), height=8, wrap="word")
+        info.pack(fill="both", expand=True, pady=(0, 10))
+        info.insert(
+            "1.0",
+            "\n".join([
+                f"Current package root: {str(record.get('current_package_root_path') or '(n/a)')}",
+                f"Install root: {install_root or '(n/a)'}",
+                f"Latest verified package: {str(record.get('latest_verified_package_label') or '(n/a)')}",
+                f"Latest verified package root: {latest_verified_root or '(n/a)'}",
+                f"Installer target: {installer_target or '(n/a)'}",
+                f"Acceptance summary: {acceptance_target or '(n/a)'}",
+            ]) + "\n",
+        )
+        info.configure(state="disabled")
+        actions = tk.Frame(body, bg=BG)
+        actions.pack(fill="x")
+        action_specs = [
+            ("Open Installed Root", lambda: _open_fs_target(install_root, title="Open Install Root Failed"), bool(install_root)),
+            ("Open Latest Verified Package", lambda: _open_fs_target(latest_verified_root, title="Open Latest Verified Package Failed"), bool(latest_verified_root)),
+            ("Open Installer Bundle", lambda: _open_fs_target(installer_target, title="Open Installer Bundle Failed"), bool(installer_target)),
+            ("Open Acceptance Summary", lambda: _open_fs_target(acceptance_target, title="Open Acceptance Summary Failed"), bool(acceptance_target)),
+            ("Relaunch From Installed Root", lambda: _relaunch_runner_from_installed_root(sess_local), bool(str(record.get("installed_runner_executable_path") or "").strip())),
+        ]
+        for col in range(len(action_specs)):
+            actions.grid_columnconfigure(col, weight=1)
+        for idx, (label, cmd, enabled) in enumerate(action_specs):
+            tk.Button(
+                actions,
+                text=label,
+                command=cmd,
+                bg=BTN_BG,
+                fg=FG,
+                relief="flat",
+                state=("normal" if enabled else "disabled"),
+            ).grid(row=0, column=idx, sticky="ew", padx=4, pady=4)
+        tk.Button(body, text="Close", command=w.destroy, bg="#14202d", fg=FG, relief="flat").pack(anchor="e", pady=(10, 0))
+
     def _show_runner_build_info(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
         text = _format_build_info_text(record)
@@ -16736,6 +16892,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         actions.pack(fill="x", pady=(0, 10))
         action_specs = [
             ("Copy Build Info", lambda: _copy_runner_build_info(text), True),
+            ("Resolve Package Status", lambda: _show_runner_package_resolution(sess_local), True),
             ("Open Runtime", lambda: _open_fs_target(record.get("runtime_path") or "", title="Open Runtime Failed"), bool(record.get("runtime_path"))),
             ("Open Install Root", lambda: _open_fs_target(record.get("install_root_path") or "", title="Open Install Root Failed"), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: _open_fs_target(record.get("logs_dir") or "", title="Open Logs Failed"), bool(record.get("logs_dir"))),
