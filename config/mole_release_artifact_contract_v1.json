@@ -79,6 +79,13 @@
       "description": "Human-readable installed-package acceptance summary for the executable bundle."
     },
     {
+      "id": "latest_verified_release_manifest_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "latest_verified_release_v1.json",
+      "description": "Canonical verified release channel manifest emitted by the executable bundle and release workflow."
+    },
+    {
       "id": "ui_help_audit_json",
       "required": true,
       "match": "exact",

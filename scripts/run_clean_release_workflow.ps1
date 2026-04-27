@@ -171,11 +171,15 @@ try {
 
         $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")
         $portableZip = Join-Path $bundleRoot ($bundleLabel + "_portable_exe_bundle.zip")
+        $verifiedReleaseManifest = Join-Path $bundleRoot "latest_verified_release_v1.json"
         if (-not (Test-Path -LiteralPath $installerZip)) {
             throw "Installer ZIP missing after bundle build: $installerZip"
         }
         if (-not (Test-Path -LiteralPath $portableZip)) {
             throw "Portable ZIP missing after bundle build: $portableZip"
+        }
+        if (-not (Test-Path -LiteralPath $verifiedReleaseManifest)) {
+            throw "Verified release manifest missing after bundle build: $verifiedReleaseManifest"
         }
 
         $acceptanceArtifacts = Join-Path $bundleRoot "_acceptance_artifacts"
@@ -191,6 +195,7 @@ try {
         New-Item -ItemType Directory -Path $releaseOutDir -Force | Out-Null
         Copy-Item -LiteralPath $installerZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($installerZip))) -Force
         Copy-Item -LiteralPath $portableZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($portableZip))) -Force
+        Copy-Item -LiteralPath $verifiedReleaseManifest -Destination (Join-Path $releaseOutDir "latest_verified_release_v1.json") -Force
         Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
         Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
         $supportBundleDir = Join-Path $acceptanceArtifacts "support_bundles"

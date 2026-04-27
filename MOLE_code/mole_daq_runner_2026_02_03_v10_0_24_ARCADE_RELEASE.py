@@ -409,12 +409,22 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Accepted package label", record.get("local_accepted_package_label") or ""),
         ("Current installer bundle", record.get("current_installer_bundle_path") or ""),
         ("Current installer script", record.get("current_installer_script_path") or ""),
-        ("Latest verified package root", record.get("latest_verified_package_root_path") or ""),
-        ("Latest verified package label", record.get("latest_verified_package_label") or ""),
-        ("Latest verified acceptance summary", record.get("latest_verified_package_acceptance_summary_path") or ""),
-        ("Latest verified acceptance JSON", record.get("latest_verified_package_acceptance_summary_json_path") or ""),
-        ("Latest verified installer bundle", record.get("latest_verified_installer_bundle_path") or ""),
-        ("Latest verified installer script", record.get("latest_verified_installer_script_path") or ""),
+        ("Verified release manifest", record.get("verified_release_manifest_path") or ""),
+        ("Verified release manifest kind", record.get("verified_release_manifest_kind") or ""),
+        ("Verified release channel", record.get("verified_release_channel_name") or ""),
+        ("Verified release generated", record.get("verified_release_generated_at") or ""),
+        ("Verified release root", record.get("verified_release_package_root_path") or ""),
+        ("Verified release label", record.get("verified_release_package_label") or ""),
+        ("Verified release git branch", record.get("verified_release_git_branch") or ""),
+        ("Verified release git commit", record.get("verified_release_git_commit") or ""),
+        ("Verified release build time", record.get("verified_release_built_at") or ""),
+        ("Verified release summary", record.get("verified_release_release_summary_path") or ""),
+        ("Verified release summary JSON", record.get("verified_release_release_summary_json_path") or ""),
+        ("Verified release acceptance status", record.get("verified_release_acceptance_status") or ""),
+        ("Verified release installer bundle", record.get("verified_release_installer_bundle_path") or ""),
+        ("Verified release installer script", record.get("verified_release_installer_script_path") or ""),
+        ("Verified release portable bundle", record.get("verified_release_portable_bundle_path") or ""),
+        ("Verified release build identity", record.get("verified_release_build_identity_path") or ""),
         ("Registry install location", record.get("uninstall_registry_install_location") or ""),
         ("Registry display version", record.get("uninstall_registry_display_version") or ""),
         ("Active config path", record.get("active_config_path") or ""),
@@ -16772,7 +16782,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _runner_resolution_installer_target(record: Dict[str, Any]) -> str:
         return str(
-            record.get("latest_verified_installer_bundle_path")
+            record.get("verified_release_installer_bundle_path")
+            or record.get("verified_release_installer_script_path")
+            or record.get("latest_verified_installer_bundle_path")
             or record.get("latest_verified_installer_script_path")
             or record.get("current_installer_bundle_path")
             or record.get("current_installer_script_path")
@@ -16781,16 +16793,19 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _runner_resolution_acceptance_target(record: Dict[str, Any]) -> str:
         return str(
-            record.get("latest_verified_package_acceptance_summary_path")
-            or record.get("packaged_acceptance_summary_path")
+            record.get("verified_release_release_summary_path")
+            or record.get("verified_release_release_summary_json_path")
+            or record.get("latest_verified_package_acceptance_summary_path")
             or record.get("latest_verified_package_acceptance_summary_json_path")
+            or record.get("packaged_acceptance_summary_path")
             or record.get("packaged_acceptance_summary_json_path")
             or ""
         ).strip()
 
     def _runner_resolution_installer_script(record: Dict[str, Any]) -> str:
         return str(
-            record.get("latest_verified_installer_script_path")
+            record.get("verified_release_installer_script_path")
+            or record.get("latest_verified_installer_script_path")
             or record.get("current_installer_script_path")
             or ""
         ).strip()
@@ -16887,23 +16902,23 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     def _install_latest_verified_package(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
         script_text = _runner_resolution_installer_script(record)
-        target_label = str(record.get("latest_verified_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        target_label = str(record.get("verified_release_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
         if not script_text:
             _stamp_runner_package_remediation(
                 sess_local,
-                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
                 result="FAIL",
                 target_kind="INSTALLER_SCRIPT",
                 target_package_label=target_label,
-                note="No latest verified installer script was found.",
+                note="No verified release installer script was found.",
             )
-            messagebox.showwarning("Resolve Package Status", "No latest verified installer script was found.")
+            messagebox.showwarning("Resolve Package Status", "No verified release installer script was found.")
             return
         script_path = Path(script_text)
         if not script_path.exists():
             _stamp_runner_package_remediation(
                 sess_local,
-                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
                 result="FAIL",
                 target_kind="INSTALLER_SCRIPT",
                 target_path=str(script_path),
@@ -16914,11 +16929,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             return
         if not messagebox.askyesno(
             "Resolve Package Status",
-            f"Install or upgrade the latest verified package now?\n\nPackage: {target_label or '(n/a)'}\nInstaller: {script_path}",
+            f"Install or upgrade the latest verified release now?\n\nRelease: {target_label or '(n/a)'}\nInstaller: {script_path}",
         ):
             _stamp_runner_package_remediation(
                 sess_local,
-                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
                 result="CANCELLED",
                 target_kind="INSTALLER_SCRIPT",
                 target_path=str(script_path),
@@ -16933,31 +16948,31 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             installed_exe = str(refreshed.get("installed_runner_executable_path") or "").strip()
             _stamp_runner_package_remediation(
                 sess_local,
-                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
                 result="PASS",
                 target_kind="INSTALLER_SCRIPT",
                 target_path=str(script_path),
                 target_package_label=target_label,
-                note="Latest verified package installer completed successfully.",
+                note="Latest verified release installer completed successfully.",
             )
             if installed_exe and messagebox.askyesno(
                 "Resolve Package Status",
-                "Latest verified package install completed.\n\nRelaunch from the installed root now?",
+                "Latest verified release install completed.\n\nRelaunch from the installed root now?",
             ):
                 _relaunch_runner_from_installed_root(sess_local)
                 return
-            messagebox.showinfo("Resolve Package Status", "Latest verified package install completed.")
+            messagebox.showinfo("Resolve Package Status", "Latest verified release install completed.")
         except Exception as e:
             _stamp_runner_package_remediation(
                 sess_local,
-                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
                 result="FAIL",
                 target_kind="INSTALLER_SCRIPT",
                 target_path=str(script_path),
                 target_package_label=target_label,
                 note=str(e),
             )
-            messagebox.showerror("Resolve Package Status", f"Failed to install the latest verified package:\n{e}")
+            messagebox.showerror("Resolve Package Status", f"Failed to install the latest verified release:\n{e}")
 
     def _show_runner_package_resolution(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
@@ -16965,9 +16980,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         summary = str(record.get("package_status_summary") or "").strip()
         detail = str(record.get("package_status_detail") or "").strip()
         running_label = str(record.get("package_label") or "").strip()
-        accepted_label = str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        verified_label = str(record.get("verified_release_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
         install_root = str(record.get("install_root_path") or "").strip()
-        latest_verified_root = str(record.get("latest_verified_package_root_path") or "").strip()
+        verified_release_root = str(record.get("verified_release_package_root_path") or record.get("latest_verified_package_root_path") or "").strip()
+        verified_release_manifest = str(record.get("verified_release_manifest_path") or "").strip()
         installer_target = _runner_resolution_installer_target(record)
         installer_script = _runner_resolution_installer_script(record)
         acceptance_target = _runner_resolution_acceptance_target(record)
@@ -17001,10 +17017,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 wraplength=820,
                 font=("Consolas", 9),
             ).pack(fill="x", pady=(0, 8))
-        if status == "STALE" and (running_label or accepted_label):
+        if status == "STALE" and (running_label or verified_label):
             tk.Label(
                 body,
-                text=f"Running package: {running_label or '(n/a)'}\nAccepted install: {accepted_label or '(n/a)'}",
+                text=f"Running package: {running_label or '(n/a)'}\nVerified release: {verified_label or '(n/a)'}",
                 bg=BG,
                 fg=ACC,
                 anchor="w",
@@ -17018,11 +17034,12 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "\n".join([
                 f"Current package root: {str(record.get('current_package_root_path') or '(n/a)')}",
                 f"Install root: {install_root or '(n/a)'}",
-                f"Latest verified package: {str(record.get('latest_verified_package_label') or '(n/a)')}",
-                f"Latest verified package root: {latest_verified_root or '(n/a)'}",
-                f"Latest verified installer script: {installer_script or '(n/a)'}",
+                f"Verified release manifest: {verified_release_manifest or '(n/a)'}",
+                f"Verified release: {verified_label or '(n/a)'}",
+                f"Verified release root: {verified_release_root or '(n/a)'}",
+                f"Verified release installer script: {installer_script or '(n/a)'}",
                 f"Installer target: {installer_target or '(n/a)'}",
-                f"Acceptance summary: {acceptance_target or '(n/a)'}",
+                f"Release summary: {acceptance_target or '(n/a)'}",
             ]) + "\n",
         )
         info.configure(state="disabled")
@@ -17034,10 +17051,11 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             action_specs.append(("Relaunch From Installed Root", lambda: _relaunch_runner_from_installed_root(sess_local), bool(str(record.get("installed_runner_executable_path") or "").strip())))
         action_specs.extend(
             [
-                ("Open Latest Verified Package", lambda: _open_fs_target(latest_verified_root, title="Open Latest Verified Package Failed"), bool(latest_verified_root)),
+                ("Open Latest Verified Release", lambda: _open_fs_target(verified_release_root, title="Open Latest Verified Release Failed"), bool(verified_release_root)),
+                ("Open Verified Release Manifest", lambda: _open_fs_target(verified_release_manifest, title="Open Verified Release Manifest Failed"), bool(verified_release_manifest)),
                 ("Open Installer Bundle", lambda: _open_fs_target(installer_target, title="Open Installer Bundle Failed"), bool(installer_target)),
-                ("Install Latest Verified Package", lambda: _install_latest_verified_package(sess_local), bool(installer_script)),
-                ("Open Acceptance Summary", lambda: _open_fs_target(acceptance_target, title="Open Acceptance Summary Failed"), bool(acceptance_target)),
+                ("Install Latest Verified Release", lambda: _install_latest_verified_package(sess_local), bool(installer_script)),
+                ("Open Release Summary", lambda: _open_fs_target(acceptance_target, title="Open Release Summary Failed"), bool(acceptance_target)),
             ]
         )
         for col in range(len(action_specs)):
@@ -17087,6 +17105,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ("Open Package Remediation", lambda: _open_fs_target(record.get("package_remediation_path") or "", title="Open Package Remediation Failed"), bool(record.get("package_remediation_path"))),
             ("Open Build Identity", lambda: _open_fs_target(record.get("build_identity_manifest_path") or "", title="Open Build Identity Failed"), bool(record.get("build_identity_manifest_path"))),
             ("Open Install Manifest", lambda: _open_fs_target(record.get("install_manifest_path") or "", title="Open Install Manifest Failed"), bool(record.get("install_manifest_path"))),
+            ("Open Verified Release Manifest", lambda: _open_fs_target(record.get("verified_release_manifest_path") or "", title="Open Verified Release Manifest Failed"), bool(record.get("verified_release_manifest_path"))),
+            ("Open Release Summary", lambda: _open_fs_target(_runner_resolution_acceptance_target(record), title="Open Release Summary Failed"), bool(_runner_resolution_acceptance_target(record))),
             ("Open Acceptance Summary", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
             ("Open Acceptance JSON", lambda: _open_fs_target(record.get("packaged_acceptance_summary_json_path") or "", title="Open Acceptance Summary JSON Failed"), bool(record.get("packaged_acceptance_summary_json_path"))),
             ("Open Accepted Marker", lambda: _open_fs_target(record.get("local_accepted_package_marker_path") or "", title="Open Accepted Marker Failed"), bool(record.get("local_accepted_package_marker_path"))),
@@ -17221,6 +17241,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "build_identity_manifest": _build_identity_manifest_path(),
                     "welcome_asset_manifest": _welcome_asset_manifest_path(),
                     "install_manifest": Path(build_info.get("install_manifest_path")) if str(build_info.get("install_manifest_path") or "").strip() else None,
+                    "verified_release_manifest": Path(build_info.get("verified_release_manifest_path")) if str(build_info.get("verified_release_manifest_path") or "").strip() else None,
                     "local_accepted_package_marker": Path(build_info.get("local_accepted_package_marker_path")) if str(build_info.get("local_accepted_package_marker_path") or "").strip() else None,
                     "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                     "packaged_acceptance_summary_json": acceptance_paths.get("json"),

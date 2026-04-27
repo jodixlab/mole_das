@@ -231,6 +231,178 @@ class RuntimeDurabilityTests(unittest.TestCase):
 
             self.assertEqual(result["package_status"], "STALE")
 
+    def test_package_status_stale_against_verified_release_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            channel_root = root / "executables"
+            current_root = channel_root / "MOLE_DAS_2026_04_27_v1"
+            verified_root = channel_root / "MOLE_DAS_2026_04_27_v2"
+            current_runtime_root = current_root / "runtime"
+            verified_runtime_root = verified_root / "runtime"
+            (current_runtime_root / "config").mkdir(parents=True, exist_ok=True)
+            (verified_runtime_root / "config").mkdir(parents=True, exist_ok=True)
+
+            current_acceptance_path = current_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            current_acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": "MOLE_DAS_2026_04_27_v1",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            verified_acceptance_json = verified_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            verified_acceptance_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": "MOLE_DAS_2026_04_27_v2",
+                        "generated_at": "2026-04-27T18:45:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            verified_acceptance_txt = verified_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            verified_acceptance_txt.write_text("status=PASS\n", encoding="utf-8")
+            verified_script = verified_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            verified_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            verified_identity = verified_runtime_root / "config" / "mole_build_identity_v1.json"
+            verified_identity.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": "MOLE_DAS_2026_04_27_v2",
+                        "built_at": "2026-04-27T18:40:00Z",
+                        "runtime_root": str(verified_runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest_path = channel_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "release_channel",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T18:46:00Z",
+                        "package_root": "MOLE_DAS_2026_04_27_v2",
+                        "package_label": "MOLE_DAS_2026_04_27_v2",
+                        "git_commit": "abc1234",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T18:40:00Z",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            original = durability.load_uninstall_registration
+            durability.load_uninstall_registration = lambda: {}
+            try:
+                result = evaluate_runtime_package_status(
+                    current_runtime_root=current_runtime_root,
+                    current_build_identity={
+                        "bundle_label": "MOLE_DAS_2026_04_27_v1",
+                        "built_at": "2026-04-27T18:30:00Z",
+                        "runtime_root": str(current_runtime_root),
+                    },
+                    current_acceptance_summary_path=current_acceptance_path,
+                )
+            finally:
+                durability.load_uninstall_registration = original
+
+            self.assertEqual(result["package_status"], "STALE")
+            self.assertEqual(result["verified_release_manifest_path"], str(manifest_path.resolve()))
+            self.assertEqual(result["verified_release_package_label"], "MOLE_DAS_2026_04_27_v2")
+            self.assertEqual(result["verified_release_installer_script_path"], str(verified_script.resolve()))
+
+    def test_package_status_uses_current_bundle_verified_release_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            current_root = root / "portable"
+            current_runtime_root = current_root / "runtime"
+            (current_runtime_root / "config").mkdir(parents=True, exist_ok=True)
+
+            current_acceptance_path = current_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            current_acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": "MOLE_DAS_2026_04_27_v3",
+                        "generated_at": "2026-04-27T19:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            current_acceptance_txt = current_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            current_acceptance_txt.write_text("status=PASS\n", encoding="utf-8")
+            current_script = current_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            current_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            current_identity = current_runtime_root / "config" / "mole_build_identity_v1.json"
+            current_identity.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": "MOLE_DAS_2026_04_27_v3",
+                        "built_at": "2026-04-27T18:55:00Z",
+                        "runtime_root": str(current_runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest_path = current_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "package_root",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T19:01:00Z",
+                        "package_root": ".",
+                        "package_label": "MOLE_DAS_2026_04_27_v3",
+                        "git_commit": "def5678",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T18:55:00Z",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            original = durability.load_uninstall_registration
+            durability.load_uninstall_registration = lambda: {}
+            try:
+                result = evaluate_runtime_package_status(
+                    current_runtime_root=current_runtime_root,
+                    current_build_identity={
+                        "bundle_label": "MOLE_DAS_2026_04_27_v3",
+                        "built_at": "2026-04-27T18:55:00Z",
+                        "runtime_root": str(current_runtime_root),
+                    },
+                    current_acceptance_summary_path=current_acceptance_path,
+                )
+            finally:
+                durability.load_uninstall_registration = original
+
+            self.assertEqual(result["package_status"], "PORTABLE")
+            self.assertEqual(result["verified_release_manifest_path"], str(manifest_path.resolve()))
+            self.assertEqual(result["verified_release_manifest_kind"], "package_root")
+            self.assertEqual(result["verified_release_package_label"], "MOLE_DAS_2026_04_27_v3")
+            self.assertEqual(result["verified_release_installer_script_path"], str(current_script.resolve()))
+
     def test_runtime_action_policy_blocks_unverified_compliance(self) -> None:
         result = evaluate_runtime_action_policy(
             package_status_record={

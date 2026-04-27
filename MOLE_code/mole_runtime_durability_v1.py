@@ -414,6 +414,179 @@ def _package_sort_ts(identity: Mapping[str, Any], acceptance: Mapping[str, Any])
     )
 
 
+def _resolve_manifest_path(
+    manifest_path: Optional[Path],
+    raw_value: Any,
+    *,
+    root_fallback: Optional[Path] = None,
+) -> Optional[Path]:
+    text = str(raw_value or "").strip()
+    if not text:
+        return None
+    try:
+        candidate = Path(text)
+    except Exception:
+        return None
+    base = None
+    if not candidate.is_absolute():
+        if isinstance(root_fallback, Path):
+            base = root_fallback
+        elif isinstance(manifest_path, Path):
+            base = manifest_path.parent
+        if isinstance(base, Path):
+            candidate = base / candidate
+    try:
+        return candidate.resolve()
+    except Exception:
+        return candidate
+
+
+def _normalize_verified_release_manifest(
+    manifest_path: Optional[Path],
+    payload: Mapping[str, Any],
+    *,
+    root_fallback: Optional[Path] = None,
+) -> Dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    schema = str(payload.get("schema") or "").strip()
+    if schema != "mole_latest_verified_release_v1":
+        return {}
+    package_root = _resolve_manifest_path(
+        manifest_path,
+        payload.get("package_root"),
+        root_fallback=root_fallback,
+    )
+    if not isinstance(package_root, Path) and isinstance(root_fallback, Path):
+        try:
+            package_root = root_fallback.resolve()
+        except Exception:
+            package_root = root_fallback
+    return {
+        "manifest_path": manifest_path.resolve() if isinstance(manifest_path, Path) else None,
+        "manifest_kind": str(payload.get("manifest_kind") or "").strip(),
+        "channel_name": str(payload.get("channel_name") or "LOCAL_VERIFIED").strip() or "LOCAL_VERIFIED",
+        "generated_at": str(payload.get("generated_at") or "").strip(),
+        "package_root": package_root,
+        "package_label": str(payload.get("package_label") or "").strip(),
+        "acceptance_text_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("acceptance_summary_path"),
+            root_fallback=package_root,
+        ),
+        "acceptance_json_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("acceptance_summary_json_path"),
+            root_fallback=package_root,
+        ),
+        "acceptance_status": str(payload.get("acceptance_status") or "").strip().upper(),
+        "installer_script_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("installer_script_path"),
+            root_fallback=package_root,
+        ),
+        "installer_bundle_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("installer_bundle_path"),
+            root_fallback=package_root,
+        ),
+        "portable_bundle_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("portable_bundle_path"),
+            root_fallback=package_root,
+        ),
+        "build_identity_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("build_identity_path"),
+            root_fallback=package_root,
+        ),
+        "git_commit": str(payload.get("git_commit") or "").strip(),
+        "git_branch": str(payload.get("git_branch") or "").strip(),
+        "built_at": str(payload.get("built_at") or "").strip(),
+    }
+
+
+def _latest_verified_release_manifest_candidates(
+    current_package_root: Optional[Path],
+    install_root: Optional[Path],
+) -> list[Path]:
+    roots: list[Optional[Path]] = []
+    current_root = _safe_path(current_package_root)
+    installed_root = _safe_path(install_root)
+    if isinstance(installed_root, Path):
+        roots.extend([installed_root.parent, installed_root])
+    if isinstance(current_root, Path):
+        roots.extend([current_root.parent, current_root])
+    seen: set[str] = set()
+    candidates: list[Path] = []
+    for base in roots:
+        if not isinstance(base, Path):
+            continue
+        try:
+            candidate = (base / "latest_verified_release_v1.json").resolve()
+        except Exception:
+            candidate = base / "latest_verified_release_v1.json"
+        key = str(candidate).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(candidate)
+    return candidates
+
+
+def _load_latest_verified_release(
+    current_package_root: Optional[Path],
+    install_root: Optional[Path],
+) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "manifest_path": None,
+        "manifest_kind": "",
+        "channel_name": "",
+        "generated_at": "",
+        "package_root": None,
+        "package_label": "",
+        "acceptance_text_path": None,
+        "acceptance_json_path": None,
+        "acceptance_status": "",
+        "installer_script_path": None,
+        "installer_bundle_path": None,
+        "portable_bundle_path": None,
+        "build_identity_path": None,
+        "git_commit": "",
+        "git_branch": "",
+        "built_at": "",
+    }
+    current_root = _safe_path(current_package_root)
+    installed_root = _safe_path(install_root)
+    for manifest_path in _latest_verified_release_manifest_candidates(current_root, installed_root):
+        payload = _load_json_dict(manifest_path)
+        normalized = _normalize_verified_release_manifest(
+            manifest_path,
+            payload,
+            root_fallback=(manifest_path.parent if manifest_path.name.lower() == "latest_verified_release_v1.json" else None),
+        )
+        if normalized and str(normalized.get("acceptance_status") or "").upper() == "PASS":
+            return normalized
+
+    search_root = current_root.parent if isinstance(current_root, Path) else None
+    fallback = _find_latest_verified_package(search_root)
+    if str(fallback.get("acceptance_status") or "").strip().upper() == "PASS":
+        result.update(
+            {
+                "manifest_kind": "fallback_search",
+                "channel_name": "LOCAL_HEURISTIC",
+                "package_root": fallback.get("package_root"),
+                "package_label": str(fallback.get("package_label") or "").strip(),
+                "acceptance_text_path": fallback.get("acceptance_text_path"),
+                "acceptance_json_path": fallback.get("acceptance_json_path"),
+                "acceptance_status": "PASS",
+                "installer_script_path": fallback.get("installer_script_path"),
+                "installer_bundle_path": fallback.get("installer_bundle_path"),
+            }
+        )
+    return result
+
+
 def _find_latest_verified_package(search_root: Optional[Path]) -> Dict[str, Any]:
     root = _safe_path(search_root)
     result: Dict[str, Any] = {
@@ -552,8 +725,19 @@ def evaluate_runtime_package_status(
     acceptance_missing = not (isinstance(current_acceptance_path, Path) and current_acceptance_path.exists())
     acceptance_failed = bool(current_acceptance and current_acceptance_status and current_acceptance_status != "PASS")
 
+    verified_release = _load_latest_verified_release(current_package_root, local_install_root)
+    verified_release_label = str(verified_release.get("package_label") or "").strip()
+    verified_release_built_at = _parse_iso_datetime(verified_release.get("built_at"))
+    stale_due_to_release_label = bool(
+        verified_release_label and current_bundle_label and verified_release_label != current_bundle_label
+    )
+    stale_due_to_release_time = bool(
+        current_built_at is not None and verified_release_built_at is not None and current_built_at < verified_release_built_at
+    )
     stale_launch = False
-    if portable_launch and isinstance(local_install_root, Path):
+    if stale_due_to_release_label or stale_due_to_release_time:
+        stale_launch = True
+    elif portable_launch and isinstance(local_install_root, Path):
         if accepted_bundle_label and current_bundle_label and accepted_bundle_label != current_bundle_label:
             stale_launch = True
         elif current_built_at is not None and installed_built_at is not None and current_built_at < installed_built_at:
@@ -571,7 +755,12 @@ def evaluate_runtime_package_status(
     if installed_label_mismatch:
         details.append("Installed package label does not match the running package label.")
     if stale_launch:
-        details.append("Running package differs from the locally installed accepted package.")
+        if stale_due_to_release_label:
+            details.append("Running package differs from the latest verified release.")
+        elif stale_due_to_release_time:
+            details.append("Running package build time is older than the latest verified release.")
+        else:
+            details.append("Running package differs from the locally installed accepted package.")
     elif portable_launch:
         details.append("Running from a portable folder instead of the installed root.")
     elif current_is_installed:
@@ -620,6 +809,22 @@ def evaluate_runtime_package_status(
         "current_package_root_path": str(current_package_root) if isinstance(current_package_root, Path) else "",
         "current_installer_script_path": str(current_installers.get("script")) if isinstance(current_installers.get("script"), Path) else "",
         "current_installer_bundle_path": str(current_installers.get("bundle")) if isinstance(current_installers.get("bundle"), Path) else "",
+        "verified_release_manifest_path": str(verified_release.get("manifest_path")) if isinstance(verified_release.get("manifest_path"), Path) else "",
+        "verified_release_manifest_kind": str(verified_release.get("manifest_kind") or "").strip(),
+        "verified_release_channel_name": str(verified_release.get("channel_name") or "").strip(),
+        "verified_release_generated_at": str(verified_release.get("generated_at") or "").strip(),
+        "verified_release_package_root_path": str(verified_release.get("package_root")) if isinstance(verified_release.get("package_root"), Path) else "",
+        "verified_release_package_label": str(verified_release.get("package_label") or "").strip(),
+        "verified_release_release_summary_path": str(verified_release.get("acceptance_text_path")) if isinstance(verified_release.get("acceptance_text_path"), Path) else "",
+        "verified_release_release_summary_json_path": str(verified_release.get("acceptance_json_path")) if isinstance(verified_release.get("acceptance_json_path"), Path) else "",
+        "verified_release_acceptance_status": str(verified_release.get("acceptance_status") or "").strip(),
+        "verified_release_installer_script_path": str(verified_release.get("installer_script_path")) if isinstance(verified_release.get("installer_script_path"), Path) else "",
+        "verified_release_installer_bundle_path": str(verified_release.get("installer_bundle_path")) if isinstance(verified_release.get("installer_bundle_path"), Path) else "",
+        "verified_release_portable_bundle_path": str(verified_release.get("portable_bundle_path")) if isinstance(verified_release.get("portable_bundle_path"), Path) else "",
+        "verified_release_build_identity_path": str(verified_release.get("build_identity_path")) if isinstance(verified_release.get("build_identity_path"), Path) else "",
+        "verified_release_git_commit": str(verified_release.get("git_commit") or "").strip(),
+        "verified_release_git_branch": str(verified_release.get("git_branch") or "").strip(),
+        "verified_release_built_at": str(verified_release.get("built_at") or "").strip(),
         "latest_verified_package_root_path": str(latest_verified.get("package_root")) if isinstance(latest_verified.get("package_root"), Path) else "",
         "latest_verified_package_label": str(latest_verified.get("package_label") or "").strip(),
         "latest_verified_package_acceptance_summary_path": str(latest_verified.get("acceptance_text_path")) if isinstance(latest_verified.get("acceptance_text_path"), Path) else "",

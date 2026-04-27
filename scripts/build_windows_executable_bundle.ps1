@@ -98,6 +98,19 @@ $acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_sum
 $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
 $publishedAcceptanceJsonName = "PACKAGED_ACCEPTANCE_SUMMARY.json"
 $publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+$verifiedReleaseManifestName = "latest_verified_release_v1.json"
+$verifiedReleaseManifestPath = Join-Path $OutputRoot $verifiedReleaseManifestName
+$shareVerifiedReleaseManifestPath = Join-Path $installRoot $verifiedReleaseManifestName
+$stableChannelManifestPath = $null
+try {
+    $outputParent = Split-Path -Parent $OutputRoot
+    if ($outputParent) {
+        $stableChannelManifestPath = Join-Path $outputParent $verifiedReleaseManifestName
+    }
+}
+catch {
+    $stableChannelManifestPath = $null
+}
 
 function Publish-PackagedAcceptanceSummary {
     param(
@@ -111,6 +124,83 @@ function Publish-PackagedAcceptanceSummary {
         Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedAcceptanceJsonName) -Force
         Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedAcceptanceTxtName) -Force
     }
+}
+
+function Get-FileHashValue {
+    param([string]$PathValue)
+    if (-not $PathValue) {
+        return ""
+    }
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        return ""
+    }
+    try {
+        return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash
+    }
+    catch {
+        return ""
+    }
+}
+
+function Write-VerifiedReleaseManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [Parameter(Mandatory = $true)][string]$ManifestKind,
+        [Parameter(Mandatory = $true)][string]$PackageRootRef,
+        [switch]$IncludeBundleHashes
+    )
+
+    $acceptanceSummary = @{}
+    if (Test-Path -LiteralPath $acceptanceSummaryJson) {
+        try {
+            $acceptanceSummary = Get-Content -LiteralPath $acceptanceSummaryJson -Raw | ConvertFrom-Json -AsHashtable
+        }
+        catch {
+            $acceptanceSummary = @{}
+        }
+    }
+
+    $payload = [ordered]@{
+        schema = "mole_latest_verified_release_v1"
+        manifest_kind = $ManifestKind
+        channel_name = "LOCAL_VERIFIED"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        package_label = $BundleLabel
+        git_commit = $gitCommit
+        git_branch = $gitBranch
+        built_at = $buildIdentity.built_at
+        package_root = $PackageRootRef
+        runtime_root = "runtime"
+        runtime_code_root = "runtime\\MOLE_code"
+        build_identity_path = "runtime\\config\\mole_build_identity_v1.json"
+        acceptance_status = [string]($acceptanceSummary["status"] ?? "")
+        acceptance_generated_at = [string]($acceptanceSummary["generated_at"] ?? "")
+        acceptance_summary_path = $publishedAcceptanceTxtName
+        acceptance_summary_json_path = $publishedAcceptanceJsonName
+        installer_script_path = "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+        installer_bundle_path = ""
+        portable_bundle_path = ""
+        hashes = [ordered]@{
+            build_identity_sha256 = Get-FileHashValue $buildIdentityPath
+            acceptance_summary_txt_sha256 = Get-FileHashValue $acceptanceSummaryTxt
+            acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
+            installer_bundle_sha256 = ""
+            portable_bundle_sha256 = ""
+        }
+    }
+
+    if ($IncludeBundleHashes) {
+        $payload.installer_bundle_path = [System.IO.Path]::GetFileName($installerZip)
+        $payload.portable_bundle_path = [System.IO.Path]::GetFileName($shareZip)
+        $payload.hashes.installer_bundle_sha256 = Get-FileHashValue $installerZip
+        $payload.hashes.portable_bundle_sha256 = Get-FileHashValue $shareZip
+    }
+
+    [System.IO.File]::WriteAllText(
+        $DestinationPath,
+        ($payload | ConvertTo-Json -Depth 6),
+        (New-Object System.Text.UTF8Encoding($false))
+    )
 }
 
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
@@ -749,6 +839,8 @@ if (-not $SkipPackagedAcceptance) {
     Require-Path $acceptanceSummaryJson "Packaged acceptance summary JSON"
     Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
     Publish-PackagedAcceptanceSummary -SourceJson $acceptanceSummaryJson -SourceTxt $acceptanceSummaryTxt -TargetRoots @($OutputRoot, $installRoot)
+    Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
 }
 
 if (Test-Path -LiteralPath $shareZip) {
@@ -774,6 +866,13 @@ for dst in targets:
                 zf.write(path, path.relative_to(src))
 "@
 ) -WorkingDirectory $RepoRoot
+
+if (-not $SkipPackagedAcceptance) {
+    Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "release_channel" -PackageRootRef "." -IncludeBundleHashes
+    if ($stableChannelManifestPath) {
+        Write-VerifiedReleaseManifest -DestinationPath $stableChannelManifestPath -ManifestKind "release_channel" -PackageRootRef ([System.IO.Path]::GetFileName($OutputRoot)) -IncludeBundleHashes
+    }
+}
 
 Write-Host ""
 Write-Host "Executable bundle ready:"
