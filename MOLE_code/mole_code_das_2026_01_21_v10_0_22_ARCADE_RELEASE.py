@@ -6940,6 +6940,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
         summary = str(record.get("package_status_summary") or "").strip()
         detail = str(record.get("package_status_detail") or "").strip()
+        stale_ack = bool(record.get("stale_package_acknowledged"))
         banner_bg, banner_fg = _build_status_banner_style(status)
         frame = tk.Frame(parent, bg=banner_bg, highlightbackground=banner_fg, highlightthickness=1, bd=0)
         frame.pack(anchor="nw", fill="x", pady=(0, 14))
@@ -6963,11 +6964,24 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 wraplength=620,
                 font=("Consolas", 9),
             ).pack(fill="x", padx=12, pady=(0, 6))
+        if status == "STALE" and stale_ack:
+            tk.Label(
+                frame,
+                text="Stale package was acknowledged for this Wizard session.",
+                fg=banner_fg,
+                bg=banner_bg,
+                anchor="w",
+                justify="left",
+                wraplength=620,
+                font=("Consolas", 9, "bold"),
+            ).pack(fill="x", padx=12, pady=(0, 6))
         actions = tk.Frame(frame, bg=banner_bg)
         actions.pack(fill="x", padx=8, pady=(0, 8))
         action_specs = [
             ("Open Build Info", self._show_wizard_build_info, True),
         ]
+        if status == "STALE" and not stale_ack:
+            action_specs.append(("Acknowledge Stale Package", self._acknowledge_stale_package_status, True))
         if status != "CURRENT":
             action_specs.extend(
                 [
@@ -7390,6 +7404,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "active_config_path": cfg_path,
             "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
+            "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
         }
         payload.update(status_record)
         return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
@@ -7433,6 +7448,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "logs_dir": str(self.logs_dir),
             "support_bundle_root": str(self._wizard_support_bundle_root()),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
+            "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
         }
         merged.update(status_record)
         if isinstance(record, dict):
@@ -7440,6 +7456,31 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 if value not in (None, ""):
                     merged[key] = value
         return merged
+
+    def _runtime_policy_state(self) -> Dict[str, Any]:
+        state = getattr(self, "_runtime_policy_state_cache", None)
+        if not isinstance(state, dict):
+            state = {}
+            setattr(self, "_runtime_policy_state_cache", state)
+        return state
+
+    def _stale_package_acknowledged(self) -> bool:
+        return bool(self._runtime_policy_state().get("stale_package_acknowledged"))
+
+    def _acknowledge_stale_package_status(self, *, rebuild: bool = True) -> None:
+        state = self._runtime_policy_state()
+        if state.get("stale_package_acknowledged"):
+            return
+        state["stale_package_acknowledged"] = True
+        try:
+            self._write_startup_diagnostic()
+        except Exception:
+            pass
+        if rebuild:
+            try:
+                self.goto(getattr(self, "current_state", "WELCOME") or "WELCOME")
+            except Exception:
+                pass
 
     def _runtime_action_policy_record(self, *, action_label: str, action_scope: str) -> Dict[str, Any]:
         record = self._wizard_build_info_record()
@@ -7451,13 +7492,23 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
                 "action_scope": str(action_scope or "GENERAL").strip().upper() or "GENERAL",
                 "action_label": str(action_label or "This action").strip() or "This action",
+                "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
             }
         try:
-            return evaluate_runtime_action_policy(
+            policy = evaluate_runtime_action_policy(
                 package_status_record=record,
                 action_scope=action_scope,
                 action_label=action_label,
             )
+            if str(policy.get("decision") or "").strip().upper() == "ACK" and self._stale_package_acknowledged():
+                policy = dict(policy)
+                policy["decision"] = "ALLOW"
+                policy["message"] = (
+                    f"{action_label} can continue.\n\n"
+                    "This stale package was explicitly acknowledged for the current Wizard session."
+                )
+            policy["stale_package_acknowledged"] = bool(self._stale_package_acknowledged())
+            return policy
         except Exception:
             return {
                 "decision": "ALLOW",
@@ -7466,6 +7517,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
                 "action_scope": str(action_scope or "GENERAL").strip().upper() or "GENERAL",
                 "action_label": str(action_label or "This action").strip() or "This action",
+                "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
             }
 
     def _enforce_runtime_action_policy(self, *, action_label: str, action_scope: str) -> bool:
@@ -7477,7 +7529,10 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             messagebox.showerror(title, message)
             return False
         if decision == "ACK":
-            return bool(messagebox.askyesno(title, message))
+            ok = bool(messagebox.askyesno(title, message))
+            if ok:
+                self._acknowledge_stale_package_status(rebuild=False)
+            return ok
         if decision == "WARN":
             messagebox.showwarning(title, message)
             return True
@@ -18315,6 +18370,21 @@ def _build_intake(self) -> None:
                 except Exception:
                     pass
 
+        action_scope = "COMPLIANCE"
+        action_label = "DAQ Runner production/test launch"
+        if is_diag_sim:
+            action_scope = "DIAGNOSTICS"
+            action_label = "DAQ Runner diagnostics training launch"
+        elif is_diag:
+            action_scope = "DIAGNOSTICS"
+            action_label = "DAQ Runner diagnostics launch"
+        elif is_sim:
+            action_scope = "TRAINING"
+            action_label = "DAQ Runner training launch"
+        policy = self._runtime_action_policy_record(action_label=action_label, action_scope=action_scope)
+        policy_decision = str(policy.get("decision") or "ALLOW").strip().upper() or "ALLOW"
+        policy_message = str(policy.get("message") or "").strip()
+        launch_enabled = policy_decision in ("ALLOW", "WARN")
         if is_diag_sim:
             btn_label = wizard_runner_launch_button_label("SIM", True)
         elif is_diag:
@@ -18323,8 +18393,39 @@ def _build_intake(self) -> None:
             btn_label = "Launch DAQ Runner (SIM / TRAINING)"
         else:
             btn_label = "Launch DAQ Runner (TEST)"
-        tk.Button(self.center, text=btn_label, command=_launch_now,
-                  bg=self.BTN_BG, fg=self.BTN_FG, relief="flat", padx=10, pady=8).pack(anchor="w", padx=10, pady=(0, 10))
+        launch_btn = tk.Button(
+            self.center,
+            text=btn_label,
+            command=_launch_now,
+            bg=self.BTN_BG,
+            fg=self.BTN_FG,
+            relief="flat",
+            padx=10,
+            pady=8,
+            state=("normal" if launch_enabled else "disabled"),
+        )
+        launch_btn.pack(anchor="w", padx=10, pady=(0, 10))
+        if not launch_enabled:
+            tk.Label(
+                self.center,
+                text=policy_message,
+                bg=self.BG,
+                fg=self.FG_WARN,
+                justify="left",
+                wraplength=760,
+                font=("Consolas", 9, "bold"),
+            ).pack(anchor="w", padx=10, pady=(0, 8))
+            if policy_decision == "ACK":
+                tk.Button(
+                    self.center,
+                    text="Acknowledge Stale Package For This Session",
+                    command=self._acknowledge_stale_package_status,
+                    bg=self.BTN_BG2,
+                    fg=self.BTN_FG,
+                    relief="flat",
+                    padx=10,
+                    pady=6,
+                ).pack(anchor="w", padx=10, pady=(0, 10))
 
         # Notes / guardrails
         if is_diag_sim:
@@ -19497,6 +19598,16 @@ def _build_intake(self) -> None:
             cfg_p = self._ensure_applied_config_silent()
 
         if cfg_p is None:
+            return
+
+        action_scope = self._runner_launch_policy_scope(launch_mode)
+        action_label = "DAQ Runner production/test launch"
+        if action_scope == "DIAGNOSTICS":
+            action_label = "DAQ Runner diagnostics launch"
+        elif action_scope == "TRAINING":
+            action_label = "DAQ Runner training launch"
+        policy = self._runtime_action_policy_record(action_label=action_label, action_scope=action_scope)
+        if str(policy.get("decision") or "ALLOW").strip().upper() != "ALLOW":
             return
 
         self._launch_daq_runner(cfg_p, launch_mode=launch_mode)

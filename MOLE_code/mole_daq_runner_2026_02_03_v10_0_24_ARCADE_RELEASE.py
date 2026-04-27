@@ -5897,6 +5897,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=early_payload, keep=20)
     except Exception:
         pass
+    package_policy_state: Dict[str, Any] = {"stale_package_acknowledged": False}
+    current_runtime_launch_mode: Dict[str, str] = {"value": str(early_launch_mode or "runner").strip().lower() or "runner"}
+    package_policy_button_labels: Dict[Any, str] = {}
+    runner_status_banner_refresh: Optional[Any] = None
 
     # -------------------------------
     # Session IO + schema helpers
@@ -8689,58 +8693,100 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     runtime_identity_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     _bind_safe_wrap(runtime_identity_lbl, left, pad_px=32, min_wrap=180)
     def _render_runner_startup_status_banner(parent: tk.Widget) -> None:
-        record = _runtime_package_status_record(build_identity)
-        status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
-        summary = str(record.get("package_status_summary") or "").strip()
-        detail = str(record.get("package_status_detail") or "").strip()
-        banner_bg, banner_fg = _build_status_banner_style(status)
-        frame = tk.Frame(parent, bg=banner_bg, highlightbackground=banner_fg, highlightthickness=1, bd=0)
+        status_var = tk.StringVar(value="")
+        detail_var = tk.StringVar(value="")
+        stale_ack_var = tk.StringVar(value="")
+        frame = tk.Frame(parent, bg=BG, highlightbackground=FG_DIM, highlightthickness=1, bd=0)
         frame.pack(fill="x", padx=12, pady=(0, 8))
         tk.Label(
             frame,
-            text=f"{status}: {summary}",
-            fg=banner_fg,
-            bg=banner_bg,
+            textvariable=status_var,
+            fg=FG,
+            bg=BG,
             anchor="w",
             justify="left",
             font=("Consolas", 9, "bold"),
         ).pack(fill="x", padx=10, pady=(8, 4))
-        if detail and detail != summary:
-            tk.Label(
-                frame,
-                text=detail,
-                fg=banner_fg,
-                bg=banner_bg,
-                anchor="w",
-                justify="left",
-                wraplength=240,
-                font=("Consolas", 8),
-            ).pack(fill="x", padx=10, pady=(0, 6))
-        actions = tk.Frame(frame, bg=banner_bg)
+        detail_lbl = tk.Label(
+            frame,
+            textvariable=detail_var,
+            fg=FG,
+            bg=BG,
+            anchor="w",
+            justify="left",
+            wraplength=240,
+            font=("Consolas", 8),
+        )
+        detail_lbl.pack(fill="x", padx=10, pady=(0, 6))
+        stale_ack_lbl = tk.Label(
+            frame,
+            textvariable=stale_ack_var,
+            fg=ACC,
+            bg=BG,
+            anchor="w",
+            justify="left",
+            wraplength=240,
+            font=("Consolas", 8, "bold"),
+        )
+        stale_ack_lbl.pack(fill="x", padx=10, pady=(0, 6))
+        actions = tk.Frame(frame, bg=BG)
         actions.pack(fill="x", padx=6, pady=(0, 6))
         startup_path = _latest_startup_diagnostic_path(_app_base_dir().parent / "mole_das_data" / "logs", "runner_startup")
-        action_specs = [
-            ("Build Info", lambda: _show_runner_build_info(_load_session()), True),
-        ]
-        if status != "CURRENT":
-            action_specs.extend(
-                [
-                    ("Acceptance", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
-                    ("Install Root", lambda: _open_fs_target(record.get("install_root_path") or "", title="Open Install Root Failed"), bool(record.get("install_root_path"))),
-                    ("Startup Stamp", lambda: _open_fs_target(startup_path or "", title="Open Startup Diagnostic Failed"), bool(startup_path)),
-                ]
-            )
-        for idx, (label, cmd, enabled) in enumerate(action_specs):
-            tk.Button(
+        action_buttons: Dict[str, Any] = {}
+        for label, cmd in [
+            ("Build Info", lambda: _show_runner_build_info(_load_session())),
+            ("Acceptance", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed")),
+            ("Install Root", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("install_root_path") or "", title="Open Install Root Failed")),
+            ("Startup Stamp", lambda: _open_fs_target(startup_path or "", title="Open Startup Diagnostic Failed")),
+            ("Acknowledge", lambda: _acknowledge_runner_stale_package_status(refresh_ui=True)),
+        ]:
+            btn = tk.Button(
                 actions,
                 text=label,
                 command=cmd,
                 bg=BTN_BG,
                 fg=FG,
                 relief="flat",
-                state=("normal" if enabled else "disabled"),
-            ).grid(row=0, column=idx, sticky="ew", padx=3, pady=2)
-            actions.grid_columnconfigure(idx, weight=1)
+            )
+            action_buttons[label] = btn
+        def _refresh_runner_startup_status_banner() -> None:
+            record = _runner_build_info_record(_load_session())
+            status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+            summary = str(record.get("package_status_summary") or "").strip()
+            detail = str(record.get("package_status_detail") or "").strip()
+            stale_ack = bool(record.get("stale_package_acknowledged"))
+            banner_bg, banner_fg = _build_status_banner_style(status)
+            frame.configure(bg=banner_bg, highlightbackground=banner_fg)
+            for widget in (actions,):
+                widget.configure(bg=banner_bg)
+            for widget in frame.winfo_children():
+                if isinstance(widget, tk.Label):
+                    widget.configure(bg=banner_bg, fg=banner_fg if widget is not stale_ack_lbl else banner_fg)
+            stale_ack_lbl.configure(fg=banner_fg)
+            status_var.set(f"{status}: {summary}")
+            detail_var.set(detail if detail and detail != summary else "")
+            stale_ack_var.set("Stale package acknowledged for this Runner session." if status == "STALE" and stale_ack else "")
+            specs = [("Build Info", True)]
+            if status != "CURRENT":
+                specs.extend(
+                    [
+                        ("Acceptance", bool(record.get("packaged_acceptance_summary_path"))),
+                        ("Install Root", bool(record.get("install_root_path"))),
+                        ("Startup Stamp", bool(startup_path)),
+                    ]
+                )
+            if status == "STALE" and not stale_ack:
+                specs.append(("Acknowledge", True))
+            for child in list(actions.winfo_children()):
+                child.grid_forget()
+            for idx, (label, enabled) in enumerate(specs):
+                btn = action_buttons[label]
+                btn.configure(state=("normal" if enabled else "disabled"), bg=BTN_BG, fg=FG)
+                btn.grid(row=0, column=idx, sticky="ew", padx=3, pady=2)
+                actions.grid_columnconfigure(idx, weight=1)
+        nonlocal runner_status_banner_refresh
+        runner_status_banner_refresh = _refresh_runner_startup_status_banner
+        _refresh_runner_startup_status_banner()
     _render_runner_startup_status_banner(left_inner)
     recovery_btns = tk.Frame(left_inner, bg=BG)
     recovery_btns.pack(fill="x", padx=12, pady=(0, 8))
@@ -11022,6 +11068,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         bg=BG,
         font=("Consolas", 9),
     ).pack(anchor="w", pady=(0, 6))
+    package_policy_var = tk.StringVar(value="Package policy: compliance controls not yet evaluated.")
+    tk.Label(
+        report_builder_wrap,
+        textvariable=package_policy_var,
+        fg=FG_DIM,
+        bg=BG,
+        justify="left",
+        wraplength=760,
+        font=("Consolas", 9, "bold"),
+    ).pack(anchor="w", pady=(0, 8))
 
     report_builder_form = tk.Frame(report_builder_wrap, bg=BG)
     report_builder_form.pack(fill="x", pady=(0, 8))
@@ -11978,6 +12034,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             launch_mode = "diagnostics"
         elif _mole_env_mode(sess) == "TRAINING":
             launch_mode = "training"
+        current_runtime_launch_mode["value"] = str(launch_mode or "runner").strip().lower() or "runner"
         welcome_sheet = _select_welcome_sprite_path()
         startup_payload = {
             "app": "runner",
@@ -16496,6 +16553,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "active_config_path": str(cfg_path),
             "welcome_asset_sheet": str(welcome_sheet) if welcome_sheet is not None else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess_local) == "TRAINING")),
+            "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
         }
         payload.update(_runtime_package_status_record(build_identity))
         return _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=payload, keep=20)
@@ -16540,6 +16598,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "logs_dir": str(_runner_logs_dir(sess_local)),
             "support_bundle_root": str(_runner_support_bundle_root(sess_local)),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
+            "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
         }
         merged.update(status_record)
         if isinstance(record, dict):
@@ -16563,13 +16622,23 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
                 "action_scope": str(action_scope or "COMPLIANCE").strip().upper() or "COMPLIANCE",
                 "action_label": str(action_label or "This action").strip() or "This action",
+                "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
             }
         try:
-            return evaluate_runtime_action_policy(
+            policy = evaluate_runtime_action_policy(
                 package_status_record=record,
                 action_scope=action_scope,
                 action_label=action_label,
             )
+            if str(policy.get("decision") or "").strip().upper() == "ACK" and bool(package_policy_state.get("stale_package_acknowledged")):
+                policy = dict(policy)
+                policy["decision"] = "ALLOW"
+                policy["message"] = (
+                    f"{action_label} can continue.\n\n"
+                    "This stale package was explicitly acknowledged for the current Runner session."
+                )
+            policy["stale_package_acknowledged"] = bool(package_policy_state.get("stale_package_acknowledged"))
+            return policy
         except Exception:
             return {
                 "decision": "ALLOW",
@@ -16578,7 +16647,33 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 "package_status": str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED",
                 "action_scope": str(action_scope or "COMPLIANCE").strip().upper() or "COMPLIANCE",
                 "action_label": str(action_label or "This action").strip() or "This action",
+                "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
             }
+
+    def _acknowledge_runner_stale_package_status(*, refresh_ui: bool = True) -> None:
+        if package_policy_state.get("stale_package_acknowledged"):
+            return
+        package_policy_state["stale_package_acknowledged"] = True
+        try:
+            sess_local = _load_session()
+            _ensure_daq_schema(sess_local)
+            _write_runner_startup_diagnostic(sess_local, current_runtime_launch_mode.get("value") or "runner")
+        except Exception:
+            pass
+        if refresh_ui:
+            try:
+                sess_local = _load_session()
+                _ensure_daq_schema(sess_local)
+                _apply_session_review_lock_state(sess_local)
+                _apply_ftir_validation_lock_state(sess_local)
+                _refresh_report_builder_status(sess_local)
+            except Exception:
+                pass
+            try:
+                if callable(runner_status_banner_refresh):
+                    runner_status_banner_refresh()
+            except Exception:
+                pass
 
     def _enforce_runner_runtime_action_policy(
         sess_local: Dict[str, Any],
@@ -16598,7 +16693,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             messagebox.showerror(title, message)
             return False
         if decision == "ACK":
-            return bool(messagebox.askyesno(title, message))
+            ok = bool(messagebox.askyesno(title, message))
+            if ok:
+                _acknowledge_runner_stale_package_status(refresh_ui=True)
+            return ok
         if decision == "WARN":
             messagebox.showwarning(title, message)
             return True
@@ -17376,6 +17474,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _set_widget_state(btn_session_review_unlock, "normal" if enabled and locked else "disabled")
             _set_widget_state(btn_session_review_sign, "normal" if enabled and locked and not signed else "disabled")
             _set_widget_state(btn_session_review_clear_signoff, "normal" if enabled and signed else "disabled")
+            try:
+                _apply_runner_package_policy_controls(sess_use)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -17472,6 +17574,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             _set_widget_state(txt_ftir_validation_signoff_note, "disabled" if signed else "normal")
             _set_widget_state(btn_ftir_validation_sign, "normal" if locked and not signed else "disabled")
             _set_widget_state(btn_ftir_validation_clear_signoff, "normal" if signed else "disabled")
+            try:
+                _apply_runner_package_policy_controls(sess_use)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -19108,6 +19214,55 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         _ensure_daq_schema(sess_use)
         _open_fs_target(_report_builder_paths(sess_use).get("report_pack_dir"), title="Open Report Pack Folder Failed")
 
+    def _apply_runner_package_policy_controls(sess_local: Optional[Dict[str, Any]] = None) -> None:
+        if diagnostics_ui:
+            return
+        try:
+            sess_use = dict(sess_local) if isinstance(sess_local, dict) else _load_session()
+            policy = _runner_runtime_action_policy_record(
+                sess_use,
+                action_label="Formal report build",
+                action_scope="COMPLIANCE",
+            )
+            decision = str(policy.get("decision") or "ALLOW").strip().upper() or "ALLOW"
+            status = str(policy.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
+            stale_ack = bool(policy.get("stale_package_acknowledged"))
+            disable_controls = decision not in ("ALLOW", "WARN")
+            if disable_controls:
+                if decision == "ACK":
+                    reason_suffix = "Needs Stale Ack"
+                else:
+                    reason_suffix = f"Blocked: {status}"
+            else:
+                reason_suffix = ""
+            for button, base_text in [
+                (btn_tm_report_pack, "Build Report"),
+                (btn_report_builder_build, "Build Formal Report"),
+                (btn_session_review_lock, "Lock Review"),
+                (btn_session_review_sign, "Sign Review"),
+                (btn_ftir_validation_lock, "Lock FTIR Review"),
+                (btn_ftir_validation_sign, "Sign FTIR Review"),
+            ]:
+                package_policy_button_labels.setdefault(button, base_text)
+                button.configure(text=(f"{base_text} ({reason_suffix})" if reason_suffix else base_text))
+                if disable_controls:
+                    _set_widget_state(button, "disabled")
+            if not disable_controls:
+                _set_widget_state(btn_tm_report_pack, "normal")
+                _set_widget_state(btn_report_builder_build, "normal")
+            try:
+                if disable_controls:
+                    if decision == "ACK" and stale_ack:
+                        package_policy_var.set("Compliance controls enabled after stale-package acknowledgment.")
+                    else:
+                        package_policy_var.set(str(policy.get("message") or "").strip() or "Compliance controls are disabled by package policy.")
+                else:
+                    package_policy_var.set("Compliance controls are available for this package state.")
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     try:
         btn_session_review_lock.configure(command=_lock_session_review)
         btn_session_review_unlock.configure(command=_unlock_session_review)
@@ -19162,6 +19317,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             btn_report_builder_open_final.configure(state="disabled")
             btn_report_builder_open_final_dir.configure(state="disabled")
             btn_report_builder_open_pack_dir.configure(state="disabled")
+        else:
+            _apply_runner_package_policy_controls(_load_session())
     except Exception:
         pass
 
