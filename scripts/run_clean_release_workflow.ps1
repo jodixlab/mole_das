@@ -160,13 +160,17 @@ try {
     }
 
     Invoke-Step "Build Windows executable bundle" {
+        $gitCommit = (git -C $repo rev-parse --short HEAD | Select-Object -First 1).Trim()
+        $gitBranch = (git -C $repo rev-parse --abbrev-ref HEAD | Select-Object -First 1).Trim()
         Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
             "-NoProfile",
             "-ExecutionPolicy", "Bypass",
             "-File", "scripts\build_windows_executable_bundle.ps1",
             "-RepoRoot", ".",
             "-OutputRoot", $bundleRoot,
-            "-BundleLabel", $bundleLabel
+            "-BundleLabel", $bundleLabel,
+            "-GitCommit", $gitCommit,
+            "-GitBranch", $gitBranch
         ) -WorkingDirectory $workspace
 
         $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")

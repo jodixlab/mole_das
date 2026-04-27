@@ -7,6 +7,10 @@ param(
 
     [string]$BundleLabel = "MOLE_DAS_WINDOWS_EXE_BUNDLE",
 
+    [string]$GitCommit = "",
+
+    [string]$GitBranch = "",
+
     [switch]$SkipPackagedAcceptance
 )
 
@@ -240,16 +244,18 @@ with zipfile.ZipFile(zip_path, 'r') as zf:
 ) -WorkingDirectory $RepoRoot
 
 $buildIdentityPath = Join-Path $runtimeConfigRoot "mole_build_identity_v1.json"
-$gitCommit = ""
-$gitBranch = ""
-try {
-    $gitCommit = (git -C $RepoRoot rev-parse --short HEAD 2>$null | Select-Object -First 1).Trim()
+if (-not $gitCommit) {
+    try {
+        $gitCommit = (git -C $RepoRoot rev-parse --short HEAD 2>$null | Select-Object -First 1).Trim()
+    }
+    catch {}
 }
-catch {}
-try {
-    $gitBranch = (git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1).Trim()
+if (-not $gitBranch) {
+    try {
+        $gitBranch = (git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1).Trim()
+    }
+    catch {}
 }
-catch {}
 $buildManifestGeneratedAt = $null
 try {
     $repoBuildManifestPath = Join-Path $RepoRoot "BUILD_MANIFEST.json"
