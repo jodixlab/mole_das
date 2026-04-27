@@ -18,6 +18,7 @@ MOLE-DAS Data Acquisition System
 - Generated clean-workspace ZIP, release cert, and package hygiene reports also appear under `RELEASES/clean_release_workflow/`
 - Generated executable bundle ZIPs and packaged-acceptance summaries also appear under `RELEASES/clean_release_workflow/`
 - The canonical verified release channel manifest `latest_verified_release_v1.json` is emitted with executable bundle builds and copied into `RELEASES/clean_release_workflow/`
+- The executable bundle builder also emits `PACKAGE_VERSION_AUDIT.json` and `PACKAGE_VERSION_AUDIT.txt`, and the clean release workflow copies both into `RELEASES/clean_release_workflow/`
 - Dependency manifests, release bundle summary, and release artifact contract are also emitted under `RELEASES/clean_release_workflow/`
 - Final go/no-go decision artifacts are emitted under `RELEASES/clean_release_workflow/`
 - UI help release artifacts now also include a coverage audit and a documentation update review pack under `RELEASES/clean_release_workflow/`

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -284,6 +285,32 @@ def _load_json_dict(path_value: Any) -> Dict[str, Any]:
         return {}
 
 
+def _sha256_file(path_value: Any) -> str:
+    path = path_value if isinstance(path_value, Path) else _safe_path(path_value)
+    if not isinstance(path, Path) or not path.exists() or not path.is_file():
+        return ""
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except Exception:
+        return ""
+    return digest.hexdigest().upper()
+
+
+def _normalize_hash_map(raw_value: Any) -> Dict[str, str]:
+    if not isinstance(raw_value, Mapping):
+        return {}
+    normalized: Dict[str, str] = {}
+    for key, value in raw_value.items():
+        name = str(key or "").strip()
+        if not name:
+            continue
+        normalized[name] = str(value or "").strip().upper()
+    return normalized
+
+
 def _path_is_same_or_child(path: Path, root: Path) -> bool:
     try:
         path_r = path.resolve()
@@ -485,6 +512,36 @@ def _normalize_verified_release_manifest(
             payload.get("installer_script_path"),
             root_fallback=package_root,
         ),
+        "version_audit_json_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("version_audit_json_path"),
+            root_fallback=package_root,
+        ),
+        "version_audit_txt_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("version_audit_txt_path"),
+            root_fallback=package_root,
+        ),
+        "launcher_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("launcher_path"),
+            root_fallback=package_root,
+        ),
+        "wizard_exe_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("wizard_exe_path"),
+            root_fallback=package_root,
+        ),
+        "runner_exe_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("runner_exe_path"),
+            root_fallback=package_root,
+        ),
+        "script_runner_exe_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("script_runner_exe_path"),
+            root_fallback=package_root,
+        ),
         "installer_bundle_path": _resolve_manifest_path(
             manifest_path,
             payload.get("installer_bundle_path"),
@@ -503,6 +560,7 @@ def _normalize_verified_release_manifest(
         "git_commit": str(payload.get("git_commit") or "").strip(),
         "git_branch": str(payload.get("git_branch") or "").strip(),
         "built_at": str(payload.get("built_at") or "").strip(),
+        "hashes": _normalize_hash_map(payload.get("hashes") or {}),
     }
 
 
@@ -834,6 +892,194 @@ def evaluate_runtime_package_status(
         "latest_verified_installer_bundle_path": str(latest_verified.get("installer_bundle_path")) if isinstance(latest_verified.get("installer_bundle_path"), Path) else "",
         "installed_wizard_executable_path": str(installed_executables.get("wizard")) if isinstance(installed_executables.get("wizard"), Path) else "",
         "installed_runner_executable_path": str(installed_executables.get("runner")) if isinstance(installed_executables.get("runner"), Path) else "",
+    }
+
+
+def _load_verified_release_manifest_for_purpose(
+    record: Optional[Mapping[str, Any]],
+    *,
+    purpose: str,
+) -> Dict[str, Any]:
+    data = dict(record or {})
+    purpose_key = str(purpose or "").strip().upper()
+    candidates: list[Path] = []
+    install_root = _safe_path(data.get("install_root_path"))
+    if purpose_key.startswith("RELAUNCH") and isinstance(install_root, Path):
+        candidates.append(install_root / "latest_verified_release_v1.json")
+    manifest_path = _safe_path(data.get("verified_release_manifest_path"))
+    if isinstance(manifest_path, Path):
+        candidates.append(manifest_path)
+    current_package_root = _safe_path(data.get("current_package_root_path"))
+    if isinstance(current_package_root, Path):
+        candidates.append(current_package_root / "latest_verified_release_v1.json")
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        payload = _load_json_dict(candidate)
+        normalized = _normalize_verified_release_manifest(
+            candidate,
+            payload,
+            root_fallback=(candidate.parent if candidate.name.lower() == "latest_verified_release_v1.json" else None),
+        )
+        if normalized and str(normalized.get("acceptance_status") or "").upper() == "PASS":
+            return normalized
+    return {}
+
+
+def _append_release_verification_issue(details: list[str], message: str) -> None:
+    text = str(message or "").strip()
+    if text:
+        details.append(text)
+
+
+def _verify_release_hash(
+    details: list[str],
+    *,
+    label: str,
+    path: Optional[Path],
+    expected_hash: str,
+    required: bool = True,
+) -> None:
+    target = path if isinstance(path, Path) else None
+    if not isinstance(target, Path) or not target.exists() or not target.is_file():
+        if required:
+            _append_release_verification_issue(details, f"{label} is missing.")
+        return
+    expected = str(expected_hash or "").strip().upper()
+    if not expected:
+        if required:
+            _append_release_verification_issue(details, f"Verified release manifest is missing {label} SHA256.")
+        return
+    actual = _sha256_file(target)
+    if not actual:
+        _append_release_verification_issue(details, f"{label} SHA256 could not be computed.")
+        return
+    if actual != expected:
+        _append_release_verification_issue(
+            details,
+            f"{label} SHA256 mismatch. Expected {expected}, got {actual}.",
+        )
+
+
+def verify_verified_release_reference(
+    package_status_record: Optional[Mapping[str, Any]] = None,
+    *,
+    purpose: str = "INSTALL",
+    target: str = "WIZARD",
+) -> Dict[str, Any]:
+    record = dict(package_status_record or {})
+    purpose_key = str(purpose or "INSTALL").strip().upper() or "INSTALL"
+    target_key = str(target or "WIZARD").strip().upper() or "WIZARD"
+    manifest = _load_verified_release_manifest_for_purpose(record, purpose=purpose_key)
+    details: list[str] = []
+    if not manifest:
+        details.append("No PASS verified release manifest was found for this action.")
+        return {
+            "status": "FAIL",
+            "purpose": purpose_key,
+            "target": target_key,
+            "package_label": "",
+            "manifest_path": "",
+            "details": details,
+            "summary": details[0],
+        }
+
+    package_label = str(manifest.get("package_label") or "").strip()
+    package_root = manifest.get("package_root") if isinstance(manifest.get("package_root"), Path) else None
+    hashes = dict(manifest.get("hashes") or {})
+
+    build_identity_path = manifest.get("build_identity_path") if isinstance(manifest.get("build_identity_path"), Path) else None
+    acceptance_text_path = manifest.get("acceptance_text_path") if isinstance(manifest.get("acceptance_text_path"), Path) else None
+    acceptance_json_path = manifest.get("acceptance_json_path") if isinstance(manifest.get("acceptance_json_path"), Path) else None
+    installer_script_path = manifest.get("installer_script_path") if isinstance(manifest.get("installer_script_path"), Path) else None
+    version_audit_json_path = manifest.get("version_audit_json_path") if isinstance(manifest.get("version_audit_json_path"), Path) else None
+
+    if not package_label:
+        _append_release_verification_issue(details, "Verified release manifest is missing package_label.")
+    if not isinstance(package_root, Path) or not package_root.exists():
+        _append_release_verification_issue(details, "Verified release package root is missing.")
+
+    audit_payload = _load_json_dict(version_audit_json_path)
+    if not audit_payload:
+        _append_release_verification_issue(details, "Package version audit is missing.")
+    else:
+        if str(audit_payload.get("status") or "").strip().upper() != "PASS":
+            _append_release_verification_issue(details, "Package version audit is not PASS.")
+        audit_label = str(audit_payload.get("expected_bundle_label") or "").strip()
+        if package_label and audit_label and audit_label != package_label:
+            _append_release_verification_issue(
+                details,
+                f"Package version audit label {audit_label} does not match verified release label {package_label}.",
+            )
+
+    build_identity_payload = _load_json_dict(build_identity_path)
+    if not build_identity_payload:
+        _append_release_verification_issue(details, "Build identity manifest is missing.")
+    elif package_label and str(build_identity_payload.get("bundle_label") or "").strip() != package_label:
+        _append_release_verification_issue(details, "Build identity bundle label does not match the verified release label.")
+
+    acceptance_payload = _load_json_dict(acceptance_json_path)
+    if not acceptance_payload:
+        _append_release_verification_issue(details, "Packaged acceptance summary JSON is missing.")
+    else:
+        if str(acceptance_payload.get("status") or "").strip().upper() != "PASS":
+            _append_release_verification_issue(details, "Packaged acceptance summary JSON is not PASS.")
+        if package_label and str(acceptance_payload.get("package_label") or "").strip() != package_label:
+            _append_release_verification_issue(details, "Packaged acceptance package label does not match the verified release label.")
+
+    _verify_release_hash(details, label="Build identity manifest", path=build_identity_path, expected_hash=hashes.get("build_identity_sha256", ""), required=True)
+    _verify_release_hash(details, label="Packaged acceptance summary", path=acceptance_text_path, expected_hash=hashes.get("acceptance_summary_txt_sha256", ""), required=True)
+    _verify_release_hash(details, label="Packaged acceptance summary JSON", path=acceptance_json_path, expected_hash=hashes.get("acceptance_summary_json_sha256", ""), required=True)
+
+    if purpose_key.startswith("INSTALL"):
+        _verify_release_hash(details, label="Installer script", path=installer_script_path, expected_hash=hashes.get("installer_script_sha256", ""), required=True)
+        _verify_release_hash(details, label="Launcher batch", path=manifest.get("launcher_path") if isinstance(manifest.get("launcher_path"), Path) else None, expected_hash=hashes.get("launcher_batch_sha256", ""), required=True)
+        _verify_release_hash(details, label="Wizard executable", path=manifest.get("wizard_exe_path") if isinstance(manifest.get("wizard_exe_path"), Path) else None, expected_hash=hashes.get("wizard_exe_sha256", ""), required=True)
+        _verify_release_hash(details, label="Runner executable", path=manifest.get("runner_exe_path") if isinstance(manifest.get("runner_exe_path"), Path) else None, expected_hash=hashes.get("runner_exe_sha256", ""), required=True)
+        _verify_release_hash(details, label="ScriptRunner executable", path=manifest.get("script_runner_exe_path") if isinstance(manifest.get("script_runner_exe_path"), Path) else None, expected_hash=hashes.get("script_runner_exe_sha256", ""), required=True)
+    elif purpose_key.startswith("RELAUNCH"):
+        install_root = _safe_path(record.get("install_root_path"))
+        installed_runtime_root = _safe_path(record.get("installed_runtime_path"))
+        installed_build_identity_path = _safe_path(record.get("build_identity_manifest_path"))
+        if not isinstance(installed_build_identity_path, Path) and isinstance(installed_runtime_root, Path):
+            installed_build_identity_path = installed_runtime_root / "config" / "mole_build_identity_v1.json"
+        installed_acceptance_paths = _package_acceptance_paths(install_root)
+        installed_acceptance_txt = installed_acceptance_paths.get("text")
+        installed_acceptance_json = installed_acceptance_paths.get("json")
+        installed_acceptance_payload = _load_json_dict(installed_acceptance_json)
+        installed_build_identity_payload = _load_json_dict(installed_build_identity_path)
+        if not installed_build_identity_payload:
+            _append_release_verification_issue(details, "Installed build identity manifest is missing.")
+        elif package_label and str(installed_build_identity_payload.get("bundle_label") or "").strip() != package_label:
+            _append_release_verification_issue(details, "Installed build identity bundle label does not match the verified release label.")
+        if not installed_acceptance_payload:
+            _append_release_verification_issue(details, "Installed packaged acceptance summary JSON is missing.")
+        else:
+            if str(installed_acceptance_payload.get("status") or "").strip().upper() != "PASS":
+                _append_release_verification_issue(details, "Installed packaged acceptance summary JSON is not PASS.")
+            if package_label and str(installed_acceptance_payload.get("package_label") or "").strip() != package_label:
+                _append_release_verification_issue(details, "Installed packaged acceptance package label does not match the verified release label.")
+        _verify_release_hash(details, label="Installed build identity manifest", path=installed_build_identity_path, expected_hash=hashes.get("build_identity_sha256", ""), required=True)
+        _verify_release_hash(details, label="Installed packaged acceptance summary", path=installed_acceptance_txt, expected_hash=hashes.get("acceptance_summary_txt_sha256", ""), required=True)
+        _verify_release_hash(details, label="Installed packaged acceptance summary JSON", path=installed_acceptance_json, expected_hash=hashes.get("acceptance_summary_json_sha256", ""), required=True)
+        if target_key == "RUNNER":
+            _verify_release_hash(details, label="Installed Runner executable", path=_safe_path(record.get("installed_runner_executable_path")), expected_hash=hashes.get("runner_exe_sha256", ""), required=True)
+        else:
+            _verify_release_hash(details, label="Installed Wizard executable", path=_safe_path(record.get("installed_wizard_executable_path")), expected_hash=hashes.get("wizard_exe_sha256", ""), required=True)
+
+    status = "PASS" if not details else "FAIL"
+    summary = "Verified release reference passed integrity checks." if status == "PASS" else details[0]
+    return {
+        "status": status,
+        "purpose": purpose_key,
+        "target": target_key,
+        "package_label": package_label,
+        "manifest_path": str(manifest.get("manifest_path")) if isinstance(manifest.get("manifest_path"), Path) else "",
+        "details": details,
+        "summary": summary,
     }
 
 

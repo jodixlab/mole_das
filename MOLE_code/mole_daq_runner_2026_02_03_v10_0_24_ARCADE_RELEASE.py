@@ -497,7 +497,7 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
@@ -507,6 +507,7 @@ except Exception:
     load_latest_health_summary = None
     load_recent_health_history = None
     record_health_journal = None
+    verify_verified_release_reference = None
     write_recovery_snapshot = None
     write_startup_diagnostic = None
 
@@ -16849,6 +16850,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _relaunch_runner_from_installed_root(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
+        verification = verify_verified_release_reference(record, purpose="RELAUNCH", target="RUNNER")
+        if str(verification.get("status") or "").strip().upper() != "PASS":
+            note = "\n".join(str(x).strip() for x in (verification.get("details") or []) if str(x).strip())
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="RUNNER_EXE",
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note=note or str(verification.get("summary") or "Verified release relaunch preflight failed."),
+            )
+            messagebox.showerror(
+                "Resolve Package Status",
+                "Installed root relaunch blocked.\n\n"
+                + str(verification.get("summary") or "Verified release relaunch preflight failed.")
+                + (f"\n\n{note}" if note else ""),
+            )
+            return
         exe_text = str(record.get("installed_runner_executable_path") or "").strip()
         if not exe_text:
             _stamp_runner_package_remediation(
@@ -16901,6 +16920,24 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _install_latest_verified_package(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
+        verification = verify_verified_release_reference(record, purpose="INSTALL", target="RUNNER")
+        if str(verification.get("status") or "").strip().upper() != "PASS":
+            note = "\n".join(str(x).strip() for x in (verification.get("details") or []) if str(x).strip())
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_RELEASE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_package_label=str(record.get("verified_release_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note=note or str(verification.get("summary") or "Verified release install preflight failed."),
+            )
+            messagebox.showerror(
+                "Resolve Package Status",
+                "Verified release install blocked.\n\n"
+                + str(verification.get("summary") or "Verified release install preflight failed.")
+                + (f"\n\n{note}" if note else ""),
+            )
+            return
         script_text = _runner_resolution_installer_script(record)
         target_label = str(record.get("verified_release_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
         if not script_text:
@@ -16955,6 +16992,16 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 target_package_label=target_label,
                 note="Latest verified release installer completed successfully.",
             )
+            relaunch_verification = verify_verified_release_reference(refreshed, purpose="RELAUNCH", target="RUNNER")
+            if str(relaunch_verification.get("status") or "").strip().upper() != "PASS":
+                relaunch_note = "\n".join(str(x).strip() for x in (relaunch_verification.get("details") or []) if str(x).strip())
+                messagebox.showwarning(
+                    "Resolve Package Status",
+                    "Install completed, but the installed runtime failed verified-release relaunch checks.\n\n"
+                    + str(relaunch_verification.get("summary") or "Installed runtime verification failed.")
+                    + (f"\n\n{relaunch_note}" if relaunch_note else ""),
+                )
+                return
             if installed_exe and messagebox.askyesno(
                 "Resolve Package Status",
                 "Latest verified release install completed.\n\nRelaunch from the installed root now?",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import sys
@@ -13,10 +14,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import mole_runtime_durability_v1 as durability
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, verify_verified_release_reference, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
     def test_package_status_current_for_installed_verified_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -402,6 +407,332 @@ class RuntimeDurabilityTests(unittest.TestCase):
             self.assertEqual(result["verified_release_manifest_kind"], "package_root")
             self.assertEqual(result["verified_release_package_label"], "MOLE_DAS_2026_04_27_v3")
             self.assertEqual(result["verified_release_installer_script_path"], str(current_script.resolve()))
+
+    def test_verify_verified_release_reference_install_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package_root = root / "MOLE_DAS_2026_04_27_v7"
+            runtime_root = package_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            config_root = runtime_root / "config"
+            code_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+
+            bundle_label = "MOLE_DAS_2026_04_27_v7"
+            build_identity_path = config_root / "mole_build_identity_v1.json"
+            build_identity_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": bundle_label,
+                        "built_at": "2026-04-27T20:30:00Z",
+                        "runtime_root": str(runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_json_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            acceptance_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": bundle_label,
+                        "generated_at": "2026-04-27T20:31:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_txt_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            acceptance_txt_path.write_text("status=PASS\n", encoding="utf-8")
+            version_audit_json = package_root / "PACKAGE_VERSION_AUDIT.json"
+            version_audit_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_package_version_audit_v1",
+                        "status": "PASS",
+                        "expected_bundle_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            version_audit_txt = package_root / "PACKAGE_VERSION_AUDIT.txt"
+            version_audit_txt.write_text(f"Bundle label: {bundle_label}\nStatus: PASS\n", encoding="utf-8")
+            launcher_path = package_root / "LAUNCH_MOLE_DAS_EXE.bat"
+            launcher_path.write_text("@echo off\r\n", encoding="utf-8")
+            installer_script = package_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            installer_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
+            wizard_exe.write_bytes(b"wizard-binary")
+            runner_exe = code_root / "MOLE_DAQ_Runner.exe"
+            runner_exe.write_bytes(b"runner-binary")
+            script_runner_exe = code_root / "MOLE_ScriptRunner.exe"
+            script_runner_exe.write_bytes(b"script-runner-binary")
+            manifest_path = package_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "package_root",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T20:32:00Z",
+                        "package_root": ".",
+                        "package_label": bundle_label,
+                        "git_commit": "6781524",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T20:30:00Z",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "version_audit_json_path": "PACKAGE_VERSION_AUDIT.json",
+                        "version_audit_txt_path": "PACKAGE_VERSION_AUDIT.txt",
+                        "launcher_path": "LAUNCH_MOLE_DAS_EXE.bat",
+                        "wizard_exe_path": "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe",
+                        "runner_exe_path": "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe",
+                        "script_runner_exe_path": "runtime\\MOLE_code\\MOLE_ScriptRunner.exe",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                        "hashes": {
+                            "build_identity_sha256": self._sha256(build_identity_path),
+                            "acceptance_summary_txt_sha256": self._sha256(acceptance_txt_path),
+                            "acceptance_summary_json_sha256": self._sha256(acceptance_json_path),
+                            "installer_script_sha256": self._sha256(installer_script),
+                            "launcher_batch_sha256": self._sha256(launcher_path),
+                            "wizard_exe_sha256": self._sha256(wizard_exe),
+                            "runner_exe_sha256": self._sha256(runner_exe),
+                            "script_runner_exe_sha256": self._sha256(script_runner_exe),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = verify_verified_release_reference(
+                {"verified_release_manifest_path": str(manifest_path)},
+                purpose="INSTALL",
+                target="WIZARD",
+            )
+
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["package_label"], bundle_label)
+
+    def test_verify_verified_release_reference_relaunch_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            install_root = root / "install_root"
+            runtime_root = install_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            config_root = runtime_root / "config"
+            code_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+
+            bundle_label = "MOLE_DAS_2026_04_27_v8"
+            build_identity_path = config_root / "mole_build_identity_v1.json"
+            build_identity_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": bundle_label,
+                        "built_at": "2026-04-27T20:40:00Z",
+                        "runtime_root": str(runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_json_path = install_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            acceptance_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": bundle_label,
+                        "generated_at": "2026-04-27T20:41:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_txt_path = install_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            acceptance_txt_path.write_text("status=PASS\n", encoding="utf-8")
+            version_audit_json = install_root / "PACKAGE_VERSION_AUDIT.json"
+            version_audit_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_package_version_audit_v1",
+                        "status": "PASS",
+                        "expected_bundle_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            version_audit_txt = install_root / "PACKAGE_VERSION_AUDIT.txt"
+            version_audit_txt.write_text(f"Bundle label: {bundle_label}\nStatus: PASS\n", encoding="utf-8")
+            launcher_path = install_root / "LAUNCH_MOLE_DAS_EXE.bat"
+            launcher_path.write_text("@echo off\r\n", encoding="utf-8")
+            installer_script = install_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            installer_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
+            wizard_exe.write_bytes(b"wizard-binary")
+            runner_exe = code_root / "MOLE_DAQ_Runner.exe"
+            runner_exe.write_bytes(b"runner-binary")
+            script_runner_exe = code_root / "MOLE_ScriptRunner.exe"
+            script_runner_exe.write_bytes(b"script-runner-binary")
+            manifest_path = install_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "package_root",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T20:42:00Z",
+                        "package_root": ".",
+                        "package_label": bundle_label,
+                        "git_commit": "6781524",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T20:40:00Z",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "version_audit_json_path": "PACKAGE_VERSION_AUDIT.json",
+                        "version_audit_txt_path": "PACKAGE_VERSION_AUDIT.txt",
+                        "launcher_path": "LAUNCH_MOLE_DAS_EXE.bat",
+                        "wizard_exe_path": "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe",
+                        "runner_exe_path": "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe",
+                        "script_runner_exe_path": "runtime\\MOLE_code\\MOLE_ScriptRunner.exe",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                        "hashes": {
+                            "build_identity_sha256": self._sha256(build_identity_path),
+                            "acceptance_summary_txt_sha256": self._sha256(acceptance_txt_path),
+                            "acceptance_summary_json_sha256": self._sha256(acceptance_json_path),
+                            "installer_script_sha256": self._sha256(installer_script),
+                            "launcher_batch_sha256": self._sha256(launcher_path),
+                            "wizard_exe_sha256": self._sha256(wizard_exe),
+                            "runner_exe_sha256": self._sha256(runner_exe),
+                            "script_runner_exe_sha256": self._sha256(script_runner_exe),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = verify_verified_release_reference(
+                {
+                    "install_root_path": str(install_root),
+                    "installed_runtime_path": str(runtime_root),
+                    "installed_wizard_executable_path": str(wizard_exe),
+                    "build_identity_manifest_path": str(build_identity_path),
+                    "verified_release_manifest_path": str(manifest_path),
+                },
+                purpose="RELAUNCH",
+                target="WIZARD",
+            )
+
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["package_label"], bundle_label)
+
+    def test_verify_verified_release_reference_fails_on_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package_root = root / "MOLE_DAS_2026_04_27_v9"
+            runtime_root = package_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            config_root = runtime_root / "config"
+            code_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+
+            bundle_label = "MOLE_DAS_2026_04_27_v9"
+            build_identity_path = config_root / "mole_build_identity_v1.json"
+            build_identity_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": bundle_label,
+                        "built_at": "2026-04-27T20:50:00Z",
+                        "runtime_root": str(runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_json_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            acceptance_json_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_txt_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            acceptance_txt_path.write_text("status=PASS\n", encoding="utf-8")
+            version_audit_json = package_root / "PACKAGE_VERSION_AUDIT.json"
+            version_audit_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_package_version_audit_v1",
+                        "status": "PASS",
+                        "expected_bundle_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            launcher_path = package_root / "LAUNCH_MOLE_DAS_EXE.bat"
+            launcher_path.write_text("@echo off\r\n", encoding="utf-8")
+            installer_script = package_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            installer_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
+            wizard_exe.write_bytes(b"wizard-binary")
+            runner_exe = code_root / "MOLE_DAQ_Runner.exe"
+            runner_exe.write_bytes(b"runner-binary")
+            script_runner_exe = code_root / "MOLE_ScriptRunner.exe"
+            script_runner_exe.write_bytes(b"script-runner-binary")
+            manifest_path = package_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "package_root",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T20:51:00Z",
+                        "package_root": ".",
+                        "package_label": bundle_label,
+                        "git_commit": "6781524",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T20:50:00Z",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "version_audit_json_path": "PACKAGE_VERSION_AUDIT.json",
+                        "launcher_path": "LAUNCH_MOLE_DAS_EXE.bat",
+                        "wizard_exe_path": "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe",
+                        "runner_exe_path": "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe",
+                        "script_runner_exe_path": "runtime\\MOLE_code\\MOLE_ScriptRunner.exe",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                        "hashes": {
+                            "build_identity_sha256": "BADHASH",
+                            "acceptance_summary_txt_sha256": self._sha256(acceptance_txt_path),
+                            "acceptance_summary_json_sha256": self._sha256(acceptance_json_path),
+                            "installer_script_sha256": self._sha256(installer_script),
+                            "launcher_batch_sha256": self._sha256(launcher_path),
+                            "wizard_exe_sha256": self._sha256(wizard_exe),
+                            "runner_exe_sha256": self._sha256(runner_exe),
+                            "script_runner_exe_sha256": self._sha256(script_runner_exe),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = verify_verified_release_reference(
+                {"verified_release_manifest_path": str(manifest_path)},
+                purpose="INSTALL",
+                target="WIZARD",
+            )
+
+            self.assertEqual(result["status"], "FAIL")
+            self.assertTrue(any("SHA256 mismatch" in detail for detail in result["details"]))
 
     def test_runtime_action_policy_blocks_unverified_compliance(self) -> None:
         result = evaluate_runtime_action_policy(

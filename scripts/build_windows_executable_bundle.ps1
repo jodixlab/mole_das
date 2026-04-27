@@ -103,8 +103,14 @@ $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summ
 $publishedAcceptanceJsonName = "PACKAGED_ACCEPTANCE_SUMMARY.json"
 $publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
+$versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
+$versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
 $verifiedReleaseManifestPath = Join-Path $OutputRoot $verifiedReleaseManifestName
 $shareVerifiedReleaseManifestPath = Join-Path $installRoot $verifiedReleaseManifestName
+$versionAuditJsonPath = Join-Path $OutputRoot $versionAuditJsonName
+$versionAuditTxtPath = Join-Path $OutputRoot $versionAuditTxtName
+$shareVersionAuditJsonPath = Join-Path $installRoot $versionAuditJsonName
+$shareVersionAuditTxtPath = Join-Path $installRoot $versionAuditTxtName
 $stableChannelManifestPath = $null
 try {
     $outputParent = Split-Path -Parent $OutputRoot
@@ -130,6 +136,22 @@ function Publish-PackagedAcceptanceSummary {
     }
 }
 
+function Get-ReadmeBundleLabel {
+    param([string]$PathValue)
+    if (-not $PathValue -or -not (Test-Path -LiteralPath $PathValue)) {
+        return ""
+    }
+    try {
+        foreach ($line in Get-Content -LiteralPath $PathValue) {
+            if ($line -match '^\s*Bundle label:\s*(.+?)\s*$') {
+                return $Matches[1].Trim()
+            }
+        }
+    }
+    catch {}
+    return ""
+}
+
 function Get-FileHashValue {
     param([string]$PathValue)
     if (-not $PathValue) {
@@ -143,6 +165,84 @@ function Get-FileHashValue {
     }
     catch {
         return ""
+    }
+}
+
+function Write-PackageVersionAudit {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedBundleLabel,
+        [Parameter(Mandatory = $true)][string]$RootPackagePath,
+        [Parameter(Mandatory = $true)][string]$SharePackagePath,
+        [string]$StableManifestPath
+    )
+
+    $rootBuildIdentityPath = Join-Path $RootPackagePath "runtime\config\mole_build_identity_v1.json"
+    $rootAcceptancePath = Join-Path $RootPackagePath $publishedAcceptanceJsonName
+    $rootVerifiedManifestPath = Join-Path $RootPackagePath $verifiedReleaseManifestName
+    $rootReadmePath = Join-Path $RootPackagePath "README_EXECUTABLE_BUNDLE.txt"
+    $shareBuildIdentityPath = Join-Path $SharePackagePath "runtime\config\mole_build_identity_v1.json"
+    $shareAcceptancePath = Join-Path $SharePackagePath $publishedAcceptanceJsonName
+    $shareVerifiedManifestPath = Join-Path $SharePackagePath $verifiedReleaseManifestName
+    $shareReadmePath = Join-Path $SharePackagePath "README_EXECUTABLE_BUNDLE.txt"
+
+    $rootBuildIdentity = if (Test-Path -LiteralPath $rootBuildIdentityPath) { Get-Content -LiteralPath $rootBuildIdentityPath -Raw | ConvertFrom-Json } else { $null }
+    $rootAcceptance = if (Test-Path -LiteralPath $rootAcceptancePath) { Get-Content -LiteralPath $rootAcceptancePath -Raw | ConvertFrom-Json } else { $null }
+    $rootVerifiedManifest = if (Test-Path -LiteralPath $rootVerifiedManifestPath) { Get-Content -LiteralPath $rootVerifiedManifestPath -Raw | ConvertFrom-Json } else { $null }
+    $shareBuildIdentity = if (Test-Path -LiteralPath $shareBuildIdentityPath) { Get-Content -LiteralPath $shareBuildIdentityPath -Raw | ConvertFrom-Json } else { $null }
+    $shareAcceptance = if (Test-Path -LiteralPath $shareAcceptancePath) { Get-Content -LiteralPath $shareAcceptancePath -Raw | ConvertFrom-Json } else { $null }
+    $shareVerifiedManifest = if (Test-Path -LiteralPath $shareVerifiedManifestPath) { Get-Content -LiteralPath $shareVerifiedManifestPath -Raw | ConvertFrom-Json } else { $null }
+    $stableManifest = if ($StableManifestPath -and (Test-Path -LiteralPath $StableManifestPath)) { Get-Content -LiteralPath $StableManifestPath -Raw | ConvertFrom-Json } else { $null }
+
+    $checks = @(
+        [ordered]@{ name = "root_build_identity_bundle_label"; expected = $ExpectedBundleLabel; actual = if ($rootBuildIdentity) { [string]$rootBuildIdentity.bundle_label } else { "" }; match = ($rootBuildIdentity -and [string]$rootBuildIdentity.bundle_label -eq $ExpectedBundleLabel); path = $rootBuildIdentityPath }
+        [ordered]@{ name = "root_acceptance_package_label"; expected = $ExpectedBundleLabel; actual = if ($rootAcceptance) { [string]$rootAcceptance.package_label } else { "" }; match = ($rootAcceptance -and [string]$rootAcceptance.package_label -eq $ExpectedBundleLabel); path = $rootAcceptancePath }
+        [ordered]@{ name = "root_verified_release_package_label"; expected = $ExpectedBundleLabel; actual = if ($rootVerifiedManifest) { [string]$rootVerifiedManifest.package_label } else { "" }; match = ($rootVerifiedManifest -and [string]$rootVerifiedManifest.package_label -eq $ExpectedBundleLabel); path = $rootVerifiedManifestPath }
+        [ordered]@{ name = "root_readme_bundle_label"; expected = $ExpectedBundleLabel; actual = (Get-ReadmeBundleLabel $rootReadmePath); match = ((Get-ReadmeBundleLabel $rootReadmePath) -eq $ExpectedBundleLabel); path = $rootReadmePath }
+        [ordered]@{ name = "share_build_identity_bundle_label"; expected = $ExpectedBundleLabel; actual = if ($shareBuildIdentity) { [string]$shareBuildIdentity.bundle_label } else { "" }; match = ($shareBuildIdentity -and [string]$shareBuildIdentity.bundle_label -eq $ExpectedBundleLabel); path = $shareBuildIdentityPath }
+        [ordered]@{ name = "share_acceptance_package_label"; expected = $ExpectedBundleLabel; actual = if ($shareAcceptance) { [string]$shareAcceptance.package_label } else { "" }; match = ($shareAcceptance -and [string]$shareAcceptance.package_label -eq $ExpectedBundleLabel); path = $shareAcceptancePath }
+        [ordered]@{ name = "share_verified_release_package_label"; expected = $ExpectedBundleLabel; actual = if ($shareVerifiedManifest) { [string]$shareVerifiedManifest.package_label } else { "" }; match = ($shareVerifiedManifest -and [string]$shareVerifiedManifest.package_label -eq $ExpectedBundleLabel); path = $shareVerifiedManifestPath }
+        [ordered]@{ name = "share_readme_bundle_label"; expected = $ExpectedBundleLabel; actual = (Get-ReadmeBundleLabel $shareReadmePath); match = ((Get-ReadmeBundleLabel $shareReadmePath) -eq $ExpectedBundleLabel); path = $shareReadmePath }
+        [ordered]@{ name = "root_installer_zip_name"; expected = "$ExpectedBundleLabel`_installer_exe_bundle.zip"; actual = [System.IO.Path]::GetFileName($installerZip); match = ([System.IO.Path]::GetFileName($installerZip) -eq "$ExpectedBundleLabel`_installer_exe_bundle.zip"); path = $installerZip }
+        [ordered]@{ name = "root_portable_zip_name"; expected = "$ExpectedBundleLabel`_portable_exe_bundle.zip"; actual = [System.IO.Path]::GetFileName($shareZip); match = ([System.IO.Path]::GetFileName($shareZip) -eq "$ExpectedBundleLabel`_portable_exe_bundle.zip"); path = $shareZip }
+    )
+
+    if ($StableManifestPath) {
+        $checks += [ordered]@{
+            name = "stable_verified_release_package_label"
+            expected = $ExpectedBundleLabel
+            actual = if ($stableManifest) { [string]$stableManifest.package_label } else { "" }
+            match = ($stableManifest -and [string]$stableManifest.package_label -eq $ExpectedBundleLabel)
+            path = $StableManifestPath
+        }
+    }
+
+    $status = if (($checks | Where-Object { -not $_.match }).Count -eq 0) { "PASS" } else { "FAIL" }
+    $payload = [ordered]@{
+        schema = "mole_package_version_audit_v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        expected_bundle_label = $ExpectedBundleLabel
+        status = $status
+        checks = $checks
+    }
+    $summaryLines = @(
+        "MOLE-DAS Package Version Audit",
+        "==============================",
+        "",
+        "Expected bundle label: $ExpectedBundleLabel",
+        "Status: $status",
+        ""
+    )
+    foreach ($check in $checks) {
+        $summaryLines += ("[{0}] {1}`n  expected: {2}`n  actual:   {3}`n  path:     {4}`n" -f ($(if ($check.match) { "PASS" } else { "FAIL" })), $check.name, $check.expected, $check.actual, $check.path)
+    }
+
+    [System.IO.File]::WriteAllText($versionAuditJsonPath, ($payload | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($versionAuditTxtPath, ($summaryLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($shareVersionAuditJsonPath, ($payload | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($shareVersionAuditTxtPath, ($summaryLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+
+    if ($status -ne "PASS") {
+        throw "Package version audit failed. See $versionAuditTxtPath"
     }
 }
 
@@ -182,12 +282,23 @@ function Write-VerifiedReleaseManifest {
         acceptance_summary_path = $publishedAcceptanceTxtName
         acceptance_summary_json_path = $publishedAcceptanceJsonName
         installer_script_path = "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+        version_audit_json_path = $versionAuditJsonName
+        version_audit_txt_path = $versionAuditTxtName
+        launcher_path = "LAUNCH_MOLE_DAS_EXE.bat"
+        wizard_exe_path = "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe"
+        runner_exe_path = "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe"
+        script_runner_exe_path = "runtime\\MOLE_code\\MOLE_ScriptRunner.exe"
         installer_bundle_path = ""
         portable_bundle_path = ""
         hashes = [ordered]@{
             build_identity_sha256 = Get-FileHashValue $buildIdentityPath
             acceptance_summary_txt_sha256 = Get-FileHashValue $acceptanceSummaryTxt
             acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
+            installer_script_sha256 = Get-FileHashValue (Join-Path $OutputRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1")
+            launcher_batch_sha256 = Get-FileHashValue (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat")
+            wizard_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_DAS_Wizard.exe")
+            runner_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_DAQ_Runner.exe")
+            script_runner_exe_sha256 = Get-FileHashValue (Join-Path $OutputRoot "MOLE_ScriptRunner.exe")
             installer_bundle_sha256 = ""
             portable_bundle_sha256 = ""
         }
@@ -488,6 +599,118 @@ function New-ShortcutFile {
     $shortcut.Save()
 }
 
+function Get-FileHashValue {
+    param([string]$PathValue)
+    if (-not $PathValue -or -not (Test-Path -LiteralPath $PathValue)) {
+        return ""
+    }
+    return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash
+}
+
+function Resolve-ManifestPath {
+    param(
+        [string]$BaseRoot,
+        [string]$PathValue
+    )
+    if (-not $PathValue) {
+        return $null
+    }
+    try {
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path $BaseRoot $PathValue))
+    }
+    catch {
+        return $null
+    }
+    return $candidate
+}
+
+function Assert-VersionAuditPass {
+    param([string]$AuditPath)
+    if (-not (Test-Path -LiteralPath $AuditPath)) {
+        throw "Package version audit not found: $AuditPath"
+    }
+    $audit = Get-Content -LiteralPath $AuditPath -Raw | ConvertFrom-Json
+    if (-not $audit -or [string]$audit.schema -ne "mole_package_version_audit_v1") {
+        throw "Package version audit schema is invalid: $AuditPath"
+    }
+    if ([string]$audit.status -ne "PASS") {
+        throw "Package version audit is not PASS: $AuditPath"
+    }
+}
+
+function Assert-VerifiedReleasePackage {
+    param([string]$PackageRoot)
+    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        throw "Verified release manifest not found: $manifestPath"
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (-not $manifest -or [string]$manifest.schema -ne "mole_latest_verified_release_v1") {
+        throw "Verified release manifest schema is invalid: $manifestPath"
+    }
+    if ([string]$manifest.acceptance_status -ne "PASS") {
+        throw "Verified release manifest acceptance_status is not PASS: $manifestPath"
+    }
+    $packageLabel = [string]$manifest.package_label
+    if (-not $packageLabel) {
+        throw "Verified release manifest package_label is missing: $manifestPath"
+    }
+    $packageBase = Resolve-ManifestPath -BaseRoot $PackageRoot -PathValue ([string]$manifest.package_root)
+    if (-not $packageBase -or -not (Test-Path -LiteralPath $packageBase)) {
+        throw "Verified release package_root is invalid: $manifestPath"
+    }
+    $versionAuditPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.version_audit_json_path)
+    Assert-VersionAuditPass -AuditPath $versionAuditPath
+
+    $hashes = $manifest.hashes
+    $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
+    $acceptanceTextPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_path)
+    $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
+    $installerScriptPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.installer_script_path)
+    $launcherPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.launcher_path)
+    $wizardExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.wizard_exe_path)
+    $runnerExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.runner_exe_path)
+    $scriptRunnerExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.script_runner_exe_path)
+
+    $targets = @(
+        @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
+        @{ Label = "Packaged acceptance summary"; Path = $acceptanceTextPath; Hash = [string]$hashes.acceptance_summary_txt_sha256 }
+        @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
+        @{ Label = "Installer script"; Path = $installerScriptPath; Hash = [string]$hashes.installer_script_sha256 }
+        @{ Label = "Launcher batch"; Path = $launcherPath; Hash = [string]$hashes.launcher_batch_sha256 }
+        @{ Label = "Wizard executable"; Path = $wizardExePath; Hash = [string]$hashes.wizard_exe_sha256 }
+        @{ Label = "Runner executable"; Path = $runnerExePath; Hash = [string]$hashes.runner_exe_sha256 }
+        @{ Label = "ScriptRunner executable"; Path = $scriptRunnerExePath; Hash = [string]$hashes.script_runner_exe_sha256 }
+    )
+    foreach ($target in $targets) {
+        if (-not $target.Path -or -not (Test-Path -LiteralPath $target.Path)) {
+            throw "$($target.Label) is missing: $($target.Path)"
+        }
+        if (-not $target.Hash) {
+            throw "Verified release manifest is missing $($target.Label) SHA256."
+        }
+        $actualHash = Get-FileHashValue -PathValue $target.Path
+        if (-not $actualHash) {
+            throw "$($target.Label) SHA256 could not be computed: $($target.Path)"
+        }
+        if ($actualHash -ne $target.Hash) {
+            throw "$($target.Label) SHA256 mismatch. Expected $($target.Hash), got $actualHash."
+        }
+    }
+
+    $buildIdentity = Get-Content -LiteralPath $buildIdentityPath -Raw | ConvertFrom-Json
+    if ([string]$buildIdentity.bundle_label -ne $packageLabel) {
+        throw "Build identity bundle_label does not match verified release package_label."
+    }
+    $acceptanceSummary = Get-Content -LiteralPath $acceptanceJsonPath -Raw | ConvertFrom-Json
+    if ([string]$acceptanceSummary.status -ne "PASS") {
+        throw "Packaged acceptance summary JSON is not PASS."
+    }
+    if ([string]$acceptanceSummary.package_label -ne $packageLabel) {
+        throw "Packaged acceptance summary package_label does not match verified release package_label."
+    }
+}
+
 if (-not $InstallRoot) {
     $InstallRoot = Join-Path $env:LOCALAPPDATA "Programs\MOLE_DAS"
 }
@@ -507,6 +730,9 @@ $SourceSupportFiles = @(
     "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat",
     "README_EXECUTABLE_BUNDLE.txt",
     "MOLE_DAS.ico",
+    "latest_verified_release_v1.json",
+    "PACKAGE_VERSION_AUDIT.json",
+    "PACKAGE_VERSION_AUDIT.txt",
     "PACKAGED_ACCEPTANCE_SUMMARY.json",
     "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 )
@@ -531,6 +757,8 @@ Write-Status ""
 Write-Status "Installing MOLE-DAS executable bundle"
 Write-Status "  Package root: $PackageRoot"
 Write-Status "  Install root: $InstallRoot"
+
+Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
 
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 Assert-ProcessesClosed -TargetRoot $InstallRoot
@@ -847,6 +1075,7 @@ if (-not $SkipPackagedAcceptance) {
     Publish-PackagedAcceptanceSummary -SourceJson $acceptanceSummaryJson -SourceTxt $acceptanceSummaryTxt -TargetRoots @($OutputRoot, $installRoot)
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
     Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
 }
 
 if (Test-Path -LiteralPath $shareZip) {
@@ -878,6 +1107,7 @@ if (-not $SkipPackagedAcceptance) {
     if ($stableChannelManifestPath) {
         Write-VerifiedReleaseManifest -DestinationPath $stableChannelManifestPath -ManifestKind "release_channel" -PackageRootRef ([System.IO.Path]::GetFileName($OutputRoot)) -IncludeBundleHashes
     }
+    Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot -StableManifestPath $stableChannelManifestPath
 }
 
 Write-Host ""
