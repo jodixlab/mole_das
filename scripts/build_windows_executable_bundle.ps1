@@ -173,8 +173,8 @@ function Write-VerifiedReleaseManifest {
         runtime_root = "runtime"
         runtime_code_root = "runtime\\MOLE_code"
         build_identity_path = "runtime\\config\\mole_build_identity_v1.json"
-        acceptance_status = [string]($acceptanceSummary["status"] ?? "")
-        acceptance_generated_at = [string]($acceptanceSummary["generated_at"] ?? "")
+        acceptance_status = [string]($acceptanceSummary["status"])
+        acceptance_generated_at = [string]($acceptanceSummary["generated_at"])
         acceptance_summary_path = $publishedAcceptanceTxtName
         acceptance_summary_json_path = $publishedAcceptanceJsonName
         installer_script_path = "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
