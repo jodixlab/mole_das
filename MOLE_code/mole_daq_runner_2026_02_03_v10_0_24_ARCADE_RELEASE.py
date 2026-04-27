@@ -427,6 +427,14 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
+        ("Package remediation path", record.get("package_remediation_path") or ""),
+        ("Last package remediation action", record.get("last_package_remediation_action") or ""),
+        ("Last package remediation result", record.get("last_package_remediation_result") or ""),
+        ("Last package remediation target kind", record.get("last_package_remediation_target_kind") or ""),
+        ("Last package remediation target path", record.get("last_package_remediation_target_path") or ""),
+        ("Last package remediation target package", record.get("last_package_remediation_target_package_label") or ""),
+        ("Last package remediation note", record.get("last_package_remediation_note") or ""),
+        ("Last package remediation recorded", record.get("last_package_remediation_recorded_utc") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
         ("Support bundle root", record.get("support_bundle_root") or ""),
         ("Latest support bundle", record.get("latest_support_bundle_path") or ""),
@@ -16574,6 +16582,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
 
     def _write_runner_startup_diagnostic(sess_local: Dict[str, Any], launch_mode: str) -> Optional[Dict[str, Path]]:
         welcome_sheet = _select_welcome_sprite_path()
+        previous = _load_startup_diagnostic_record(_runner_startup_diagnostic_path(sess_local))
         payload = {
             "app": "runner",
             "launch_mode": str(launch_mode or "runner").strip().lower() or "runner",
@@ -16588,11 +16597,27 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess_local) == "TRAINING")),
             "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
         }
+        for key in (
+            "package_remediation_path",
+            "last_package_remediation_action",
+            "last_package_remediation_result",
+            "last_package_remediation_target_kind",
+            "last_package_remediation_target_path",
+            "last_package_remediation_target_package_label",
+            "last_package_remediation_note",
+            "last_package_remediation_recorded_utc",
+        ):
+            value = previous.get(key) if isinstance(previous, dict) else None
+            if value not in (None, ""):
+                payload[key] = value
         payload.update(_runtime_package_status_record(build_identity))
         return _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=payload, keep=20)
 
     def _runner_startup_diagnostic_path(sess_local: Dict[str, Any]) -> Optional[Path]:
         return _latest_startup_diagnostic_path(_runner_logs_dir(sess_local), "runner_startup")
+
+    def _runner_package_remediation_path(sess_local: Dict[str, Any]) -> Optional[Path]:
+        return _latest_startup_diagnostic_path(_runner_logs_dir(sess_local), "runner_package_remediation")
 
     def _runner_support_bundle_root(sess_local: Dict[str, Any]) -> Path:
         outputs_local = init_outputs(sess_local, cfg_path, None)
@@ -16628,6 +16653,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=training),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
+            "package_remediation_path": str(_runner_package_remediation_path(sess_local)) if isinstance(_runner_package_remediation_path(sess_local), Path) and _runner_package_remediation_path(sess_local).exists() else "",
             "logs_dir": str(_runner_logs_dir(sess_local)),
             "support_bundle_root": str(_runner_support_bundle_root(sess_local)),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
@@ -16762,22 +16788,176 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             or ""
         ).strip()
 
+    def _runner_resolution_installer_script(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_installer_script_path")
+            or record.get("current_installer_script_path")
+            or ""
+        ).strip()
+
+    def _installer_command(script_path: Path) -> list[str]:
+        suffix = script_path.suffix.strip().lower()
+        if suffix == ".ps1":
+            return ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script_path)]
+        if suffix in {".bat", ".cmd"}:
+            return ["cmd.exe", "/c", str(script_path)]
+        return [str(script_path)]
+
+    def _stamp_runner_package_remediation(
+        sess_local: Dict[str, Any],
+        *,
+        action: str,
+        result: str,
+        target_kind: str = "",
+        target_path: str = "",
+        target_package_label: str = "",
+        note: str = "",
+    ) -> None:
+        recorded_utc = datetime.now(timezone.utc).isoformat()
+        startup_payload = _runner_build_info_record(sess_local)
+        startup_payload.update(
+            {
+                "package_remediation_path": "",
+                "last_package_remediation_action": str(action or "").strip().upper(),
+                "last_package_remediation_result": str(result or "").strip().upper(),
+                "last_package_remediation_target_kind": str(target_kind or "").strip().upper(),
+                "last_package_remediation_target_path": str(target_path or "").strip(),
+                "last_package_remediation_target_package_label": str(target_package_label or "").strip(),
+                "last_package_remediation_note": str(note or "").strip(),
+                "last_package_remediation_recorded_utc": recorded_utc,
+            }
+        )
+        event_paths = _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_package_remediation", payload=startup_payload, keep=20)
+        remediation_path = event_paths.get("latest")
+        startup_payload["package_remediation_path"] = str(remediation_path) if isinstance(remediation_path, Path) else ""
+        _write_startup_diagnostic_record(_runner_logs_dir(sess_local), label="runner_startup", payload=startup_payload, keep=20)
+
     def _relaunch_runner_from_installed_root(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
         exe_text = str(record.get("installed_runner_executable_path") or "").strip()
         if not exe_text:
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="RUNNER_EXE",
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="No installed Runner executable was found for relaunch.",
+            )
             messagebox.showwarning("Resolve Package Status", "No installed Runner executable was found for relaunch.")
             return
         exe_path = Path(exe_text)
         if not exe_path.exists():
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="RUNNER_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="Installed Runner executable was not found at relaunch time.",
+            )
             messagebox.showwarning("Resolve Package Status", f"Installed Runner executable was not found:\n{exe_path}")
             return
         try:
             cmd = [str(exe_path), "--config", str(cfg_path), "--ui"]
             subprocess.Popen(cmd, cwd=str(exe_path.parent), creationflags=_win_creationflags())
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="PASS",
+                target_kind="RUNNER_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="Relaunched Runner from installed root.",
+            )
             root.after(250, root.destroy)
         except Exception as e:
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="RUNNER_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note=str(e),
+            )
             messagebox.showerror("Resolve Package Status", f"Failed to relaunch installed Runner:\n{e}")
+
+    def _install_latest_verified_package(sess_local: Dict[str, Any]) -> None:
+        record = _runner_build_info_record(sess_local)
+        script_text = _runner_resolution_installer_script(record)
+        target_label = str(record.get("latest_verified_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        if not script_text:
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_package_label=target_label,
+                note="No latest verified installer script was found.",
+            )
+            messagebox.showwarning("Resolve Package Status", "No latest verified installer script was found.")
+            return
+        script_path = Path(script_text)
+        if not script_path.exists():
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Installer script path does not exist.",
+            )
+            messagebox.showwarning("Resolve Package Status", f"Installer script was not found:\n{script_path}")
+            return
+        if not messagebox.askyesno(
+            "Resolve Package Status",
+            f"Install or upgrade the latest verified package now?\n\nPackage: {target_label or '(n/a)'}\nInstaller: {script_path}",
+        ):
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="CANCELLED",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Operator canceled install prompt.",
+            )
+            return
+        try:
+            subprocess.run(_installer_command(script_path), cwd=str(script_path.parent), check=True)
+            _write_runner_startup_diagnostic(sess_local, current_runtime_launch_mode.get("value") or "runner")
+            refreshed = _runner_build_info_record(sess_local)
+            installed_exe = str(refreshed.get("installed_runner_executable_path") or "").strip()
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="PASS",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Latest verified package installer completed successfully.",
+            )
+            if installed_exe and messagebox.askyesno(
+                "Resolve Package Status",
+                "Latest verified package install completed.\n\nRelaunch from the installed root now?",
+            ):
+                _relaunch_runner_from_installed_root(sess_local)
+                return
+            messagebox.showinfo("Resolve Package Status", "Latest verified package install completed.")
+        except Exception as e:
+            _stamp_runner_package_remediation(
+                sess_local,
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note=str(e),
+            )
+            messagebox.showerror("Resolve Package Status", f"Failed to install the latest verified package:\n{e}")
 
     def _show_runner_package_resolution(sess_local: Dict[str, Any]) -> None:
         record = _runner_build_info_record(sess_local)
@@ -16789,6 +16969,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         install_root = str(record.get("install_root_path") or "").strip()
         latest_verified_root = str(record.get("latest_verified_package_root_path") or "").strip()
         installer_target = _runner_resolution_installer_target(record)
+        installer_script = _runner_resolution_installer_script(record)
         acceptance_target = _runner_resolution_acceptance_target(record)
 
         w = tk.Toplevel(root)
@@ -16839,6 +17020,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 f"Install root: {install_root or '(n/a)'}",
                 f"Latest verified package: {str(record.get('latest_verified_package_label') or '(n/a)')}",
                 f"Latest verified package root: {latest_verified_root or '(n/a)'}",
+                f"Latest verified installer script: {installer_script or '(n/a)'}",
                 f"Installer target: {installer_target or '(n/a)'}",
                 f"Acceptance summary: {acceptance_target or '(n/a)'}",
             ]) + "\n",
@@ -16846,13 +17028,18 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         info.configure(state="disabled")
         actions = tk.Frame(body, bg=BG)
         actions.pack(fill="x")
-        action_specs = [
-            ("Open Installed Root", lambda: _open_fs_target(install_root, title="Open Install Root Failed"), bool(install_root)),
-            ("Open Latest Verified Package", lambda: _open_fs_target(latest_verified_root, title="Open Latest Verified Package Failed"), bool(latest_verified_root)),
-            ("Open Installer Bundle", lambda: _open_fs_target(installer_target, title="Open Installer Bundle Failed"), bool(installer_target)),
-            ("Open Acceptance Summary", lambda: _open_fs_target(acceptance_target, title="Open Acceptance Summary Failed"), bool(acceptance_target)),
-            ("Relaunch From Installed Root", lambda: _relaunch_runner_from_installed_root(sess_local), bool(str(record.get("installed_runner_executable_path") or "").strip())),
-        ]
+        action_specs = []
+        if status != "UNVERIFIED":
+            action_specs.append(("Open Installed Root", lambda: _open_fs_target(install_root, title="Open Install Root Failed"), bool(install_root)))
+            action_specs.append(("Relaunch From Installed Root", lambda: _relaunch_runner_from_installed_root(sess_local), bool(str(record.get("installed_runner_executable_path") or "").strip())))
+        action_specs.extend(
+            [
+                ("Open Latest Verified Package", lambda: _open_fs_target(latest_verified_root, title="Open Latest Verified Package Failed"), bool(latest_verified_root)),
+                ("Open Installer Bundle", lambda: _open_fs_target(installer_target, title="Open Installer Bundle Failed"), bool(installer_target)),
+                ("Install Latest Verified Package", lambda: _install_latest_verified_package(sess_local), bool(installer_script)),
+                ("Open Acceptance Summary", lambda: _open_fs_target(acceptance_target, title="Open Acceptance Summary Failed"), bool(acceptance_target)),
+            ]
+        )
         for col in range(len(action_specs)):
             actions.grid_columnconfigure(col, weight=1)
         for idx, (label, cmd, enabled) in enumerate(action_specs):
@@ -16897,6 +17084,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             ("Open Install Root", lambda: _open_fs_target(record.get("install_root_path") or "", title="Open Install Root Failed"), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: _open_fs_target(record.get("logs_dir") or "", title="Open Logs Failed"), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: _open_fs_target(record.get("startup_diagnostic_path") or "", title="Open Startup Diagnostic Failed"), bool(record.get("startup_diagnostic_path"))),
+            ("Open Package Remediation", lambda: _open_fs_target(record.get("package_remediation_path") or "", title="Open Package Remediation Failed"), bool(record.get("package_remediation_path"))),
             ("Open Build Identity", lambda: _open_fs_target(record.get("build_identity_manifest_path") or "", title="Open Build Identity Failed"), bool(record.get("build_identity_manifest_path"))),
             ("Open Install Manifest", lambda: _open_fs_target(record.get("install_manifest_path") or "", title="Open Install Manifest Failed"), bool(record.get("install_manifest_path"))),
             ("Open Acceptance Summary", lambda: _open_fs_target(record.get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed"), bool(record.get("packaged_acceptance_summary_path"))),
@@ -17037,6 +17225,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                     "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                     "runner_startup_diagnostic": _runner_startup_diagnostic_path(sess_local),
+                    "runner_package_remediation": _runner_package_remediation_path(sess_local),
                     "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
                     "runner_ui_crash_log": _runner_crash_log_path(sess_local),
                     "runner_health_latest": journal.get("latest"),

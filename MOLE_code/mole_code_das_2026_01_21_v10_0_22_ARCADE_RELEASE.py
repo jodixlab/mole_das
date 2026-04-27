@@ -549,6 +549,14 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
+        ("Package remediation path", record.get("package_remediation_path") or ""),
+        ("Last package remediation action", record.get("last_package_remediation_action") or ""),
+        ("Last package remediation result", record.get("last_package_remediation_result") or ""),
+        ("Last package remediation target kind", record.get("last_package_remediation_target_kind") or ""),
+        ("Last package remediation target path", record.get("last_package_remediation_target_path") or ""),
+        ("Last package remediation target package", record.get("last_package_remediation_target_package_label") or ""),
+        ("Last package remediation note", record.get("last_package_remediation_note") or ""),
+        ("Last package remediation recorded", record.get("last_package_remediation_recorded_utc") or ""),
         ("Logs dir", record.get("logs_dir") or ""),
         ("Support bundle root", record.get("support_bundle_root") or ""),
         ("Latest support bundle", record.get("latest_support_bundle_path") or ""),
@@ -7417,6 +7425,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
         sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
         status_record = _runtime_package_status_record(base_dir=getattr(self, "base_dir", None), build_identity=self.build_identity)
+        previous = _load_startup_diagnostic_record(self._wizard_startup_diagnostic_path())
         payload = {
             "app": "wizard",
             "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
@@ -7431,11 +7440,27 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
             "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
         }
+        for key in (
+            "package_remediation_path",
+            "last_package_remediation_action",
+            "last_package_remediation_result",
+            "last_package_remediation_target_kind",
+            "last_package_remediation_target_path",
+            "last_package_remediation_target_package_label",
+            "last_package_remediation_note",
+            "last_package_remediation_recorded_utc",
+        ):
+            value = previous.get(key) if isinstance(previous, dict) else None
+            if value not in (None, ""):
+                payload[key] = value
         payload.update(status_record)
         return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
 
     def _wizard_startup_diagnostic_path(self) -> Optional[Path]:
         return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_startup")
+
+    def _wizard_package_remediation_path(self) -> Optional[Path]:
+        return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_package_remediation")
 
     def _wizard_support_bundle_root(self) -> Path:
         return Path(self.logs_dir) / "support_bundles"
@@ -7470,6 +7495,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
+            "package_remediation_path": str(self._wizard_package_remediation_path()) if isinstance(self._wizard_package_remediation_path(), Path) and self._wizard_package_remediation_path().exists() else "",
             "logs_dir": str(self.logs_dir),
             "support_bundle_root": str(self._wizard_support_bundle_root()),
             "latest_support_bundle_path": str(latest_bundle) if isinstance(latest_bundle, Path) and latest_bundle.exists() else "",
@@ -7601,21 +7627,170 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             or ""
         ).strip()
 
+    @staticmethod
+    def _wizard_resolution_installer_script(record: Dict[str, Any]) -> str:
+        return str(
+            record.get("latest_verified_installer_script_path")
+            or record.get("current_installer_script_path")
+            or ""
+        ).strip()
+
+    @staticmethod
+    def _installer_command(script_path: Path) -> list[str]:
+        suffix = script_path.suffix.strip().lower()
+        if suffix == ".ps1":
+            return ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script_path)]
+        if suffix in {".bat", ".cmd"}:
+            return ["cmd.exe", "/c", str(script_path)]
+        return [str(script_path)]
+
+    def _stamp_wizard_package_remediation(
+        self,
+        *,
+        action: str,
+        result: str,
+        target_kind: str = "",
+        target_path: str = "",
+        target_package_label: str = "",
+        note: str = "",
+    ) -> None:
+        recorded_utc = datetime.now(timezone.utc).isoformat()
+        latest_path = self._wizard_startup_diagnostic_path()
+        startup_payload = self._wizard_build_info_record()
+        startup_payload.update(
+            {
+                "package_remediation_path": "",
+                "last_package_remediation_action": str(action or "").strip().upper(),
+                "last_package_remediation_result": str(result or "").strip().upper(),
+                "last_package_remediation_target_kind": str(target_kind or "").strip().upper(),
+                "last_package_remediation_target_path": str(target_path or "").strip(),
+                "last_package_remediation_target_package_label": str(target_package_label or "").strip(),
+                "last_package_remediation_note": str(note or "").strip(),
+                "last_package_remediation_recorded_utc": recorded_utc,
+            }
+        )
+        event_payload = dict(startup_payload)
+        event_paths = _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_package_remediation", payload=event_payload, keep=20)
+        remediation_path = event_paths.get("latest")
+        startup_payload["package_remediation_path"] = str(remediation_path) if isinstance(remediation_path, Path) else ""
+        _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=startup_payload, keep=20)
+
     def _relaunch_wizard_from_installed_root(self) -> None:
         record = self._wizard_build_info_record()
         exe_text = str(record.get("installed_wizard_executable_path") or "").strip()
         if not exe_text:
+            self._stamp_wizard_package_remediation(
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="WIZARD_EXE",
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="No installed Wizard executable was found for relaunch.",
+            )
             messagebox.showwarning("Resolve Package Status", "No installed Wizard executable was found for relaunch.")
             return
         exe_path = Path(exe_text)
         if not exe_path.exists():
+            self._stamp_wizard_package_remediation(
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="WIZARD_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="Installed Wizard executable was not found at relaunch time.",
+            )
             messagebox.showwarning("Resolve Package Status", f"Installed Wizard executable was not found:\n{exe_path}")
             return
         try:
             subprocess.Popen([str(exe_path)], cwd=str(exe_path.parent))
+            self._stamp_wizard_package_remediation(
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="PASS",
+                target_kind="WIZARD_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note="Relaunched Wizard from installed root.",
+            )
             self.after(250, self.destroy)
         except Exception as e:
+            self._stamp_wizard_package_remediation(
+                action="RELAUNCH_FROM_INSTALLED_ROOT",
+                result="FAIL",
+                target_kind="WIZARD_EXE",
+                target_path=str(exe_path),
+                target_package_label=str(record.get("local_accepted_package_label") or record.get("installed_bundle_label") or ""),
+                note=str(e),
+            )
             messagebox.showerror("Resolve Package Status", f"Failed to relaunch installed Wizard:\n{e}")
+
+    def _install_latest_verified_package(self) -> None:
+        record = self._wizard_build_info_record()
+        script_text = self._wizard_resolution_installer_script(record)
+        target_label = str(record.get("latest_verified_package_label") or record.get("local_accepted_package_label") or record.get("installed_bundle_label") or "").strip()
+        if not script_text:
+            self._stamp_wizard_package_remediation(
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_package_label=target_label,
+                note="No latest verified installer script was found.",
+            )
+            messagebox.showwarning("Resolve Package Status", "No latest verified installer script was found.")
+            return
+        script_path = Path(script_text)
+        if not script_path.exists():
+            self._stamp_wizard_package_remediation(
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Installer script path does not exist.",
+            )
+            messagebox.showwarning("Resolve Package Status", f"Installer script was not found:\n{script_path}")
+            return
+        if not messagebox.askyesno(
+            "Resolve Package Status",
+            f"Install or upgrade the latest verified package now?\n\nPackage: {target_label or '(n/a)'}\nInstaller: {script_path}",
+        ):
+            self._stamp_wizard_package_remediation(
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="CANCELLED",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Operator canceled install prompt.",
+            )
+            return
+        try:
+            subprocess.run(self._installer_command(script_path), cwd=str(script_path.parent), check=True)
+            self._write_startup_diagnostic()
+            refreshed = self._wizard_build_info_record()
+            installed_exe = str(refreshed.get("installed_wizard_executable_path") or "").strip()
+            self._stamp_wizard_package_remediation(
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="PASS",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note="Latest verified package installer completed successfully.",
+            )
+            if installed_exe and messagebox.askyesno(
+                "Resolve Package Status",
+                "Latest verified package install completed.\n\nRelaunch from the installed root now?",
+            ):
+                self._relaunch_wizard_from_installed_root()
+                return
+            messagebox.showinfo("Resolve Package Status", "Latest verified package install completed.")
+        except Exception as e:
+            self._stamp_wizard_package_remediation(
+                action="INSTALL_LATEST_VERIFIED_PACKAGE",
+                result="FAIL",
+                target_kind="INSTALLER_SCRIPT",
+                target_path=str(script_path),
+                target_package_label=target_label,
+                note=str(e),
+            )
+            messagebox.showerror("Resolve Package Status", f"Failed to install the latest verified package:\n{e}")
 
     def _show_wizard_package_resolution(self) -> None:
         record = self._wizard_build_info_record()
@@ -7627,6 +7802,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         install_root = str(record.get("install_root_path") or "").strip()
         latest_verified_root = str(record.get("latest_verified_package_root_path") or "").strip()
         installer_target = self._wizard_resolution_installer_target(record)
+        installer_script = self._wizard_resolution_installer_script(record)
         acceptance_target = self._wizard_resolution_acceptance_target(record)
 
         win = tk.Toplevel(self)
@@ -7677,6 +7853,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 f"Install root: {install_root or '(n/a)'}",
                 f"Latest verified package: {str(record.get('latest_verified_package_label') or '(n/a)')}",
                 f"Latest verified package root: {latest_verified_root or '(n/a)'}",
+                f"Latest verified installer script: {installer_script or '(n/a)'}",
                 f"Installer target: {installer_target or '(n/a)'}",
                 f"Acceptance summary: {acceptance_target or '(n/a)'}",
             ]) + "\n",
@@ -7684,13 +7861,18 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         info.configure(state="disabled")
         actions = tk.Frame(body, bg=self.BG)
         actions.pack(fill="x")
-        action_specs = [
-            ("Open Installed Root", lambda: self._dbpaths_open_path(install_root), bool(install_root)),
-            ("Open Latest Verified Package", lambda: self._dbpaths_open_path(latest_verified_root), bool(latest_verified_root)),
-            ("Open Installer Bundle", lambda: self._dbpaths_open_path(installer_target), bool(installer_target)),
-            ("Open Acceptance Summary", lambda: self._dbpaths_open_path(acceptance_target), bool(acceptance_target)),
-            ("Relaunch From Installed Root", self._relaunch_wizard_from_installed_root, bool(str(record.get("installed_wizard_executable_path") or "").strip())),
-        ]
+        action_specs = []
+        if status != "UNVERIFIED":
+            action_specs.append(("Open Installed Root", lambda: self._dbpaths_open_path(install_root), bool(install_root)))
+            action_specs.append(("Relaunch From Installed Root", self._relaunch_wizard_from_installed_root, bool(str(record.get("installed_wizard_executable_path") or "").strip())))
+        action_specs.extend(
+            [
+                ("Open Latest Verified Package", lambda: self._dbpaths_open_path(latest_verified_root), bool(latest_verified_root)),
+                ("Open Installer Bundle", lambda: self._dbpaths_open_path(installer_target), bool(installer_target)),
+                ("Install Latest Verified Package", self._install_latest_verified_package, bool(installer_script)),
+                ("Open Acceptance Summary", lambda: self._dbpaths_open_path(acceptance_target), bool(acceptance_target)),
+            ]
+        )
         for col in range(len(action_specs)):
             actions.grid_columnconfigure(col, weight=1)
         for idx, (label, cmd, enabled) in enumerate(action_specs):
@@ -7735,6 +7917,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             ("Open Install Root", lambda: self._dbpaths_open_path(record.get("install_root_path") or ""), bool(record.get("install_root_path"))),
             ("Open Logs", lambda: self._dbpaths_open_path(record.get("logs_dir") or ""), bool(record.get("logs_dir"))),
             ("Open Startup Stamp", lambda: self._dbpaths_open_path(record.get("startup_diagnostic_path") or ""), bool(record.get("startup_diagnostic_path"))),
+            ("Open Package Remediation", lambda: self._dbpaths_open_path(record.get("package_remediation_path") or ""), bool(record.get("package_remediation_path"))),
             ("Open Build Identity", lambda: self._dbpaths_open_path(record.get("build_identity_manifest_path") or ""), bool(record.get("build_identity_manifest_path"))),
             ("Open Install Manifest", lambda: self._dbpaths_open_path(record.get("install_manifest_path") or ""), bool(record.get("install_manifest_path"))),
             ("Open Acceptance Summary", lambda: self._dbpaths_open_path(record.get("packaged_acceptance_summary_path") or ""), bool(record.get("packaged_acceptance_summary_path"))),
@@ -7847,6 +8030,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                 "packaged_acceptance_summary_json": acceptance_paths.get("json"),
                 "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),
+                "wizard_package_remediation": self._wizard_package_remediation_path(),
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),
                 "wizard_sqlite_backup": self._latest_wizard_db_backup_path(),
                 "wizard_crash_log": self._latest_wizard_crash_log_path(),
