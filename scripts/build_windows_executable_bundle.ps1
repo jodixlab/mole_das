@@ -1147,28 +1147,23 @@ Initialize-CleanDirectory -PathValue $zipStageRoot
 Initialize-CleanDirectory -PathValue $portableStageRoot
 Initialize-CleanDirectory -PathValue $installerStageRoot
 
-# Portable zip: exact shareable payload users can unzip and run directly.
-Copy-TreeRobust -Source $installRoot -Destination $portableStageRoot
-
-# Installer zip: curated root package with runtime and install assets, without
-# the duplicate nested shareable tree or transient build/acceptance directories.
-Copy-VariantPaths -SourceRoot $OutputRoot -DestinationRoot $installerStageRoot -RelativePaths @(
+# Portable zip: direct-run payload only. No installer or uninstaller scripts.
+Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -RelativePaths @(
     "runtime",
     "LAUNCH_MOLE_DAS_EXE.bat",
-    "INSTALL_MOLE_DAS_EXE_BUNDLE.bat",
-    "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat",
-    "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
-    "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
     "README_EXECUTABLE_BUNDLE.txt",
     "MOLE_DAS.ico",
     "Launch MOLE-DAS.lnk",
-    "Install MOLE-DAS.lnk",
     $publishedAcceptanceJsonName,
     $publishedAcceptanceTxtName,
     $verifiedReleaseManifestName,
     $versionAuditJsonName,
     $versionAuditTxtName
 )
+
+# Installer zip: full curated install package rooted at the bundle root, using
+# the same trimmed runtime payload plus install/uninstall entrypoints.
+Copy-TreeRobust -Source $installRoot -Destination $installerStageRoot
 
 Write-ZipFromDirectory -SourceRoot $portableStageRoot -DestinationZip $shareZip
 Write-ZipFromDirectory -SourceRoot $installerStageRoot -DestinationZip $installerZip
