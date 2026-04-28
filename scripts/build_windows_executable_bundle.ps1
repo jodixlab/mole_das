@@ -70,6 +70,59 @@ function Copy-TreeRobust {
     }
 }
 
+function Initialize-CleanDirectory {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+    if (Test-Path -LiteralPath $PathValue) {
+        Remove-Item -LiteralPath $PathValue -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $PathValue -Force | Out-Null
+}
+
+function Copy-VariantPaths {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot,
+        [Parameter(Mandatory = $true)][string[]]$RelativePaths
+    )
+    foreach ($relativePath in $RelativePaths) {
+        $sourcePath = Join-Path $SourceRoot $relativePath
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            throw "Variant source path not found: $sourcePath"
+        }
+        $destinationPath = Join-Path $DestinationRoot $relativePath
+        if (Test-Path -LiteralPath $sourcePath -PathType Container) {
+            Copy-TreeRobust -Source $sourcePath -Destination $destinationPath
+        }
+        else {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destinationPath) -Force | Out-Null
+            Copy-Item -LiteralPath $sourcePath -Destination $destinationPath -Force
+        }
+    }
+}
+
+function Write-ZipFromDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationZip
+    )
+    if (Test-Path -LiteralPath $DestinationZip) {
+        Remove-Item -LiteralPath $DestinationZip -Force
+    }
+    Invoke-Native -FilePath $python -ArgumentList @(
+        "-c",
+        @"
+from pathlib import Path
+import zipfile
+src = Path(r'''$SourceRoot''')
+dst = Path(r'''$DestinationZip''')
+with zipfile.ZipFile(dst, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+    for path in src.rglob('*'):
+        if path.is_file():
+            zf.write(path, path.relative_to(src))
+"@
+    ) -WorkingDirectory $RepoRoot
+}
+
 $RepoRoot = (Resolve-Path $RepoRoot).Path
 $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $codeRoot = Join-Path $RepoRoot "MOLE_code"
@@ -97,6 +150,9 @@ $shareRoot = Join-Path $OutputRoot "shareable"
 $installRoot = Join-Path $shareRoot $BundleLabel
 $shareZip = Join-Path $OutputRoot "$BundleLabel`_portable_exe_bundle.zip"
 $installerZip = Join-Path $OutputRoot "$BundleLabel`_installer_exe_bundle.zip"
+$zipStageRoot = Join-Path $buildRoot "_zip_stage"
+$portableStageRoot = Join-Path $zipStageRoot "portable"
+$installerStageRoot = Join-Path $zipStageRoot "installer"
 $acceptanceArtifacts = Join-Path $OutputRoot "_acceptance_artifacts"
 $acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
 $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
@@ -1087,23 +1143,35 @@ if (Test-Path -LiteralPath $shareZip) {
 if (Test-Path -LiteralPath $installerZip) {
     Remove-Item -LiteralPath $installerZip -Force
 }
-Invoke-Native -FilePath $python -ArgumentList @(
-    "-c",
-    @"
-from pathlib import Path
-import zipfile
-src = Path(r'''$installRoot''')
-targets = [
-    Path(r'''$shareZip'''),
-    Path(r'''$installerZip'''),
-]
-for dst in targets:
-    with zipfile.ZipFile(dst, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
-        for path in src.rglob('*'):
-            if path.is_file():
-                zf.write(path, path.relative_to(src))
-"@
-) -WorkingDirectory $RepoRoot
+Initialize-CleanDirectory -PathValue $zipStageRoot
+Initialize-CleanDirectory -PathValue $portableStageRoot
+Initialize-CleanDirectory -PathValue $installerStageRoot
+
+# Portable zip: exact shareable payload users can unzip and run directly.
+Copy-TreeRobust -Source $installRoot -Destination $portableStageRoot
+
+# Installer zip: curated root package with runtime and install assets, without
+# the duplicate nested shareable tree or transient build/acceptance directories.
+Copy-VariantPaths -SourceRoot $OutputRoot -DestinationRoot $installerStageRoot -RelativePaths @(
+    "runtime",
+    "LAUNCH_MOLE_DAS_EXE.bat",
+    "INSTALL_MOLE_DAS_EXE_BUNDLE.bat",
+    "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat",
+    "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+    "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+    "README_EXECUTABLE_BUNDLE.txt",
+    "MOLE_DAS.ico",
+    "Launch MOLE-DAS.lnk",
+    "Install MOLE-DAS.lnk",
+    $publishedAcceptanceJsonName,
+    $publishedAcceptanceTxtName,
+    $verifiedReleaseManifestName,
+    $versionAuditJsonName,
+    $versionAuditTxtName
+)
+
+Write-ZipFromDirectory -SourceRoot $portableStageRoot -DestinationZip $shareZip
+Write-ZipFromDirectory -SourceRoot $installerStageRoot -DestinationZip $installerZip
 
 if (-not $SkipPackagedAcceptance) {
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "release_channel" -PackageRootRef "." -IncludeBundleHashes
