@@ -152,7 +152,6 @@ $shareZip = Join-Path $OutputRoot "$BundleLabel`_portable_exe_bundle.zip"
 $installerZip = Join-Path $OutputRoot "$BundleLabel`_installer_exe_bundle.zip"
 $zipStageRoot = Join-Path $buildRoot "_zip_stage"
 $portableStageRoot = Join-Path $zipStageRoot "portable"
-$installerStageRoot = Join-Path $zipStageRoot "installer"
 $acceptanceArtifacts = Join-Path $OutputRoot "_acceptance_artifacts"
 $acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
 $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
@@ -1145,7 +1144,6 @@ if (Test-Path -LiteralPath $installerZip) {
 }
 Initialize-CleanDirectory -PathValue $zipStageRoot
 Initialize-CleanDirectory -PathValue $portableStageRoot
-Initialize-CleanDirectory -PathValue $installerStageRoot
 
 # Portable zip: direct-run payload only. No installer or uninstaller scripts.
 Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -RelativePaths @(
@@ -1161,12 +1159,8 @@ Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -
     $versionAuditTxtName
 )
 
-# Installer zip: full curated install package rooted at the bundle root, using
-# the same trimmed runtime payload plus install/uninstall entrypoints.
-Copy-TreeRobust -Source $installRoot -Destination $installerStageRoot
-
 Write-ZipFromDirectory -SourceRoot $portableStageRoot -DestinationZip $shareZip
-Write-ZipFromDirectory -SourceRoot $installerStageRoot -DestinationZip $installerZip
+Write-ZipFromDirectory -SourceRoot $installRoot -DestinationZip $installerZip
 
 if (-not $SkipPackagedAcceptance) {
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "release_channel" -PackageRootRef "." -IncludeBundleHashes
