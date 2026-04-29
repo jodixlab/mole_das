@@ -8,9 +8,22 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+from datetime import datetime, timezone
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any, Dict, List
+
+_MUTABLE_DATA_LABELS = (
+    "logs",
+    "backups",
+    "sessions",
+    "daq_runs",
+    "exports",
+    "validation",
+    "inbox_packages",
+    "inbox_archive",
+    "cache",
+)
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
@@ -67,20 +80,9 @@ def _count_files(path: Path) -> int:
 
 def _summarize_mutable_payload(root: Path) -> Dict[str, Any]:
     root = Path(root)
-    labels = (
-        "logs",
-        "backups",
-        "sessions",
-        "daq_runs",
-        "exports",
-        "validation",
-        "inbox_packages",
-        "inbox_archive",
-        "cache",
-    )
     entries: List[Dict[str, Any]] = []
     total_files = 0
-    for label in labels:
+    for label in _MUTABLE_DATA_LABELS:
         path = root / label
         file_count = _count_files(path)
         if file_count <= 0:
@@ -99,6 +101,162 @@ def _summarize_mutable_payload(root: Path) -> Dict[str, Any]:
         "file_count": total_files,
         "entries": entries,
     }
+
+
+def _inventory_files(root: Path, *, scoped_labels: tuple[str, ...] | None = None) -> Dict[str, Dict[str, Any]]:
+    root = Path(root)
+    inventory: Dict[str, Dict[str, Any]] = {}
+    if not root.exists():
+        return inventory
+    for item in sorted(root.rglob("*"), key=lambda p: str(p).lower()):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(root)
+        if scoped_labels is not None:
+            parts = rel.parts
+            if not parts or parts[0] not in scoped_labels:
+                continue
+        inventory[rel.as_posix()] = {
+            "relative_path": rel.as_posix(),
+            "absolute_path": str(item),
+            "size_bytes": int(item.stat().st_size),
+            "sha256": "",
+        }
+    return inventory
+
+
+def _attach_hashes(records: Dict[str, Dict[str, Any]], *, rel_paths: List[str]) -> None:
+    for rel in rel_paths:
+        entry = records.get(rel)
+        if not entry:
+            continue
+        if entry.get("sha256"):
+            continue
+        try:
+            entry["sha256"] = _sha256_file(Path(entry["absolute_path"]))
+        except Exception:
+            entry["sha256"] = ""
+
+
+def _render_delta_lines(delta: Dict[str, Any]) -> List[str]:
+    lines = [
+        f"Package data files to add: {delta['package_add_count']}",
+        f"Package data files to update: {delta['package_update_count']}",
+        f"Installed data files left untouched: {delta['installed_untouched_count']}",
+        f"Legacy runtime files to migrate: {delta['legacy_migrate_count']}",
+        f"Legacy runtime files already present in data root (back up + remove runtime copy only): {delta['legacy_preserve_existing_count']}",
+        f"Legacy runtime files to back up before cleanup: {delta['legacy_backup_count']}",
+    ]
+    for heading, key in (
+        ("Package additions", "package_additions"),
+        ("Package updates", "package_updates"),
+        ("Installed data left untouched", "installed_untouched"),
+        ("Legacy runtime files to migrate", "legacy_runtime_migrate"),
+        ("Legacy runtime files to back up and then remove", "legacy_runtime_backup"),
+        ("Legacy runtime files whose installed data copy stays untouched", "legacy_runtime_existing_targets"),
+    ):
+        items = list(delta.get(key) or [])
+        lines.append("")
+        lines.append(f"{heading}:")
+        if not items:
+            lines.append("  (none)")
+            continue
+        for item in items:
+            rel = str(item.get("relative_path") or "")
+            extra = ""
+            if key == "package_updates":
+                extra = f" [installed={item.get('installed_sha256','')[:12]} incoming={item.get('package_sha256','')[:12]}]"
+            elif key == "legacy_runtime_existing_targets":
+                extra = f" [runtime={item.get('runtime_sha256','')[:12]} installed={item.get('installed_sha256','')[:12]}]"
+            lines.append(f"  - {rel}{extra}")
+    return lines
+
+
+def _build_upgrade_delta(package: Dict[str, Any], installed: Dict[str, Any]) -> Dict[str, Any]:
+    package_root = Path(str(package.get("package_root") or "")).resolve()
+    install_root = Path(str(installed.get("install_root") or "")).resolve()
+    package_data_root = package_root / "data"
+    installed_data_root = install_root / "data"
+    legacy_runtime_root = install_root / "runtime" / "mole_das_data"
+
+    package_files = _inventory_files(package_data_root)
+    installed_files = _inventory_files(installed_data_root)
+    legacy_files = _inventory_files(legacy_runtime_root, scoped_labels=_MUTABLE_DATA_LABELS)
+
+    package_additions: List[Dict[str, Any]] = []
+    package_updates: List[Dict[str, Any]] = []
+    installed_untouched: List[Dict[str, Any]] = []
+    legacy_runtime_migrate: List[Dict[str, Any]] = []
+    legacy_runtime_existing_targets: List[Dict[str, Any]] = []
+    legacy_runtime_backup: List[Dict[str, Any]] = []
+
+    overlapping_package_paths = [rel for rel in package_files if rel in installed_files]
+    _attach_hashes(package_files, rel_paths=overlapping_package_paths)
+    _attach_hashes(installed_files, rel_paths=overlapping_package_paths)
+
+    for rel, package_entry in package_files.items():
+        installed_entry = installed_files.get(rel)
+        if not installed_entry:
+            package_additions.append(dict(package_entry))
+            continue
+        package_hash = str(package_entry.get("sha256") or "")
+        installed_hash = str(installed_entry.get("sha256") or "")
+        if package_hash != installed_hash:
+            package_updates.append(
+                {
+                    **dict(package_entry),
+                    "package_sha256": package_hash,
+                    "installed_sha256": installed_hash,
+                    "installed_absolute_path": installed_entry.get("absolute_path"),
+                }
+            )
+
+    for rel, installed_entry in installed_files.items():
+        if rel not in package_files:
+            installed_untouched.append(dict(installed_entry))
+
+    overlapping_legacy_paths = [rel for rel in legacy_files if rel in installed_files]
+    _attach_hashes(legacy_files, rel_paths=list(legacy_files.keys()))
+    _attach_hashes(installed_files, rel_paths=overlapping_legacy_paths)
+
+    for rel, legacy_entry in legacy_files.items():
+        legacy_runtime_backup.append(dict(legacy_entry))
+        installed_entry = installed_files.get(rel)
+        if installed_entry:
+            legacy_runtime_existing_targets.append(
+                {
+                    **dict(legacy_entry),
+                    "runtime_sha256": legacy_entry.get("sha256"),
+                    "installed_sha256": installed_entry.get("sha256"),
+                    "installed_absolute_path": installed_entry.get("absolute_path"),
+                }
+            )
+        else:
+            legacy_runtime_migrate.append(dict(legacy_entry))
+
+    delta = {
+        "schema": "mole_install_upgrade_delta_v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "package_root": str(package_root),
+        "install_root": str(install_root),
+        "package_data_root": str(package_data_root),
+        "installed_data_root": str(installed_data_root),
+        "legacy_runtime_root": str(legacy_runtime_root),
+        "package_add_count": len(package_additions),
+        "package_update_count": len(package_updates),
+        "installed_untouched_count": len(installed_untouched),
+        "legacy_migrate_count": len(legacy_runtime_migrate),
+        "legacy_preserve_existing_count": len(legacy_runtime_existing_targets),
+        "legacy_backup_count": len(legacy_runtime_backup),
+        "package_additions": package_additions,
+        "package_updates": package_updates,
+        "installed_untouched": installed_untouched,
+        "legacy_runtime_migrate": legacy_runtime_migrate,
+        "legacy_runtime_existing_targets": legacy_runtime_existing_targets,
+        "legacy_runtime_backup": legacy_runtime_backup,
+    }
+    delta["lines"] = _render_delta_lines(delta)
+    return delta
 
 
 def _build_upgrade_plan(package: Dict[str, Any], installed: Dict[str, Any]) -> Dict[str, Any]:
@@ -296,6 +454,7 @@ class InstallClient(tk.Tk):
         self.uninstall_reg_var = tk.BooleanVar(value=True)
         self.current_install = _installed_summary(Path(self.install_root_var.get()))
         self.upgrade_plan: Dict[str, Any] = {}
+        self.upgrade_delta: Dict[str, Any] = {}
 
         self._build_ui()
         self._refresh_state()
@@ -334,6 +493,11 @@ class InstallClient(tk.Tk):
         self.plan_text = tk.Text(plan_box, height=8, wrap="word")
         self.plan_text.pack(fill="both", expand=True)
 
+        delta_box = ttk.LabelFrame(outer, text="Preflight Delta Review", padding=12)
+        delta_box.pack(fill="both", expand=True, pady=(12, 0))
+        self.delta_text = tk.Text(delta_box, height=14, wrap="word")
+        self.delta_text.pack(fill="both", expand=True)
+
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.pack(fill="x", pady=(12, 0))
         ttk.Checkbutton(options, text="Launch Wizard after install", variable=self.launch_after_install_var).pack(anchor="w")
@@ -348,6 +512,7 @@ class InstallClient(tk.Tk):
         ttk.Button(row1, text="Refresh", command=self._refresh_state).pack(side="left")
         ttk.Button(row1, text="Validate Package", command=self._validate_package).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Preview Upgrade Plan", command=self._preview_upgrade_plan).pack(side="left", padx=(8, 0))
+        ttk.Button(row1, text="Preview Delta Review", command=self._preview_delta_review).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Install / Upgrade", command=self._install_package).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Upgrade + Relaunch", command=self._upgrade_and_relaunch).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Repair Install", command=self._repair_install).pack(side="left", padx=(8, 0))
@@ -386,6 +551,7 @@ class InstallClient(tk.Tk):
         self.package = _package_summary(self.package_root)
         self.current_install = _installed_summary(Path(self.install_root_var.get()))
         self.upgrade_plan = _build_upgrade_plan(self.package, self.current_install)
+        self.upgrade_delta = _build_upgrade_delta(self.package, self.current_install)
         package_lines = [
             f"Package label: {self.package['package_label']}",
             f"Git commit: {self.package['git_commit']}",
@@ -414,9 +580,11 @@ class InstallClient(tk.Tk):
             f"Summary: {self.upgrade_plan.get('summary') or '(none)'}",
             *list(self.upgrade_plan.get("lines") or []),
         ]
+        delta_lines = list(self.upgrade_delta.get("lines") or [])
         self._write_text(self.package_text, "\n".join(package_lines))
         self._write_text(self.install_text, "\n".join(install_lines))
         self._write_text(self.plan_text, "\n".join(plan_lines))
+        self._write_text(self.delta_text, "\n".join(delta_lines))
 
     def _validate_package(self) -> bool:
         failures = []
@@ -454,6 +622,13 @@ class InstallClient(tk.Tk):
         detail = "\n".join(plan_lines).strip() or "No upgrade plan is available."
         self._append_log("Upgrade plan preview:\n" + detail)
         messagebox.showinfo("Upgrade Plan", detail)
+
+    def _preview_delta_review(self) -> None:
+        self._refresh_state()
+        delta_lines = list(self.upgrade_delta.get("lines") or [])
+        detail = "\n".join(delta_lines).strip() or "No delta review is available."
+        self._append_log("Preflight delta review:\n" + detail)
+        messagebox.showinfo("Preflight Delta Review", detail)
 
     def _run_async(self, label: str, script_path: Path, args: list[str]) -> None:
         def worker() -> None:
@@ -521,6 +696,7 @@ def main() -> int:
     package = _package_summary(package_root)
     installed = _installed_summary(_default_install_root())
     upgrade_plan = _build_upgrade_plan(package, installed)
+    upgrade_delta = _build_upgrade_delta(package, installed)
     if args.headless_summary:
         print(
             json.dumps(
@@ -529,6 +705,7 @@ def main() -> int:
                     "package": package,
                     "installed": installed,
                     "upgrade_plan": upgrade_plan,
+                    "upgrade_delta": upgrade_delta,
                 },
                 indent=2,
             )
