@@ -259,6 +259,23 @@ def _build_upgrade_delta(package: Dict[str, Any], installed: Dict[str, Any]) -> 
     return delta
 
 
+def _build_upgrade_review_text(plan: Dict[str, Any], delta: Dict[str, Any]) -> str:
+    plan_lines = list(plan.get("lines") or [])
+    delta_lines = list(delta.get("lines") or [])
+    sections: List[str] = []
+    if plan_lines:
+        sections.append("Upgrade Plan")
+        sections.append("------------")
+        sections.extend(plan_lines)
+    if delta_lines:
+        if sections:
+            sections.append("")
+        sections.append("Preflight Delta Review")
+        sections.append("----------------------")
+        sections.extend(delta_lines)
+    return "\n".join(sections).strip()
+
+
 def _build_upgrade_plan(package: Dict[str, Any], installed: Dict[str, Any]) -> Dict[str, Any]:
     package_label = str(package.get("package_label") or "").strip()
     installed_label = str(installed.get("bundle_label") or "").strip()
@@ -547,6 +564,40 @@ class InstallClient(tk.Tk):
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _show_text_dialog(self, title: str, content: str, *, confirm_label: str = "") -> bool:
+        dialog = tk.Toplevel(self)
+        dialog.title(title)
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.geometry("920x720")
+
+        outer = ttk.Frame(dialog, padding=12)
+        outer.pack(fill="both", expand=True)
+
+        text = tk.Text(outer, wrap="word")
+        text.pack(fill="both", expand=True)
+        text.insert("1.0", content.strip() or "(no details)")
+        text.configure(state="disabled")
+
+        button_row = ttk.Frame(outer)
+        button_row.pack(fill="x", pady=(12, 0))
+
+        result = {"confirmed": False}
+
+        def close_with(value: bool) -> None:
+            result["confirmed"] = value
+            dialog.destroy()
+
+        if confirm_label:
+            ttk.Button(button_row, text=confirm_label, command=lambda: close_with(True)).pack(side="left")
+            ttk.Button(button_row, text="Cancel", command=lambda: close_with(False)).pack(side="left", padx=(8, 0))
+        else:
+            ttk.Button(button_row, text="Close", command=lambda: close_with(False)).pack(side="left")
+
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close_with(False))
+        self.wait_window(dialog)
+        return bool(result["confirmed"])
+
     def _refresh_state(self) -> None:
         self.package = _package_summary(self.package_root)
         self.current_install = _installed_summary(Path(self.install_root_var.get()))
@@ -628,7 +679,7 @@ class InstallClient(tk.Tk):
         delta_lines = list(self.upgrade_delta.get("lines") or [])
         detail = "\n".join(delta_lines).strip() or "No delta review is available."
         self._append_log("Preflight delta review:\n" + detail)
-        messagebox.showinfo("Preflight Delta Review", detail)
+        self._show_text_dialog("Preflight Delta Review", detail)
 
     def _run_async(self, label: str, script_path: Path, args: list[str]) -> None:
         def worker() -> None:
@@ -655,11 +706,11 @@ class InstallClient(tk.Tk):
         self._refresh_state()
         if not self._validate_package():
             return
-        plan_lines = list(self.upgrade_plan.get("lines") or [])
-        detail = "\n".join(plan_lines).strip() or "No upgrade plan is available."
-        ok = messagebox.askyesno(
-            "Upgrade + Relaunch",
+        detail = _build_upgrade_review_text(self.upgrade_plan, self.upgrade_delta)
+        ok = self._show_text_dialog(
+            "Upgrade + Relaunch Review",
             detail + "\n\nContinue with the verified install and relaunch?",
+            confirm_label="Continue",
         )
         if not ok:
             self._append_log("Upgrade + Relaunch canceled by user.")
