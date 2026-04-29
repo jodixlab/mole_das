@@ -276,6 +276,74 @@ def _build_upgrade_review_text(plan: Dict[str, Any], delta: Dict[str, Any]) -> s
     return "\n".join(sections).strip()
 
 
+def _default_upgrade_report_dir(package_root: Path, install_root: Path) -> Path:
+    install_root = Path(install_root)
+    if install_root.exists():
+        return install_root / "data" / "backups" / "upgrade_reviews"
+    return Path(package_root) / "_upgrade_reports"
+
+
+def _build_upgrade_report(
+    package: Dict[str, Any],
+    installed: Dict[str, Any],
+    plan: Dict[str, Any],
+    delta: Dict[str, Any],
+) -> Dict[str, Any]:
+    review_text = _build_upgrade_review_text(plan, delta)
+    return {
+        "schema": "mole_install_upgrade_report_v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "package_label": str(package.get("package_label") or ""),
+        "package_git_commit": str(package.get("git_commit") or ""),
+        "package_git_branch": str(package.get("git_branch") or ""),
+        "install_root": str(installed.get("install_root") or ""),
+        "installed_bundle_label": str(installed.get("bundle_label") or ""),
+        "installed_data_schema_version": str(installed.get("data_schema_version") or ""),
+        "upgrade_action": str(plan.get("action") or ""),
+        "upgrade_summary": str(plan.get("summary") or ""),
+        "plan": plan,
+        "delta": delta,
+        "review_text": review_text,
+    }
+
+
+def _render_upgrade_report_text(report: Dict[str, Any]) -> str:
+    lines = [
+        "MOLE-DAS Upgrade Report",
+        "=======================",
+        f"Generated at: {report.get('generated_at') or ''}",
+        f"Package label: {report.get('package_label') or '(unknown)'}",
+        f"Package git commit: {report.get('package_git_commit') or '(unknown)'}",
+        f"Package git branch: {report.get('package_git_branch') or '(unknown)'}",
+        f"Install root: {report.get('install_root') or '(unset)'}",
+        f"Installed bundle label: {report.get('installed_bundle_label') or '(none)'}",
+        f"Installed data schema version: {report.get('installed_data_schema_version') or '(none)'}",
+        f"Upgrade action: {report.get('upgrade_action') or '(none)'}",
+        f"Upgrade summary: {report.get('upgrade_summary') or '(none)'}",
+        "",
+        str(report.get("review_text") or "").strip(),
+    ]
+    return "\n".join(lines).strip() + "\n"
+
+
+def _write_upgrade_report(report: Dict[str, Any], output_dir: Path) -> Dict[str, str]:
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    package_label = str(report.get("package_label") or "MOLE_DAS").strip() or "MOLE_DAS"
+    safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "_", package_label)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    prefix = f"upgrade_report__{safe_label}__{stamp}"
+    json_path = output_dir / f"{prefix}.json"
+    txt_path = output_dir / f"{prefix}.txt"
+    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    txt_path.write_text(_render_upgrade_report_text(report), encoding="utf-8")
+    return {
+        "output_dir": str(output_dir),
+        "json_path": str(json_path),
+        "txt_path": str(txt_path),
+    }
+
+
 def _build_upgrade_plan(package: Dict[str, Any], installed: Dict[str, Any]) -> Dict[str, Any]:
     package_label = str(package.get("package_label") or "").strip()
     installed_label = str(installed.get("bundle_label") or "").strip()
@@ -530,6 +598,7 @@ class InstallClient(tk.Tk):
         ttk.Button(row1, text="Validate Package", command=self._validate_package).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Preview Upgrade Plan", command=self._preview_upgrade_plan).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Preview Delta Review", command=self._preview_delta_review).pack(side="left", padx=(8, 0))
+        ttk.Button(row1, text="Export Upgrade Report", command=self._export_upgrade_report).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Install / Upgrade", command=self._install_package).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Upgrade + Relaunch", command=self._upgrade_and_relaunch).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Repair Install", command=self._repair_install).pack(side="left", padx=(8, 0))
@@ -681,6 +750,35 @@ class InstallClient(tk.Tk):
         self._append_log("Preflight delta review:\n" + detail)
         self._show_text_dialog("Preflight Delta Review", detail)
 
+    def _export_upgrade_report(self, *, output_dir: str = "") -> Dict[str, str] | None:
+        self._refresh_state()
+        default_dir = _default_upgrade_report_dir(self.package_root, Path(self.install_root_var.get()))
+        target_dir = output_dir.strip()
+        if not target_dir:
+            selected = filedialog.askdirectory(initialdir=str(default_dir))
+            if not selected:
+                self._append_log("Upgrade report export canceled by user.")
+                return None
+            target_dir = selected
+        report = _build_upgrade_report(self.package, self.current_install, self.upgrade_plan, self.upgrade_delta)
+        try:
+            result = _write_upgrade_report(report, Path(target_dir))
+        except Exception as exc:
+            messagebox.showerror("Export Upgrade Report", f"Failed to write upgrade report.\n\n{exc}")
+            self._append_log(f"Upgrade report export failed: {exc}")
+            return None
+        self._append_log(
+            "Upgrade report exported:\n"
+            f"  TXT: {result['txt_path']}\n"
+            f"  JSON: {result['json_path']}"
+        )
+        if not output_dir:
+            messagebox.showinfo(
+                "Export Upgrade Report",
+                f"Upgrade report exported.\n\nTXT:\n{result['txt_path']}\n\nJSON:\n{result['json_path']}",
+            )
+        return result
+
     def _run_async(self, label: str, script_path: Path, args: list[str]) -> None:
         def worker() -> None:
             self._append_log(f"{label} started.")
@@ -715,7 +813,16 @@ class InstallClient(tk.Tk):
         if not ok:
             self._append_log("Upgrade + Relaunch canceled by user.")
             return
+        export_result = self._export_upgrade_report(output_dir=str(_default_upgrade_report_dir(self.package_root, Path(self.install_root_var.get()))))
+        if not export_result:
+            self._append_log("Upgrade + Relaunch aborted because the upgrade report could not be exported.")
+            return
         self._append_log("Upgrade + Relaunch confirmed.\n" + detail)
+        self._append_log(
+            "Upgrade + Relaunch report:\n"
+            f"  TXT: {export_result['txt_path']}\n"
+            f"  JSON: {export_result['json_path']}"
+        )
         self._run_async("Upgrade + Relaunch", Path(self.package["installer_script_path"]), self._install_args(force_launch=True))
 
     def _repair_install(self) -> None:
@@ -741,6 +848,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="MOLE-DAS installation client")
     parser.add_argument("--package-root", default="", help="Override package root")
     parser.add_argument("--headless-summary", action="store_true", help="Print package/install summary JSON and exit")
+    parser.add_argument("--headless-export-upgrade-report", default="", help="Write upgrade report files to the given directory and print the output paths as JSON")
     args = parser.parse_args()
 
     package_root = _resolve_package_root(args.package_root or None)
@@ -761,6 +869,11 @@ def main() -> int:
                 indent=2,
             )
         )
+        return 0
+    if args.headless_export_upgrade_report:
+        report = _build_upgrade_report(package, installed, upgrade_plan, upgrade_delta)
+        result = _write_upgrade_report(report, Path(args.headless_export_upgrade_report))
+        print(json.dumps(result, indent=2))
         return 0
 
     app = InstallClient(package_root)
