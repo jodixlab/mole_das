@@ -299,6 +299,7 @@ try {
     $codeRoot = Join-Path $runtimeRoot "MOLE_code"
     $dataRoot = Join-Path $InstallRoot "data"
     $logsDir = Join-Path $dataRoot "logs"
+    $dataRootManifestPath = Join-Path $dataRoot "data_root_manifest_v1.json"
     $runtimeLogsDir = Join-Path $runtimeRoot "mole_das_data\\logs"
     $installedPython = Join-Path $codeRoot ".venv\\Scripts\\python.exe"
     $installedWizard = Join-Path $codeRoot "MOLE_DAS_Wizard.exe"
@@ -338,17 +339,58 @@ try {
         install_manifest_path = $installManifestPath
     }
 
+    $legacyRuntimeLogsDir = Join-Path $runtimeRoot "mole_das_data\\logs"
+    $legacyRuntimeExportsDir = Join-Path $runtimeRoot "mole_das_data\\exports"
+    $legacyRuntimeLogPath = Join-Path $legacyRuntimeLogsDir "legacy_runtime_probe.log"
+    $legacyRuntimeExportPath = Join-Path $legacyRuntimeExportsDir "legacy_report_probe.txt"
+    New-Item -ItemType Directory -Path $legacyRuntimeLogsDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $legacyRuntimeExportsDir -Force | Out-Null
+    [System.IO.File]::WriteAllText($legacyRuntimeLogPath, "legacy log payload", (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($legacyRuntimeExportPath, "legacy export payload", (New-Object System.Text.UTF8Encoding($false)))
+    Add-StepResult -Name "seed_legacy_runtime_payload" -Status "PASS" -Detail "Seeded legacy mutable runtime payload to validate migration into the external data root." -Extra @{
+        legacy_log_path = $legacyRuntimeLogPath
+        legacy_export_path = $legacyRuntimeExportPath
+    }
+
     Remove-Item -LiteralPath $wizardStampPath -Force -ErrorAction SilentlyContinue
     $wizardProc = Start-Process -FilePath $installedWizard -WorkingDirectory $codeRoot -PassThru
     if (-not (Wait-ForFile -PathValue $wizardStampPath -TimeoutSec 75)) {
         throw "Wizard startup stamp was not written: $wizardStampPath"
     }
     Require-Path -PathValue $dataRoot -Label "External writable data root"
+    Require-Path -PathValue $dataRootManifestPath -Label "External data root manifest"
+    $migratedLegacyLogPath = Join-Path $dataRoot "logs\\legacy_runtime_probe.log"
+    $migratedLegacyExportPath = Join-Path $dataRoot "exports\\legacy_report_probe.txt"
+    Require-Path -PathValue $migratedLegacyLogPath -Label "Migrated legacy runtime log"
+    Require-Path -PathValue $migratedLegacyExportPath -Label "Migrated legacy runtime export"
+    if (Test-Path -LiteralPath $legacyRuntimeLogPath) {
+        throw "Legacy runtime log was not removed from the immutable runtime payload: $legacyRuntimeLogPath"
+    }
+    if (Test-Path -LiteralPath $legacyRuntimeExportPath) {
+        throw "Legacy runtime export was not removed from the immutable runtime payload: $legacyRuntimeExportPath"
+    }
+    $dataRootManifest = Get-Content -LiteralPath $dataRootManifestPath -Raw | ConvertFrom-Json
+    if ([string]$dataRootManifest.schema -ne "mole_data_root_manifest_v1") {
+        throw "Data root manifest schema is invalid: $dataRootManifestPath"
+    }
+    if (-not $dataRootManifest.migration.performed) {
+        throw "Data root manifest did not record the legacy runtime migration."
+    }
+    if (-not $dataRootManifest.migration.backup_path) {
+        throw "Data root manifest did not record a migration backup path."
+    }
+    Require-Path -PathValue ([string]$dataRootManifest.migration.backup_path) -Label "Data root migration backup"
     $summary.wizard_startup_path = $wizardStampPath
     Copy-Item -LiteralPath $wizardStampPath -Destination (Join-Path $ArtifactOutDir "wizard_startup__latest.json") -Force
     Add-StepResult -Name "launch_wizard" -Status "PASS" -Detail "Installed Wizard launched and wrote startup diagnostics." -Extra @{
         startup_stamp = $wizardStampPath
         data_root = $dataRoot
+    }
+    Add-StepResult -Name "validate_data_root_manifest" -Status "PASS" -Detail "Validated data-root manifest creation, legacy payload migration, and migration backup." -Extra @{
+        data_root_manifest_path = $dataRootManifestPath
+        migrated_legacy_log_path = $migratedLegacyLogPath
+        migrated_legacy_export_path = $migratedLegacyExportPath
+        migration_backup_path = [string]$dataRootManifest.migration.backup_path
     }
     Start-Sleep -Seconds 2
     Stop-ProcessIfRunning -ProcessObject $wizardProc
@@ -464,6 +506,7 @@ manifest = {
 artifacts = {
     "build_identity": Path(r'''$buildIdentityPath'''),
     "welcome_manifest": Path(r'''$welcomeManifestPath''') if r'''$welcomeManifestPath''' else None,
+    "data_root_manifest": Path(r'''$dataRootManifestPath'''),
     "wizard_startup": Path(r'''$wizardStampPath'''),
     "runner_startup": Path(r'''$runnerStampPath'''),
     "runner_config": Path(r'''$($summary.runner_config_path)'''),

@@ -22,6 +22,8 @@ except Exception:
 _UTC_STAMP_LOCK = threading.Lock()
 _UTC_STAMP_LAST_BASE = ""
 _UTC_STAMP_SEQ = 0
+DATA_ROOT_MANIFEST_SCHEMA = "mole_data_root_manifest_v1"
+DATA_ROOT_SCHEMA_VERSION = "2026_04_29_v1"
 
 
 def _utc_stamp() -> str:
@@ -414,12 +416,127 @@ def _runtime_seed_config_sources(seed_root: Path, *, training: bool) -> list[Pat
     return sources
 
 
-def _seed_runtime_data_root(layout: Mapping[str, Any]) -> None:
+def _path_has_payload(path: Path) -> bool:
+    path = Path(path)
+    if not path.exists():
+        return False
+    if path.is_file():
+        return True
+    try:
+        return any(item.is_file() for item in path.rglob("*"))
+    except Exception:
+        return False
+
+
+def _copy_tree_backup(source: Path, destination: Path) -> int:
+    source = Path(source)
+    destination = Path(destination)
+    if not source.exists():
+        return 0
+    copied = 0
+    for item in sorted(source.rglob("*"), key=lambda p: str(p).lower()):
+        rel = item.relative_to(source)
+        target = destination / rel
+        if item.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, target)
+        copied += 1
+    return copied
+
+
+def _remove_tree_payload(path: Path) -> None:
+    path = Path(path)
+    if not path.exists():
+        return
+    if path.is_file():
+        path.unlink(missing_ok=True)
+        return
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def _data_root_manifest_path(layout: Mapping[str, Any]) -> Path:
+    return (Path(layout.get("data_root") or "") / "data_root_manifest_v1.json").resolve()
+
+
+def _data_root_migration_backup_root(layout: Mapping[str, Any]) -> Path:
+    return (Path(layout.get("backups_dir") or "") / "migrations").resolve()
+
+
+def _migrate_legacy_packaged_runtime_data(layout: Mapping[str, Any]) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "performed": False,
+        "backup_path": "",
+        "migrated_labels": [],
+        "migrated_source_paths": [],
+        "migrated_target_paths": [],
+        "removed_source_paths": [],
+    }
+    if not bool(layout.get("packaged_layout")):
+        return result
+
+    seed_root = Path(layout.get("seed_root") or "")
+    if not seed_root.exists():
+        return result
+
+    mappings = [
+        ("logs", seed_root / "logs", Path(layout.get("logs_dir") or "")),
+        ("backups", seed_root / "backups", Path(layout.get("backups_dir") or "")),
+        ("sessions", seed_root / "sessions", Path(layout.get("sessions_dir") or "")),
+        ("daq_runs", seed_root / "daq_runs", Path(layout.get("daq_runs_dir") or "")),
+        ("exports", seed_root / "exports", Path(layout.get("exports_dir") or "")),
+        ("validation", seed_root / "validation", Path(layout.get("validation_dir") or "")),
+        ("inbox_packages", seed_root / "inbox_packages", Path(layout.get("packages_inbox_dir") or "")),
+        ("inbox_archive", seed_root / "inbox_archive", Path(layout.get("packages_archive_dir") or "")),
+        ("cache", seed_root / "cache", Path(layout.get("cache_dir") or "")),
+    ]
+    active = [(label, src, dst) for (label, src, dst) in mappings if _path_has_payload(src)]
+    if not active:
+        return result
+
+    backup_root = _data_root_migration_backup_root(layout) / f"runtime_data_root_migration__{_utc_stamp()}"
+    for label, source, destination in active:
+        try:
+            snapshot_root = backup_root / "legacy_runtime_data" / label
+            copied = _copy_tree_backup(source, snapshot_root)
+            if source.is_dir():
+                _copy_tree_if_missing(source, destination)
+            elif source.is_file():
+                _copy_file_if_missing(source, destination)
+            _remove_tree_payload(source)
+            result["performed"] = True
+            result["migrated_labels"].append(label)
+            result["migrated_source_paths"].append(str(source.resolve()))
+            result["migrated_target_paths"].append(str(destination.resolve()))
+            result["removed_source_paths"].append(str(source.resolve()))
+            if copied > 0:
+                result["backup_path"] = str(backup_root.resolve())
+        except Exception:
+            continue
+
+    if result["backup_path"]:
+        atomic_write_json(
+            backup_root / "migration_manifest.json",
+            {
+                "schema": "mole_data_root_migration_backup_v1",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "data_root": str(Path(layout.get("data_root") or "").resolve()),
+                "seed_root": str(seed_root.resolve()),
+                "migration": result,
+            },
+        )
+    return result
+
+
+def _seed_runtime_data_root(layout: Mapping[str, Any]) -> list[str]:
     data_root = Path(layout.get("data_root") or "")
     seed_root = Path(layout.get("seed_root") or "")
     config_root = Path(layout.get("config_root") or "")
     if not data_root:
-        return
+        return []
+
+    actions: list[str] = []
 
     for key in (
         "data_root",
@@ -439,18 +556,29 @@ def _seed_runtime_data_root(layout: Mapping[str, Any]) -> None:
         try:
             target = Path(layout.get(key) or "")
             if target:
+                existed = target.exists()
                 target.mkdir(parents=True, exist_ok=True)
+                if not existed:
+                    actions.append(f"mkdir:{key}")
         except Exception:
             continue
 
     for db_name in ("mole_master.sqlite", "mole_packages_inbox.sqlite"):
         try:
-            _copy_file_if_missing(seed_root / "db" / db_name, Path(layout.get("db_dir") or "") / db_name)
+            target = Path(layout.get("db_dir") or "") / db_name
+            existed = target.exists()
+            _copy_file_if_missing(seed_root / "db" / db_name, target)
+            if (not existed) and target.exists():
+                actions.append(f"seed_db:{db_name}")
         except Exception:
             continue
 
     try:
-        _copy_tree_if_missing(seed_root / "rule_packs", Path(layout.get("rule_packs_dir") or ""))
+        target = Path(layout.get("rule_packs_dir") or "")
+        existed = target.exists()
+        _copy_tree_if_missing(seed_root / "rule_packs", target)
+        if (not existed) and target.exists():
+            actions.append("seed_rule_packs")
     except Exception:
         pass
 
@@ -471,8 +599,52 @@ def _seed_runtime_data_root(layout: Mapping[str, Any]) -> None:
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(item, target)
+                actions.append(f"seed_config:{rel.as_posix()}")
         except Exception:
             continue
+    return actions
+
+
+def ensure_runtime_data_root(layout: Mapping[str, Any]) -> Dict[str, Any]:
+    migration = _migrate_legacy_packaged_runtime_data(layout)
+    repair_actions = _seed_runtime_data_root(layout)
+    manifest_path = _data_root_manifest_path(layout)
+    previous = _load_json_dict(manifest_path)
+    previous_migration = previous.get("migration")
+    if (
+        isinstance(previous_migration, Mapping)
+        and bool(previous_migration.get("performed"))
+        and not bool(migration.get("performed"))
+    ):
+        migration = dict(previous_migration)
+    build_identity = _load_json_dict(Path(layout.get("runtime_root") or "") / "config" / "mole_build_identity_v1.json")
+    created_utc = str(previous.get("created_utc") or datetime.now(timezone.utc).isoformat())
+    payload: Dict[str, Any] = {
+        "schema": DATA_ROOT_MANIFEST_SCHEMA,
+        "data_schema_version": DATA_ROOT_SCHEMA_VERSION,
+        "created_utc": created_utc,
+        "updated_utc": datetime.now(timezone.utc).isoformat(),
+        "package_label": str(build_identity.get("bundle_label") or previous.get("package_label") or ""),
+        "git_commit": str(build_identity.get("git_commit") or previous.get("git_commit") or ""),
+        "git_branch": str(build_identity.get("git_branch") or previous.get("git_branch") or ""),
+        "packaged_layout": bool(layout.get("packaged_layout")),
+        "training": bool(layout.get("training")),
+        "env_mode": str(layout.get("env_mode") or ""),
+        "package_root": str(Path(layout.get("package_root") or "").resolve()),
+        "runtime_root": str(Path(layout.get("runtime_root") or "").resolve()),
+        "seed_root": str(Path(layout.get("seed_root") or "").resolve()),
+        "immutable_runtime_data_root": str(Path(layout.get("immutable_runtime_data_root") or "").resolve()),
+        "data_root": str(Path(layout.get("data_root") or "").resolve()),
+        "config_root": str(Path(layout.get("config_root") or "").resolve()),
+        "db_path": str(Path(layout.get("db_path") or "").resolve()),
+        "logs_dir": str(Path(layout.get("logs_dir") or "").resolve()),
+        "exports_dir": str(Path(layout.get("exports_dir") or "").resolve()),
+        "validation_dir": str(Path(layout.get("validation_dir") or "").resolve()),
+        "migration": migration,
+        "repair_actions": repair_actions,
+    }
+    atomic_write_json(manifest_path, payload)
+    return payload
 
 
 def resolve_runtime_storage_layout(
@@ -517,9 +689,10 @@ def resolve_runtime_storage_layout(
         "exports_dir": (data_root / "exports").resolve(),
         "validation_dir": (data_root / "validation").resolve(),
         "assets_dir": (runtime_root / "mole_assets").resolve(),
+        "data_root_manifest_path": (data_root / "data_root_manifest_v1.json").resolve(),
     }
     if seed_if_missing:
-        _seed_runtime_data_root(layout)
+        ensure_runtime_data_root(layout)
     return layout
 
 

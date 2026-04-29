@@ -128,12 +128,14 @@ $OutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $codeRoot = Join-Path $RepoRoot "MOLE_code"
 $python = Join-Path $codeRoot ".venv\Scripts\python.exe"
 $packager = Join-Path $codeRoot "mole_packager.py"
+$installClientSource = Join-Path $RepoRoot "scripts\mole_install_client.py"
 $wizardScript = Join-Path $codeRoot "mole_code_das_2026_01_21_v10_0_22_ARCADE_RELEASE.py"
 $runnerScript = Join-Path $codeRoot "mole_daq_runner_2026_02_03_v10_0_24_ARCADE_RELEASE.py"
 $scriptRunnerEntry = Join-Path $codeRoot "mole_script_runner_entry.py"
 
 Require-Path $python "Python runtime"
 Require-Path $packager "Packager"
+Require-Path $installClientSource "Install client"
 Require-Path $wizardScript "Wizard script"
 Require-Path $runnerScript "Runner script"
 Require-Path $scriptRunnerEntry "Script runner entrypoint"
@@ -653,6 +655,15 @@ if not exist "%ROOT%\MOLE_DAS_Wizard.exe" (
 start "" /D "%ROOT%" "%ROOT%\MOLE_DAS_Wizard.exe"
 '@
 
+$installClientBatch = @'
+@echo off
+setlocal
+"%~dp0runtime\MOLE_code\.venv\Scripts\python.exe" "%~dp0MOLE_DAS_INSTALL_CLIENT.py" %*
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" pause
+exit /b %RC%
+'@
+
 $installerBatch = @'
 @echo off
 setlocal
@@ -747,6 +758,15 @@ function New-ShortcutFile {
     $shortcut.WorkingDirectory = $WorkingDirectory
     $shortcut.IconLocation = $IconLocation
     $shortcut.Save()
+}
+
+function Test-PathHasFiles {
+    param([string]$PathValue)
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        return $false
+    }
+    $first = Get-ChildItem -LiteralPath $PathValue -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    return ($null -ne $first)
 }
 
 function Get-FileHashValue {
@@ -889,6 +909,8 @@ if (-not (Test-Path -LiteralPath $SourceWizard)) {
 
 $SourceSupportFiles = @(
     "LAUNCH_MOLE_DAS_EXE.bat",
+    "INSTALL_MOLE_DAS_CLIENT.bat",
+    "MOLE_DAS_INSTALL_CLIENT.py",
     "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
     "INSTALL_MOLE_DAS_EXE_BUNDLE.bat",
     "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
@@ -919,6 +941,8 @@ $InstalledUninstallBat = Join-Path $InstallRoot "UNINSTALL_MOLE_DAS_EXE_BUNDLE.b
 $InstalledIcon = Join-Path $InstallRoot "MOLE_DAS.ico"
 $InstalledWizard = Join-Path $ActiveRuntime "MOLE_code\MOLE_DAS_Wizard.exe"
 $InstalledRunner = Join-Path $ActiveRuntime "MOLE_code\MOLE_DAQ_Runner.exe"
+$SourceDataRoot = Join-Path $PackageRoot "data"
+$InstalledDataRoot = Join-Path $InstallRoot "data"
 
 Write-Status ""
 Write-Status "Installing MOLE-DAS executable bundle"
@@ -973,6 +997,14 @@ foreach ($name in $SourceSupportFiles) {
     }
 }
 
+if ((Test-PathHasFiles -PathValue $SourceDataRoot) -and ([System.IO.Path]::GetFullPath($SourceDataRoot) -ne [System.IO.Path]::GetFullPath($InstalledDataRoot))) {
+    Write-Status "Migrating package data root..."
+    Copy-TreeRobust -Source $SourceDataRoot -Destination $InstalledDataRoot
+}
+else {
+    New-Item -ItemType Directory -Path $InstalledDataRoot -Force | Out-Null
+}
+
 $buildIdentity = $null
 if (Test-Path -LiteralPath $BuildIdentityPath) {
     $buildIdentity = Get-Content -LiteralPath $BuildIdentityPath -Raw | ConvertFrom-Json
@@ -992,6 +1024,7 @@ $installManifest = [ordered]@{
     runner_exe = $InstalledRunner
     launcher = $InstalledLauncher
     uninstall_script = $InstalledUninstallPs1
+    data_root = $InstalledDataRoot
     bundle_label = $displayVersion
     git_commit = if ($buildIdentity) { $buildIdentity.git_commit } else { $null }
     git_branch = if ($buildIdentity) { $buildIdentity.git_branch } else { $null }
@@ -1132,8 +1165,10 @@ Write-Status "  Root removed: $InstallRoot"
 
 foreach ($targetRoot in @($OutputRoot, $installRoot)) {
     Set-Content -LiteralPath (Join-Path $targetRoot "LAUNCH_MOLE_DAS_EXE.bat") -Value $launcher -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $targetRoot "INSTALL_MOLE_DAS_CLIENT.bat") -Value $installClientBatch -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $targetRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.bat") -Value $installerBatch -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $targetRoot "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat") -Value $uninstallerBatch -Encoding ASCII
+    Copy-Item -LiteralPath $installClientSource -Destination (Join-Path $targetRoot "MOLE_DAS_INSTALL_CLIENT.py") -Force
     [System.IO.File]::WriteAllText(
         (Join-Path $targetRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"),
         $installerPs1,
@@ -1158,6 +1193,8 @@ Portable launch:
 - or runtime\MOLE_code\MOLE_DAS_Wizard.exe
 
 Installer launch:
+- INSTALL_MOLE_DAS_CLIENT.bat
+- guided install, upgrade, repair, and uninstall client
 - INSTALL_MOLE_DAS_EXE_BUNDLE.bat
 - default install root: %LOCALAPPDATA%\Programs\MOLE_DAS
 - creates Start Menu and Desktop shortcuts
@@ -1219,7 +1256,7 @@ foreach ($targetRoot in @($OutputRoot, $installRoot)) {
     $launchShortcut.Save()
 
     $installShortcut = $shell.CreateShortcut((Join-Path $targetRoot "Install MOLE-DAS.lnk"))
-    $installShortcut.TargetPath = (Join-Path $targetRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.bat")
+    $installShortcut.TargetPath = (Join-Path $targetRoot "INSTALL_MOLE_DAS_CLIENT.bat")
     $installShortcut.WorkingDirectory = $targetRoot
     $installShortcut.IconLocation = $targetIcon
     $installShortcut.Save()
@@ -1262,9 +1299,12 @@ Initialize-CleanDirectory -PathValue $installerStageRoot
 Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -RelativePaths @(
     "runtime",
     "LAUNCH_MOLE_DAS_EXE.bat",
+    "INSTALL_MOLE_DAS_CLIENT.bat",
+    "MOLE_DAS_INSTALL_CLIENT.py",
     "README_EXECUTABLE_BUNDLE.txt",
     "MOLE_DAS.ico",
     "Launch MOLE-DAS.lnk",
+    "Install MOLE-DAS.lnk",
     $publishedAcceptanceJsonName,
     $publishedAcceptanceTxtName,
     $verifiedReleaseManifestName,

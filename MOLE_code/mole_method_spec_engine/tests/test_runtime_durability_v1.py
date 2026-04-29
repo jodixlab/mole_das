@@ -45,6 +45,62 @@ class RuntimeDurabilityTests(unittest.TestCase):
             self.assertFalse((install_root / "data" / "configs" / "mole_config.json").exists())
             self.assertTrue((install_root / "data" / "db" / "mole_master.sqlite").exists())
             self.assertTrue((install_root / "data" / "rule_packs" / "sample_rule.json").exists())
+            manifest_path = install_root / "data" / "data_root_manifest_v1.json"
+            self.assertTrue(manifest_path.exists())
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["schema"], durability.DATA_ROOT_MANIFEST_SCHEMA)
+            self.assertEqual(manifest["data_schema_version"], durability.DATA_ROOT_SCHEMA_VERSION)
+            self.assertEqual(Path(manifest["data_root"]), (install_root / "data").resolve())
+
+    def test_packaged_runtime_migrates_legacy_mutable_payload_out_of_runtime_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            install_root = Path(td) / "MOLE_DAS_2026_04_28_v5"
+            runtime_root = install_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            seed_root = runtime_root / "mole_das_data"
+            (code_root).mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "db").mkdir(parents=True, exist_ok=True)
+            (seed_root / "rule_packs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "logs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "exports").mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs" / "mole_session_2026_03_31_1209.json").write_text("{}", encoding="utf-8")
+            (seed_root / "db" / "mole_master.sqlite").write_text("seed-db", encoding="utf-8")
+            (seed_root / "logs" / "legacy_runtime.log").write_text("legacy", encoding="utf-8")
+            (seed_root / "exports" / "legacy_report.txt").write_text("legacy-report", encoding="utf-8")
+
+            layout = resolve_runtime_storage_layout(code_root, env_mode="PRODUCTION", seed_if_missing=True)
+
+            self.assertFalse((seed_root / "logs" / "legacy_runtime.log").exists())
+            self.assertFalse((seed_root / "exports" / "legacy_report.txt").exists())
+            self.assertTrue((install_root / "data" / "logs" / "legacy_runtime.log").exists())
+            self.assertTrue((install_root / "data" / "exports" / "legacy_report.txt").exists())
+            manifest = json.loads((install_root / "data" / "data_root_manifest_v1.json").read_text(encoding="utf-8"))
+            self.assertTrue(manifest["migration"]["performed"])
+            self.assertIn("logs", manifest["migration"]["migrated_labels"])
+            self.assertTrue(Path(manifest["migration"]["backup_path"]).exists())
+
+    def test_packaged_runtime_manifest_preserves_migration_state_across_repeat_seed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            install_root = Path(td) / "MOLE_DAS_2026_04_28_v5"
+            runtime_root = install_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            seed_root = runtime_root / "mole_das_data"
+            (code_root).mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "db").mkdir(parents=True, exist_ok=True)
+            (seed_root / "logs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs" / "mole_session_2026_03_31_1209.json").write_text("{}", encoding="utf-8")
+            (seed_root / "db" / "mole_master.sqlite").write_text("seed-db", encoding="utf-8")
+            (seed_root / "logs" / "legacy_runtime.log").write_text("legacy", encoding="utf-8")
+
+            resolve_runtime_storage_layout(code_root, env_mode="PRODUCTION", seed_if_missing=True)
+            resolve_runtime_storage_layout(code_root, env_mode="PRODUCTION", seed_if_missing=True)
+
+            manifest = json.loads((install_root / "data" / "data_root_manifest_v1.json").read_text(encoding="utf-8"))
+            self.assertTrue(manifest["migration"]["performed"])
+            self.assertIn("logs", manifest["migration"]["migrated_labels"])
+            self.assertTrue(Path(manifest["migration"]["backup_path"]).exists())
 
     def test_dev_runtime_layout_keeps_internal_data_root(self) -> None:
         with tempfile.TemporaryDirectory() as td:
