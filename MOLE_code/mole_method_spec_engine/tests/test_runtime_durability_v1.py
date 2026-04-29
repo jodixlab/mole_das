@@ -14,13 +14,46 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import mole_runtime_durability_v1 as durability
-from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, verify_verified_release_reference, write_recovery_snapshot
+from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, resolve_runtime_storage_layout, resolve_runtime_storage_layout_from_root, verify_verified_release_reference, write_recovery_snapshot
 
 
 class RuntimeDurabilityTests(unittest.TestCase):
     @staticmethod
     def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+    def test_packaged_runtime_layout_uses_external_data_root_and_seeds(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            install_root = Path(td) / "MOLE_DAS_2026_04_28_v5"
+            runtime_root = install_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            seed_root = runtime_root / "mole_das_data"
+            (code_root).mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "db").mkdir(parents=True, exist_ok=True)
+            (seed_root / "rule_packs").mkdir(parents=True, exist_ok=True)
+            (seed_root / "configs" / "mole_session_2026_03_31_1209.json").write_text("{}", encoding="utf-8")
+            (seed_root / "configs" / "mole_config.json").write_text("{}", encoding="utf-8")
+            (seed_root / "db" / "mole_master.sqlite").write_text("seed-db", encoding="utf-8")
+            (seed_root / "rule_packs" / "sample_rule.json").write_text("{}", encoding="utf-8")
+
+            layout = resolve_runtime_storage_layout(code_root, env_mode="PRODUCTION", seed_if_missing=True)
+
+            self.assertTrue(layout["packaged_layout"])
+            self.assertEqual(Path(layout["data_root"]), (install_root / "data").resolve())
+            self.assertTrue((install_root / "data" / "configs" / "mole_session_2026_03_31_1209.json").exists())
+            self.assertFalse((install_root / "data" / "configs" / "mole_config.json").exists())
+            self.assertTrue((install_root / "data" / "db" / "mole_master.sqlite").exists())
+            self.assertTrue((install_root / "data" / "rule_packs" / "sample_rule.json").exists())
+
+    def test_dev_runtime_layout_keeps_internal_data_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td) / "repo"
+            code_root = repo_root / "MOLE_code"
+            (code_root).mkdir(parents=True, exist_ok=True)
+            layout = resolve_runtime_storage_layout_from_root(repo_root, env_mode="PRODUCTION", seed_if_missing=False)
+            self.assertFalse(layout["packaged_layout"])
+            self.assertEqual(Path(layout["data_root"]), (repo_root / "mole_das_data").resolve())
 
     def test_package_status_current_for_installed_verified_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as td:

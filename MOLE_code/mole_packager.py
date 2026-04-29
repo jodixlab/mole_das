@@ -52,6 +52,17 @@ SKIP_FILE_NAMES = {
     "desktop.ini",
     "Thumbs.db",
 }
+IMMUTABLE_RUNTIME_DATA_SKIP_TOP_DIRS = {
+    "backups",
+    "cache",
+    "daq_runs",
+    "exports",
+    "inbox_archive",
+    "inbox_packages",
+    "logs",
+    "sessions",
+    "validation",
+}
 
 
 def _sha256_file(path: Path, chunk: int = 1024 * 1024) -> str:
@@ -67,11 +78,35 @@ def _sha256_file(path: Path, chunk: int = 1024 * 1024) -> str:
 
 def _should_skip_file(root: Path, path: Path, *, include_manifest: bool) -> bool:
     rel_parts = path.relative_to(root).parts
+    rel_parts_lower = tuple(str(part).strip().lower() for part in rel_parts)
     if any(part in SKIP_DIR_NAMES or part.startswith(".venv_stale") for part in rel_parts):
         return True
-    if "mole_das_data" in rel_parts and "logs" in rel_parts:
-        return True
+    if "mole_das_data" in rel_parts:
+        try:
+            idx = rel_parts.index("mole_das_data")
+            tail = [str(part).strip().lower() for part in rel_parts[idx + 1:]]
+            if tail:
+                top = tail[0]
+                if top in IMMUTABLE_RUNTIME_DATA_SKIP_TOP_DIRS:
+                    return True
+                if top == "training":
+                    if len(tail) > 1 and tail[1] == "sessions":
+                        return True
+                    if len(tail) > 1 and tail[1] not in {"db", "training", "keep.txt"}:
+                        return True
+                    if len(tail) > 2 and tail[1] == "training" and tail[2] != "configs":
+                        return True
+        except Exception:
+            return True
     name = path.name
+    name_lower = name.lower()
+    if name_lower in {"mole_config.json", "mole_config_training.json"}:
+        if len(rel_parts_lower) == 1:
+            return True
+        if rel_parts_lower[:2] == ("config", name_lower):
+            return True
+        if "mole_das_data" in rel_parts_lower and "configs" in rel_parts_lower:
+            return True
     if name in SKIP_FILE_NAMES:
         return True
     if name.startswith("~$") or name.startswith("~$$"):

@@ -297,7 +297,9 @@ try {
 
     $runtimeRoot = Join-Path $InstallRoot "runtime"
     $codeRoot = Join-Path $runtimeRoot "MOLE_code"
-    $logsDir = Join-Path $runtimeRoot "mole_das_data\\logs"
+    $dataRoot = Join-Path $InstallRoot "data"
+    $logsDir = Join-Path $dataRoot "logs"
+    $runtimeLogsDir = Join-Path $runtimeRoot "mole_das_data\\logs"
     $installedPython = Join-Path $codeRoot ".venv\\Scripts\\python.exe"
     $installedWizard = Join-Path $codeRoot "MOLE_DAS_Wizard.exe"
     $installedRunner = Join-Path $codeRoot "MOLE_DAQ_Runner.exe"
@@ -324,6 +326,8 @@ try {
     $summary.git_commit = [string]$buildIdentity.git_commit
     $summary.git_branch = [string]$buildIdentity.git_branch
     $summary.build_identity_path = $buildIdentityPath
+    $summary.data_root = $dataRoot
+    $summary.logs_dir = $logsDir
     if (Test-Path -LiteralPath $welcomeManifestPath) {
         $summary.welcome_manifest_path = $welcomeManifestPath
     }
@@ -339,10 +343,12 @@ try {
     if (-not (Wait-ForFile -PathValue $wizardStampPath -TimeoutSec 75)) {
         throw "Wizard startup stamp was not written: $wizardStampPath"
     }
+    Require-Path -PathValue $dataRoot -Label "External writable data root"
     $summary.wizard_startup_path = $wizardStampPath
     Copy-Item -LiteralPath $wizardStampPath -Destination (Join-Path $ArtifactOutDir "wizard_startup__latest.json") -Force
     Add-StepResult -Name "launch_wizard" -Status "PASS" -Detail "Installed Wizard launched and wrote startup diagnostics." -Extra @{
         startup_stamp = $wizardStampPath
+        data_root = $dataRoot
     }
     Start-Sleep -Seconds 2
     Stop-ProcessIfRunning -ProcessObject $wizardProc
@@ -376,6 +382,9 @@ print(json.dumps(payload))
     Require-Path -PathValue $summary.session_dir -Label "Seeded acceptance session"
     Require-Path -PathValue $summary.runner_config_path -Label "Seeded runner config"
     Require-Path -PathValue $summary.session_profile_path -Label "Seeded session profile"
+    if (-not ([string]$summary.session_dir).StartsWith([System.IO.Path]::GetFullPath($dataRoot), [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Seeded acceptance session was not written under the external data root: $($summary.session_dir)"
+    }
     Add-StepResult -Name "seed_session" -Status "PASS" -Detail "Seeded deterministic session fixture inside the installed runtime." -Extra @{
         session_dir = $summary.session_dir
         runner_config_path = $summary.runner_config_path
@@ -395,6 +404,18 @@ print(json.dumps(payload))
     Start-Sleep -Seconds 3
     Stop-ProcessIfRunning -ProcessObject $runnerProc
     $runnerProc = $null
+
+    if (Test-Path -LiteralPath $runtimeLogsDir) {
+        $runtimeLogFiles = Get-ChildItem -LiteralPath $runtimeLogsDir -Filter "*startup*.json" -ErrorAction SilentlyContinue
+        if ($runtimeLogFiles) {
+            throw "Packaged runtime wrote startup diagnostics into the immutable runtime payload: $runtimeLogsDir"
+        }
+    }
+    Add-StepResult -Name "validate_external_data_root" -Status "PASS" -Detail "Installed runtime wrote mutable data into the external data root, not the runtime payload." -Extra @{
+        data_root = $dataRoot
+        logs_dir = $logsDir
+        runtime_logs_dir = $runtimeLogsDir
+    }
 
     $reportResult = Invoke-CapturedProcess `
         -Label "report_pack_export" `

@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import shutil
+import sys
 import threading
 import zipfile
 from datetime import datetime, timezone
@@ -367,6 +368,172 @@ def _package_root_from_runtime_root(runtime_root: Path) -> Path:
     if runtime_root.name.strip().lower() == "runtime":
         return runtime_root.parent.resolve()
     return runtime_root
+
+
+def _copy_file_if_missing(source: Path, destination: Path) -> None:
+    source = Path(source)
+    destination = Path(destination)
+    if not source.exists() or not source.is_file() or destination.exists():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+
+def _copy_tree_if_missing(source: Path, destination: Path) -> None:
+    source = Path(source)
+    destination = Path(destination)
+    if not source.exists() or not source.is_dir():
+        return
+    for item in sorted(source.rglob("*"), key=lambda p: str(p).lower()):
+        rel = item.relative_to(source)
+        target = destination / rel
+        if item.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        if target.exists():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, target)
+
+
+def _runtime_env_is_training(env_mode: Any) -> bool:
+    text = str(env_mode or "").strip().upper()
+    return text in {"TRAINING", "SIM_TRAINING", "SIMTRAINING", "TRAIN"}
+
+
+def _runtime_seed_config_sources(seed_root: Path, *, training: bool) -> list[Path]:
+    seed_root = Path(seed_root).resolve()
+    sources: list[Path] = []
+    direct = seed_root / "configs"
+    if direct.exists():
+        sources.append(direct)
+    if training:
+        nested = seed_root / "training" / "configs"
+        if nested.exists():
+            sources.append(nested)
+    return sources
+
+
+def _seed_runtime_data_root(layout: Mapping[str, Any]) -> None:
+    data_root = Path(layout.get("data_root") or "")
+    seed_root = Path(layout.get("seed_root") or "")
+    config_root = Path(layout.get("config_root") or "")
+    if not data_root:
+        return
+
+    for key in (
+        "data_root",
+        "config_root",
+        "logs_dir",
+        "backups_dir",
+        "sessions_dir",
+        "daq_runs_dir",
+        "rule_packs_dir",
+        "packages_inbox_dir",
+        "packages_archive_dir",
+        "db_dir",
+        "cache_dir",
+        "exports_dir",
+        "validation_dir",
+    ):
+        try:
+            target = Path(layout.get(key) or "")
+            if target:
+                target.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            continue
+
+    for db_name in ("mole_master.sqlite", "mole_packages_inbox.sqlite"):
+        try:
+            _copy_file_if_missing(seed_root / "db" / db_name, Path(layout.get("db_dir") or "") / db_name)
+        except Exception:
+            continue
+
+    try:
+        _copy_tree_if_missing(seed_root / "rule_packs", Path(layout.get("rule_packs_dir") or ""))
+    except Exception:
+        pass
+
+    for source_dir in _runtime_seed_config_sources(
+        seed_root,
+        training=bool(layout.get("training")),
+    ):
+        try:
+            for item in sorted(source_dir.rglob("*"), key=lambda p: str(p).lower()):
+                rel = item.relative_to(source_dir)
+                target = config_root / rel
+                if item.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                if item.name.lower().startswith("mole_config"):
+                    continue
+                if target.exists():
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, target)
+        except Exception:
+            continue
+
+
+def resolve_runtime_storage_layout(
+    runtime_base_dir: Path,
+    *,
+    env_mode: str = "PRODUCTION",
+    seed_if_missing: bool = False,
+) -> Dict[str, Any]:
+    code_root = Path(runtime_base_dir).resolve()
+    runtime_root = code_root.parent.resolve()
+    package_root = _package_root_from_runtime_root(runtime_root)
+    training = _runtime_env_is_training(env_mode)
+    frozen = bool(getattr(sys, "frozen", False))
+    packaged_layout = frozen or runtime_root.name.strip().lower() == "runtime"
+    seed_root = (runtime_root / "mole_das_data" / ("training" if training else "")).resolve()
+    data_root = ((package_root / "data") / ("training" if training else "")).resolve() if packaged_layout else seed_root
+    config_name = "mole_config_training.json" if training else "mole_config.json"
+    layout: Dict[str, Any] = {
+        "frozen": frozen,
+        "packaged_layout": packaged_layout,
+        "training": training,
+        "env_mode": "TRAINING" if training else "PRODUCTION",
+        "code_root": code_root,
+        "runtime_root": runtime_root,
+        "package_root": package_root,
+        "seed_root": seed_root,
+        "immutable_runtime_data_root": (runtime_root / "mole_das_data").resolve(),
+        "data_root": data_root,
+        "config_root": (data_root / "configs").resolve(),
+        "config_path": (data_root / "configs" / config_name).resolve(),
+        "logs_dir": (data_root / "logs").resolve(),
+        "backups_dir": (data_root / "backups").resolve(),
+        "sessions_dir": (data_root / "sessions").resolve(),
+        "daq_runs_dir": (data_root / "daq_runs").resolve(),
+        "rule_packs_dir": (data_root / "rule_packs").resolve(),
+        "packages_inbox_dir": (data_root / "inbox_packages").resolve(),
+        "packages_archive_dir": (data_root / "inbox_archive").resolve(),
+        "db_dir": (data_root / "db").resolve(),
+        "db_path": (data_root / "db" / "mole_master.sqlite").resolve(),
+        "package_index_db_path": (data_root / "db" / "mole_packages_inbox.sqlite").resolve(),
+        "cache_dir": (data_root / "cache").resolve(),
+        "exports_dir": (data_root / "exports").resolve(),
+        "validation_dir": (data_root / "validation").resolve(),
+        "assets_dir": (runtime_root / "mole_assets").resolve(),
+    }
+    if seed_if_missing:
+        _seed_runtime_data_root(layout)
+    return layout
+
+
+def resolve_runtime_storage_layout_from_root(
+    runtime_root: Path,
+    *,
+    env_mode: str = "PRODUCTION",
+    seed_if_missing: bool = False,
+) -> Dict[str, Any]:
+    runtime_root = Path(runtime_root).resolve()
+    code_root = runtime_root / "MOLE_code"
+    if not code_root.exists():
+        code_root = runtime_root
+    return resolve_runtime_storage_layout(code_root, env_mode=env_mode, seed_if_missing=seed_if_missing)
 
 
 def _first_existing_path(*paths: Path) -> Optional[Path]:

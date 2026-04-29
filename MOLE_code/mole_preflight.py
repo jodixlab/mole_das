@@ -27,6 +27,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    from mole_runtime_durability_v1 import resolve_runtime_storage_layout_from_root
+except Exception:
+    resolve_runtime_storage_layout_from_root = None
+
 
 def _utc_iso(ts: Optional[float] = None) -> str:
     dt = datetime.fromtimestamp(ts or time.time(), tz=timezone.utc)
@@ -102,9 +107,23 @@ def run_preflight(*, app: str, code_dir: Path, strict_hash: bool = False) -> Dic
         errors.append(f"Missing mole_das_data folder: {root / 'mole_das_data'}")
 
     # --- config existence
+    runtime_layout = {}
+    try:
+        if callable(resolve_runtime_storage_layout_from_root):
+            runtime_layout = resolve_runtime_storage_layout_from_root(root, env_mode="PRODUCTION", seed_if_missing=True)
+    except Exception:
+        runtime_layout = {}
+    packaged_layout = bool((runtime_layout or {}).get("packaged_layout"))
     cfg_path = root / "mole_config.json"
+    try:
+        runtime_cfg = (runtime_layout or {}).get("config_path")
+        if runtime_cfg:
+            cfg_path = Path(runtime_cfg).resolve()
+    except Exception:
+        pass
     if not cfg_path.exists():
-        warnings.append(f"mole_config.json not found at expected path: {cfg_path}")
+        if not packaged_layout:
+            warnings.append(f"mole_config.json not found at expected path: {cfg_path}")
     else:
         cfg, err = _safe_json_load(cfg_path)
         if err:
@@ -169,6 +188,14 @@ def run_preflight(*, app: str, code_dir: Path, strict_hash: bool = False) -> Dic
     log_path = None
     try:
         logs_dir = root / "mole_das_data" / "logs"
+        if callable(resolve_runtime_storage_layout_from_root):
+            try:
+                layout = resolve_runtime_storage_layout_from_root(root, env_mode="PRODUCTION", seed_if_missing=True)
+                candidate = layout.get("logs_dir")
+                if candidate:
+                    logs_dir = Path(candidate).resolve()
+            except Exception:
+                pass
         logs_dir.mkdir(parents=True, exist_ok=True)
         log_path = logs_dir / f"mole_preflight_{app}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
         log_path.write_text(json.dumps({

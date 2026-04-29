@@ -22,6 +22,7 @@ import math
 import socket
 import os
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
@@ -330,7 +331,7 @@ def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[st
     record = dict(payload or {})
     record.setdefault("schema", "mole_startup_diagnostic_v1")
     record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
-    text = json.dumps(record, indent=2, ensure_ascii=False)
+    text = json.dumps(record, indent=2, ensure_ascii=False, default=str)
     for target in (stamped, latest):
         tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{ts}")
         try:
@@ -497,7 +498,7 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, resolve_runtime_storage_layout, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
@@ -507,6 +508,7 @@ except Exception:
     load_latest_health_summary = None
     load_recent_health_history = None
     record_health_journal = None
+    resolve_runtime_storage_layout = None
     verify_verified_release_reference = None
     write_recovery_snapshot = None
     write_startup_diagnostic = None
@@ -545,15 +547,48 @@ def _mole_env_mode(session: Optional[Dict[str, Any]] = None) -> str:
 
 
 def _pkg_root_dir() -> Path:
-    """Return runtime package root directory (contains mole_assets + mole_das_data)."""
+    """Return runtime payload root directory (contains MOLE_code, mole_assets, immutable seed data)."""
     try:
         return _app_base_dir().parent
     except Exception:
         return Path(__file__).resolve().parent.parent
 
 
+def _runtime_data_layout(session: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    env_mode = _mole_env_mode(session)
+    if resolve_runtime_storage_layout is not None:
+        try:
+            return resolve_runtime_storage_layout(_app_base_dir(), env_mode=env_mode, seed_if_missing=True)
+        except Exception:
+            pass
+    data_root = (_pkg_root_dir() / "mole_das_data" / "training") if env_mode == "TRAINING" else (_pkg_root_dir() / "mole_das_data")
+    return {
+        "env_mode": env_mode,
+        "training": env_mode == "TRAINING",
+        "runtime_root": _pkg_root_dir(),
+        "package_root": _pkg_root_dir(),
+        "seed_root": Path(data_root).resolve(),
+        "data_root": Path(data_root).resolve(),
+        "config_root": (Path(data_root) / "configs").resolve(),
+        "logs_dir": (Path(data_root) / "logs").resolve(),
+        "db_path": (Path(data_root) / "db" / "mole_master.sqlite").resolve(),
+        "sessions_dir": (Path(data_root) / "sessions").resolve(),
+        "validation_dir": (Path(data_root) / "validation").resolve(),
+        "exports_dir": (Path(data_root) / "exports").resolve(),
+        "rule_packs_dir": (Path(data_root) / "rule_packs").resolve(),
+        "assets_dir": (_pkg_root_dir() / "mole_assets").resolve(),
+    }
+
+
+def _runtime_logs_dir(session: Optional[Dict[str, Any]] = None) -> Path:
+    layout = _runtime_data_layout(session)
+    path = Path(layout.get("logs_dir") or (_pkg_root_dir() / "mole_das_data" / "logs")).resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _training_data_root() -> Path:
-    return _pkg_root_dir() / "mole_das_data" / "training"
+    return Path(_runtime_data_layout({"environment": "TRAINING"}).get("data_root") or (_pkg_root_dir() / "mole_das_data" / "training")).resolve()
 
 
 def _is_frozen() -> bool:
@@ -3014,7 +3049,7 @@ def build_sim_training_scenario(
             return cache
         db: Dict[str, Any] = {}
         try:
-            p = _pkg_root_dir() / "mole_das_data" / "configs" / "sim_emissions_ranges.json"
+            p = Path(_runtime_data_layout().get("config_root") or (_pkg_root_dir() / "mole_das_data" / "configs")) / "sim_emissions_ranges.json"
             if p.exists():
                 db = json.loads(p.read_text(encoding="utf-8"))
         except Exception:
@@ -4871,13 +4906,12 @@ def main() -> None:
                 "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
             }
             startup_payload.update(_runtime_package_status_record(build_identity_main))
-            log_dir = _app_base_dir().parent / "mole_das_data" / "logs"
-            log_dir.mkdir(parents=True, exist_ok=True)
+            log_dir = _runtime_logs_dir(session if isinstance(session, dict) else None)
             ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
             record = dict(startup_payload)
             record.setdefault("schema", "mole_startup_diagnostic_v1")
             record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
-            text = json.dumps(record, indent=2, ensure_ascii=False)
+            text = json.dumps(record, indent=2, ensure_ascii=False, default=str)
             stamped = log_dir / f"runner_startup__{ts}.json"
             latest = log_dir / "runner_startup__latest.json"
             for target in (stamped, latest):
@@ -5054,7 +5088,7 @@ def main() -> None:
             "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
         }
         startup_payload.update(_runtime_package_status_record(build_identity_main))
-        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+        _write_startup_diagnostic_record(_runtime_logs_dir(session if isinstance(session, dict) else None), label="runner_startup", payload=startup_payload, keep=20)
     except Exception:
         pass
 
@@ -5139,7 +5173,7 @@ def main() -> None:
                     "window_title": _format_window_title(APP_TITLE, build_identity_main, training=("training" in launch_mode)),
                 }
                 startup_payload.update(_runtime_package_status_record(build_identity_main))
-                _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+                _write_startup_diagnostic_record(_runtime_logs_dir(session if isinstance(session, dict) else None), label="runner_startup", payload=startup_payload, keep=20)
             except Exception:
                 pass
             run_ui_shell(str(ui_cfg), auto_start=bool(args.run))
@@ -5924,7 +5958,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "window_title": _format_window_title(APP_TITLE, build_identity, training=("training" in early_launch_mode)),
         }
         early_payload.update(_runtime_package_status_record(build_identity))
-        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=early_payload, keep=20)
+        _write_startup_diagnostic_record(_runtime_logs_dir(), label="runner_startup", payload=early_payload, keep=20)
     except Exception:
         pass
     package_policy_state: Dict[str, Any] = {"stale_package_acknowledged": False}
@@ -8722,6 +8756,19 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
     runtime_identity_lbl = tk.Label(left_inner, textvariable=runtime_identity_var, fg=FG_DIM, bg=BG, font=("Consolas", 8), anchor="w", justify="left")
     runtime_identity_lbl.pack(anchor="w", fill="x", padx=12, pady=(0, 8))
     _bind_safe_wrap(runtime_identity_lbl, left, pad_px=32, min_wrap=180)
+    def _runner_status_banner_record(sess_local: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        record: Dict[str, Any] = {
+            "package_label": str((build_identity or {}).get("bundle_label") or ""),
+            "build_time": str((build_identity or {}).get("built_at") or ""),
+            "git_commit": str((build_identity or {}).get("git_commit") or ""),
+            "git_branch": str((build_identity or {}).get("git_branch") or ""),
+            "stale_package_acknowledged": bool(package_policy_state.get("stale_package_acknowledged")),
+        }
+        try:
+            record.update(_runtime_package_status_record(build_identity))
+        except Exception:
+            pass
+        return record
     def _render_runner_startup_status_banner(parent: tk.Widget) -> None:
         status_var = tk.StringVar(value="")
         detail_var = tk.StringVar(value="")
@@ -8773,13 +8820,13 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         stale_ack_lbl.pack(fill="x", padx=10, pady=(0, 6))
         actions = tk.Frame(frame, bg=BG)
         actions.pack(fill="x", padx=6, pady=(0, 6))
-        startup_path = _latest_startup_diagnostic_path(_app_base_dir().parent / "mole_das_data" / "logs", "runner_startup")
+        startup_path = _latest_startup_diagnostic_path(_runtime_logs_dir(_load_session()), "runner_startup")
         action_buttons: Dict[str, Any] = {}
         for label, cmd in [
             ("Build Info", lambda: _show_runner_build_info(_load_session())),
             ("Resolve Package Status", lambda: _show_runner_package_resolution(_load_session())),
-            ("Acceptance", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed")),
-            ("Install Root", lambda: _open_fs_target((_runner_build_info_record(_load_session())).get("install_root_path") or "", title="Open Install Root Failed")),
+            ("Acceptance", lambda: _open_fs_target((_runner_status_banner_record(_load_session())).get("packaged_acceptance_summary_path") or "", title="Open Acceptance Summary Failed")),
+            ("Install Root", lambda: _open_fs_target((_runner_status_banner_record(_load_session())).get("install_root_path") or "", title="Open Install Root Failed")),
             ("Startup Stamp", lambda: _open_fs_target(startup_path or "", title="Open Startup Diagnostic Failed")),
             ("Acknowledge", lambda: _acknowledge_runner_stale_package_status(refresh_ui=True)),
         ]:
@@ -8793,7 +8840,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             )
             action_buttons[label] = btn
         def _refresh_runner_startup_status_banner() -> None:
-            record = _runner_build_info_record(_load_session())
+            record = _runner_status_banner_record(_load_session())
             status = str(record.get("package_status") or "UNVERIFIED").strip().upper() or "UNVERIFIED"
             summary = str(record.get("package_status_summary") or "").strip()
             detail = str(record.get("package_status_detail") or "").strip()
@@ -12102,7 +12149,7 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "window_title": _format_window_title(APP_TITLE, build_identity, training=(_mole_env_mode(sess) == "TRAINING")),
         }
         startup_payload.update(_runtime_package_status_record(build_identity))
-        _write_startup_diagnostic_record(_app_base_dir().parent / "mole_das_data" / "logs", label="runner_startup", payload=startup_payload, keep=20)
+        _write_startup_diagnostic_record(_runtime_logs_dir(sess if isinstance(sess, dict) else None), label="runner_startup", payload=startup_payload, keep=20)
     except Exception:
         pass
     DIAG_CAL_VERIFICATION_NOTICE = (
@@ -16579,10 +16626,9 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                 pass
 
     def _runner_logs_dir(sess_local: Dict[str, Any]) -> Path:
-        runtime_logs_dir = _app_base_dir().parent / "mole_das_data" / "logs"
+        runtime_logs_dir = _runtime_logs_dir(sess_local)
         try:
             if _is_frozen():
-                runtime_logs_dir.mkdir(parents=True, exist_ok=True)
                 return runtime_logs_dir.resolve()
         except Exception:
             pass

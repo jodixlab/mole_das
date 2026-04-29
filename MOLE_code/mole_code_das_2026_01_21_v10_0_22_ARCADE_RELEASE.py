@@ -99,7 +99,7 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, resolve_runtime_storage_layout, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
@@ -453,7 +453,7 @@ def _write_startup_diagnostic_record(log_dir: Path, label: str, payload: Dict[st
     record = dict(payload or {})
     record.setdefault("schema", "mole_startup_diagnostic_v1")
     record.setdefault("recorded_utc", datetime.now(timezone.utc).isoformat())
-    text = json.dumps(record, indent=2, ensure_ascii=False)
+    text = json.dumps(record, indent=2, ensure_ascii=False, default=str)
     for target in (stamped, latest):
         tmp = target.with_name(f"{target.name}.tmp-{os.getpid()}-{ts}")
         try:
@@ -1389,7 +1389,13 @@ def _mole_env_mode() -> str:
 def mole_cfg_default(base_dir: Path) -> Dict[str, Any]:
     # base_dir is MOLE_code
     env = _mole_env_mode()
-    dr = "../mole_das_data/training" if env == "TRAINING" else "../mole_das_data"
+    if _is_frozen_runtime():
+        layout = resolve_runtime_storage_layout(base_dir, env_mode=env, seed_if_missing=True)
+        dr = str(layout["data_root"])
+        assets_dir = str(layout["assets_dir"])
+    else:
+        dr = "../mole_das_data/training" if env == "TRAINING" else "../mole_das_data"
+        assets_dir = "../mole_assets"
     return {
         "paths": {
             "data_root": dr,
@@ -1402,7 +1408,7 @@ def mole_cfg_default(base_dir: Path) -> Dict[str, Any]:
             "daq_runs_dir": f"{dr}/daq_runs",
             "logs_dir": f"{dr}/logs",
             "backups_dir": f"{dr}/backups",
-            "assets_dir": "../mole_assets",
+            "assets_dir": assets_dir,
             "methods_db_path": None,
             "cylinders_db_path": None,
             "instruments_db_path": None,
@@ -1432,11 +1438,16 @@ def mole_cfg_default(base_dir: Path) -> Dict[str, Any]:
 
 def mole_cfg_path(base_dir: Path) -> Path:
     env = _mole_env_mode()
+    if _is_frozen_runtime():
+        layout = resolve_runtime_storage_layout(base_dir, env_mode=env, seed_if_missing=True)
+        return Path(layout["config_path"]).resolve()
     name = "mole_config_training.json" if env == "TRAINING" else "mole_config.json"
     return (base_dir.parent / "config" / name).resolve()
 
 def mole_cfg_mirror_paths(base_dir: Path) -> List[Path]:
     """Return non-authoritative runtime mirrors that should track the active config."""
+    if _is_frozen_runtime():
+        return []
     env = _mole_env_mode()
     name = "mole_config_training.json" if env == "TRAINING" else "mole_config.json"
     targets: List[Path] = [
@@ -1487,6 +1498,10 @@ def mole_cfg_load_or_create(base_dir: Path) -> Dict[str, Any]:
     cfg.setdefault("sqlite", {})
     for k, v in dflt["sqlite"].items():
         cfg["sqlite"].setdefault(k, v)
+
+    if _is_frozen_runtime():
+        for k, v in dflt["paths"].items():
+            cfg["paths"][k] = v
 
     cfg.setdefault("ui", {})
     for k, v in (dflt.get("ui") or {}).items():
@@ -2440,6 +2455,10 @@ class MoleDASWizard(tk.Tk):
             pass
 
         self._init_stable_paths_and_config()
+        try:
+            self._write_bootstrap_startup_diagnostic()
+        except Exception:
+            pass
 
 
         self._init_option_lists()
@@ -2465,24 +2484,28 @@ class MoleDASWizard(tk.Tk):
     def _init_stable_paths_and_config(self) -> None:
         """Initialize shared config + stable folders (DB, sessions, runs, logs, assets)."""
         # Shared config (stored at ../config/mole_config.json relative to MOLE_code)
+        env_mode = _mole_env_mode()
+        runtime_layout = resolve_runtime_storage_layout(self.base_dir, env_mode=env_mode, seed_if_missing=True)
+        self.runtime_layout = runtime_layout
         self.mole_cfg = mole_cfg_load_or_create(self.base_dir)
         resolved = mole_cfg_resolve_paths(self.mole_cfg, self.base_dir)
 
         # Canonical roots
         self.mole_home = self.base_dir.parent
-        self.data_root = resolved.get("data_root", (self.mole_home / "mole_das_data").resolve())
-        self.assets_dir = resolved.get("assets_dir", (self.mole_home / "mole_assets").resolve())
-        self.logs_dir = resolved.get("logs_dir", (self.data_root / "logs").resolve())
-        self.backups_dir = resolved.get("backups_dir", (self.data_root / "backups").resolve())
-        self.sessions_root = resolved.get("sessions_dir", (self.data_root / "sessions").resolve())
-        self.daq_runs_root = resolved.get("daq_runs_dir", (self.data_root / "daq_runs").resolve())
-        self.rule_packs_dir = resolved.get("rule_packs_dir", (self.data_root / "rule_packs").resolve())
-        self.master_db_path = resolved.get("db_path", (self.data_root / "db" / "mole_master.sqlite").resolve())
+        self.data_root = resolved.get("data_root", Path(runtime_layout["data_root"]).resolve())
+        self.assets_dir = resolved.get("assets_dir", Path(runtime_layout["assets_dir"]).resolve())
+        self.logs_dir = resolved.get("logs_dir", Path(runtime_layout["logs_dir"]).resolve())
+        self.backups_dir = resolved.get("backups_dir", Path(runtime_layout["backups_dir"]).resolve())
+        self.sessions_root = resolved.get("sessions_dir", Path(runtime_layout["sessions_dir"]).resolve())
+        self.daq_runs_root = resolved.get("daq_runs_dir", Path(runtime_layout["daq_runs_dir"]).resolve())
+        self.rule_packs_dir = resolved.get("rule_packs_dir", Path(runtime_layout["rule_packs_dir"]).resolve())
+        self.master_db_path = resolved.get("db_path", Path(runtime_layout["db_path"]).resolve())
+        self.seed_data_root = Path(runtime_layout["seed_root"]).resolve()
 
         # Packages inbox (v10.0.11)
-        self.packages_inbox_dir = resolved.get("packages_inbox_dir", (self.data_root / "inbox_packages").resolve())
-        self.packages_archive_dir = resolved.get("packages_archive_dir", (self.data_root / "inbox_archive").resolve())
-        self.package_index_db_path = resolved.get("package_index_db_path", (self.data_root / "db" / "mole_packages_inbox.sqlite").resolve())
+        self.packages_inbox_dir = resolved.get("packages_inbox_dir", Path(runtime_layout["packages_inbox_dir"]).resolve())
+        self.packages_archive_dir = resolved.get("packages_archive_dir", Path(runtime_layout["packages_archive_dir"]).resolve())
+        self.package_index_db_path = resolved.get("package_index_db_path", Path(runtime_layout["package_index_db_path"]).resolve())
 
         # Ensure folders exist
         for p in [self.data_root, self.assets_dir, self.logs_dir, self.backups_dir, self.sessions_root, self.daq_runs_root, self.rule_packs_dir, self.packages_inbox_dir, self.packages_archive_dir, self.package_index_db_path.parent, self.master_db_path.parent]:
@@ -2492,7 +2515,7 @@ class MoleDASWizard(tk.Tk):
                 pass
 
         # Session config staging (legacy location) moved into data_root for stability
-        self.config_dir = self.data_root / "configs"
+        self.config_dir = Path(runtime_layout["config_root"]).resolve()
         safe_mkdir(self.config_dir)
 
         # UI crash log
@@ -7424,7 +7447,7 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         return path_obj if path_obj.exists() else None
 
     def _wizard_health_journal_paths(self) -> Dict[str, Optional[Path]]:
-        journal_dir = Path(self.logs_dir) / "health_journal"
+        journal_dir = self._wizard_logs_dir_path() / "health_journal"
         latest = journal_dir / "wizard_health__latest.json"
         history = journal_dir / "wizard_health__history.jsonl"
         return {
@@ -7432,49 +7455,103 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "history": history if history.exists() else None,
         }
 
-    def _write_startup_diagnostic(self) -> Optional[Dict[str, Path]]:
-        cfg_path = str(((self.session.get("paths") or {}).get("session_config_path") or "")).strip()
-        sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
-        status_record = _runtime_package_status_record(base_dir=getattr(self, "base_dir", None), build_identity=self.build_identity)
-        previous = _load_startup_diagnostic_record(self._wizard_startup_diagnostic_path())
-        payload = {
+    def _wizard_logs_dir_path(self) -> Path:
+        candidate = None
+        try:
+            candidate = ((getattr(self, "runtime_layout", {}) or {}).get("logs_dir") or getattr(self, "logs_dir", None))
+        except Exception:
+            candidate = getattr(self, "logs_dir", None)
+        try:
+            if candidate:
+                return Path(candidate).resolve()
+        except Exception:
+            pass
+        base_dir = Path(getattr(self, "base_dir", _app_base_dir())).resolve()
+        env_mode = "TRAINING" if bool(getattr(self, "training_mode", False)) else _mole_env_mode()
+        try:
+            layout = resolve_runtime_storage_layout(base_dir, env_mode=env_mode, seed_if_missing=True)
+            return Path(layout["logs_dir"]).resolve()
+        except Exception:
+            fallback = base_dir.parent / "mole_das_data"
+            if env_mode == "TRAINING":
+                fallback = fallback / "training"
+            return (fallback / "logs").resolve()
+
+    def _write_bootstrap_startup_diagnostic(self) -> Optional[Dict[str, Path]]:
+        build_identity = dict(getattr(self, "build_identity", {}) or {})
+        payload: Dict[str, Any] = {
             "app": "wizard",
             "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
-            "package_label": str((self.build_identity or {}).get("bundle_label") or ""),
-            "build_time": str((self.build_identity or {}).get("built_at") or ""),
-            "git_commit": str((self.build_identity or {}).get("git_commit") or ""),
-            "git_branch": str((self.build_identity or {}).get("git_branch") or ""),
+            "package_label": str(build_identity.get("bundle_label") or ""),
+            "build_time": str(build_identity.get("built_at") or ""),
+            "git_commit": str(build_identity.get("git_commit") or ""),
+            "git_branch": str(build_identity.get("git_branch") or ""),
             "executable_path": str(Path(sys.executable).resolve()),
-            "runtime_path": str(getattr(self, "base_dir", _app_base_dir())),
-            "active_config_path": cfg_path,
-            "welcome_asset_sheet": str(sprite_path) if sprite_path is not None else "",
-            "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
+            "runtime_path": str(Path(getattr(self, "base_dir", _app_base_dir())).resolve()),
+            "active_config_path": str(mole_cfg_path(getattr(self, "base_dir", _app_base_dir()))),
+            "welcome_asset_sheet": "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=bool(getattr(self, "training_mode", False))),
+            "startup_diagnostic_status": "BOOTSTRAP",
+        }
+        try:
+            sprite_path = _select_welcome_sprite_path(getattr(self, "base_dir", None))
+            if sprite_path is not None:
+                payload["welcome_asset_sheet"] = str(sprite_path)
+        except Exception:
+            pass
+        return _write_startup_diagnostic_record(self._wizard_logs_dir_path(), label="wizard_startup", payload=payload, keep=20)
+
+    def _write_startup_diagnostic(self) -> Optional[Dict[str, Path]]:
+        log_dir = self._wizard_logs_dir_path()
+        base_dir = Path(getattr(self, "base_dir", _app_base_dir())).resolve()
+        build_identity = dict(getattr(self, "build_identity", {}) or {})
+        payload: Dict[str, Any] = {
+            "app": "wizard",
+            "launch_mode": "training" if bool(getattr(self, "training_mode", False)) else "wizard",
+            "package_label": str(build_identity.get("bundle_label") or ""),
+            "build_time": str(build_identity.get("built_at") or ""),
+            "git_commit": str(build_identity.get("git_commit") or ""),
+            "git_branch": str(build_identity.get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(base_dir),
+            "active_config_path": str((((getattr(self, "session", {}) or {}).get("paths") or {}).get("session_config_path") or "")).strip(),
+            "welcome_asset_sheet": "",
+            "window_title": _format_window_title(APP_TITLE, build_identity, training=bool(getattr(self, "training_mode", False))),
             "stale_package_acknowledged": bool(self._stale_package_acknowledged()),
         }
-        for key in (
-            "package_remediation_path",
-            "last_package_remediation_action",
-            "last_package_remediation_result",
-            "last_package_remediation_target_kind",
-            "last_package_remediation_target_path",
-            "last_package_remediation_target_package_label",
-            "last_package_remediation_note",
-            "last_package_remediation_recorded_utc",
-        ):
-            value = previous.get(key) if isinstance(previous, dict) else None
-            if value not in (None, ""):
-                payload[key] = value
-        payload.update(status_record)
-        return _write_startup_diagnostic_record(Path(self.logs_dir), label="wizard_startup", payload=payload, keep=20)
+        try:
+            sprite_path = _select_welcome_sprite_path(base_dir)
+            if sprite_path is not None:
+                payload["welcome_asset_sheet"] = str(sprite_path)
+            status_record = _runtime_package_status_record(base_dir=base_dir, build_identity=build_identity)
+            previous = _load_startup_diagnostic_record(_latest_startup_diagnostic_path(log_dir, "wizard_startup"))
+            for key in (
+                "package_remediation_path",
+                "last_package_remediation_action",
+                "last_package_remediation_result",
+                "last_package_remediation_target_kind",
+                "last_package_remediation_target_path",
+                "last_package_remediation_target_package_label",
+                "last_package_remediation_note",
+                "last_package_remediation_recorded_utc",
+            ):
+                value = previous.get(key) if isinstance(previous, dict) else None
+                if value not in (None, ""):
+                    payload[key] = value
+            payload.update(status_record)
+        except Exception as exc:
+            payload["startup_diagnostic_status"] = "DEGRADED"
+            payload["startup_diagnostic_error"] = f"{type(exc).__name__}: {exc}"
+        return _write_startup_diagnostic_record(log_dir, label="wizard_startup", payload=payload, keep=20)
 
     def _wizard_startup_diagnostic_path(self) -> Optional[Path]:
-        return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_startup")
+        return _latest_startup_diagnostic_path(self._wizard_logs_dir_path(), "wizard_startup")
 
     def _wizard_package_remediation_path(self) -> Optional[Path]:
-        return _latest_startup_diagnostic_path(Path(self.logs_dir), "wizard_package_remediation")
+        return _latest_startup_diagnostic_path(self._wizard_logs_dir_path(), "wizard_package_remediation")
 
     def _wizard_support_bundle_root(self) -> Path:
-        return Path(self.logs_dir) / "support_bundles"
+        return self._wizard_logs_dir_path() / "support_bundles"
 
     def _wizard_latest_support_bundle_path(self) -> Optional[Path]:
         return _latest_bundle_path(self._wizard_support_bundle_root(), "wizard_support_bundle")
@@ -13594,7 +13671,7 @@ def _build_intake(self) -> None:
         guide_text = (
             "Headless Engine command (P8):\n"
             "  python mole_engine_p8_2026_01_18_v10_0_8_ARCADE_RELEASE.py --config ..\\config\\mole_config.json\n"
-            "Engine writes: mole_das_data\\sessions\\YYYY-MM-DD\\<session_id>\\raw\\raw_samples.jsonl\n"
+            "Engine writes under the active session data root: sessions\\YYYY-MM-DD\\<session_id>\\raw\\raw_samples.jsonl\n"
         )
         if engine_script is None:
             guide_text = "Headless P8 engine helper is not included in this runtime package.\n"
@@ -14535,7 +14612,7 @@ def _build_intake(self) -> None:
             try:
                 root = Path(getattr(self, "sessions_root", "")).resolve()
             except Exception:
-                root = (self.base_dir.parent / "mole_das_data" / "sessions").resolve()
+                root = Path(((getattr(self, "runtime_layout", {}) or {}).get("sessions_dir") or (self.base_dir.parent / "mole_das_data" / "sessions"))).resolve()
 
             if not root.exists():
                 return out
@@ -18742,7 +18819,7 @@ def _build_intake(self) -> None:
                 "Launch the production diagnostics shell. This path is operator-facing, excludes compliance support, and is intended for diagnostic calculations only.",
             )
         elif is_sim:
-            self._header("DAQ Runner - SIM / TRAINING", "Launch sandboxed DAQ Runner (SIM_TRAINING). Hardware drivers disabled; outputs go to mole_das_data/training.")
+            self._header("DAQ Runner - SIM / TRAINING", "Launch sandboxed DAQ Runner (SIM_TRAINING). Hardware drivers disabled; outputs go to the external training data root.")
         else:
             self._header("DAQ Runner - TEST", "Launch DAQ Runner with the applied session config (production/test).")
 
@@ -19499,7 +19576,7 @@ def _build_intake(self) -> None:
 
         v10.0.12 unifies the DAQ Runner evidence contract with the Headless Engine:
 
-          mole_das_data/sessions/YYYY-MM-DD/<session_id>/
+data_root/sessions/YYYY-MM-DD/<session_id>/
             runner_config.json
             session_profile.json
             meta/{session.json,build.json,manifest.json}
@@ -20785,7 +20862,7 @@ def _build_intake(self) -> None:
         # Lazy import (keeps base boot fast)
         from mole_empirical_conditions_v1 import load_registry, save_registry
 
-        reg_path = (self.base_dir.parent / "mole_das_data" / "configs" / "empirical_conditions.json")
+        reg_path = Path(getattr(self, "config_dir", self.base_dir.parent / "mole_das_data" / "configs")) / "empirical_conditions.json"
         reg = load_registry(reg_path)
         formulas = list(reg.get("formulas") or [])
         cats = sorted({str(f.get("category") or "Uncategorized") for f in formulas}) or ["Uncategorized"]
@@ -20851,7 +20928,7 @@ def _build_intake(self) -> None:
             tk.Button(box, text="Open in Browser", command=self._open_site_map_in_browser, bg=self.BTN_BG2, fg=self.BTN_FG, relief="flat").pack(anchor="w", padx=10, pady=(0, 10))
             return
 
-        cache_dir = (self.base_dir.parent / "mole_das_data" / "cache" / "maps")
+        cache_dir = Path(getattr(self, "data_root", self.base_dir.parent / "mole_das_data")) / "cache" / "maps"
         self._site_map_widget = StaticMapWidget(box, cache_dir=cache_dir, width=520, height=260, zoom=15, bg=self.BG)
         self._site_map_widget.frame.pack(fill="x", padx=10, pady=8)
 
@@ -22682,7 +22759,7 @@ def _build_catalog_governance(self) -> None:
         try:
             log_dir = getattr(self, "logs_dir", None)
             if log_dir is None:
-                log_dir = Path(self.base_dir) / ".." / "mole_das_data" / "logs"
+                log_dir = ((getattr(self, "runtime_layout", {}) or {}).get("logs_dir") or (Path(self.base_dir) / ".." / "mole_das_data" / "logs"))
             log_dir = Path(log_dir)
             log_dir.mkdir(parents=True, exist_ok=True)
             p = log_dir / "catalog_governance_audit.jsonl"
@@ -23493,7 +23570,7 @@ def _catalog_repo(self):
         if not dbp:
             # Safe fallback if stable-path init is not available
             base_dir = Path(__file__).resolve().parent
-            dbp = (base_dir.parent / "mole_das_data" / "db" / "mole_master.sqlite").resolve()
+            dbp = Path(resolve_runtime_storage_layout(base_dir, env_mode=_mole_env_mode(), seed_if_missing=True)["db_path"]).resolve()
 
         cfg = MoleDBConfig(db_path=Path(dbp))
         repo = MoleMasterDB(cfg)
@@ -26029,7 +26106,7 @@ def _build_sample_system(self: 'MoleDASWizard') -> None:
                 return out_dir
             except Exception:
                 pass
-        fallback = (self.base_dir.parent / "mole_das_data" / "exports" / "sample_system").resolve()
+        fallback = Path(getattr(self, "data_root", self.base_dir.parent / "mole_das_data")).resolve() / "exports" / "sample_system"
         try:
             fallback.mkdir(parents=True, exist_ok=True)
         except Exception:
@@ -27878,6 +27955,31 @@ if __name__ == "__main__":
         # Preflight should never block startup if it fails internally.
         pass
     # -------------------------------------------------------------------------------
+
+    try:
+        _bootstrap_base = _app_base_dir()
+        _bootstrap_identity = _load_build_identity(_bootstrap_base)
+        _bootstrap_layout = resolve_runtime_storage_layout(_bootstrap_base, env_mode=_mole_env_mode(), seed_if_missing=True)
+        _bootstrap_payload: Dict[str, Any] = {
+            "app": "wizard",
+            "launch_mode": "training" if _mole_env_mode() == "TRAINING" else "wizard",
+            "package_label": str((_bootstrap_identity or {}).get("bundle_label") or ""),
+            "build_time": str((_bootstrap_identity or {}).get("built_at") or ""),
+            "git_commit": str((_bootstrap_identity or {}).get("git_commit") or ""),
+            "git_branch": str((_bootstrap_identity or {}).get("git_branch") or ""),
+            "executable_path": str(Path(sys.executable).resolve()),
+            "runtime_path": str(_bootstrap_base),
+            "active_config_path": str(Path(_bootstrap_layout["config_path"]).resolve()),
+            "welcome_asset_sheet": "",
+            "window_title": _format_window_title(APP_TITLE, _bootstrap_identity, training=(_mole_env_mode() == "TRAINING")),
+            "startup_diagnostic_status": "BOOTSTRAP_MAIN",
+        }
+        _bootstrap_sprite = _select_welcome_sprite_path(_bootstrap_base)
+        if _bootstrap_sprite is not None:
+            _bootstrap_payload["welcome_asset_sheet"] = str(_bootstrap_sprite)
+        _write_startup_diagnostic_record(Path(_bootstrap_layout["logs_dir"]).resolve(), label="wizard_startup", payload=_bootstrap_payload, keep=20)
+    except Exception:
+        pass
 
     try:
         MoleDASWizard().mainloop()

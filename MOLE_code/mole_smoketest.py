@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 
 from mole_preflight import run_preflight, format_preflight_report
 from mole_postcal_policy_regression import run_regression as run_postcal_policy_regression, format_regression_report
+from mole_runtime_durability_v1 import resolve_runtime_storage_layout_from_root
 
 
 def _walk_py_files(code_dir: Path) -> List[Path]:
@@ -53,7 +54,9 @@ def _slug_text(value: Any) -> str:
 
 
 def _seed_integration_session(root: Path) -> Optional[Path]:
-    config_dir = root / "mole_das_data" / "configs"
+    layout = resolve_runtime_storage_layout_from_root(root, env_mode="PRODUCTION", seed_if_missing=True)
+    data_root = Path(layout["data_root"]).resolve()
+    config_dir = Path(layout["config_root"]).resolve()
     candidates: List[Path] = []
     preferred = config_dir / "mole_session_2026_03_31_1209.json"
     if preferred.exists():
@@ -87,7 +90,7 @@ def _seed_integration_session(root: Path) -> Optional[Path]:
     site_slug = _slug_text(project.get("site_facility") or "fixture_site")
     run_id = f"{job_id}__SMOKETEST"
 
-    fixture_root = root / "mole_das_data" / "validation" / "_smoke"
+    fixture_root = data_root / "validation" / "_smoke"
     session_dir = fixture_root / run_id
     if session_dir.exists():
         shutil.rmtree(session_dir, ignore_errors=True)
@@ -99,8 +102,8 @@ def _seed_integration_session(root: Path) -> Optional[Path]:
     paths = session.get("paths") if isinstance(session.get("paths"), dict) else {}
     paths["session_dir"] = str(session_dir)
     paths["daq_run_dir"] = str(session_dir)
-    paths["db_path"] = str((root / "mole_das_data" / "db" / "mole_master.sqlite").resolve())
-    paths["logs_dir"] = str((root / "mole_das_data" / "logs").resolve())
+    paths["db_path"] = str(Path(layout["db_path"]).resolve())
+    paths["logs_dir"] = str(Path(layout["logs_dir"]).resolve())
     session["paths"] = paths
 
     meta = dict(meta)
@@ -129,8 +132,8 @@ def _seed_integration_session(root: Path) -> Optional[Path]:
             "session_config_path": str(session_cfg_path.resolve()),
             "session_dir": str(session_dir),
             "daq_run_dir": str(session_dir),
-            "db_path": str((root / "mole_das_data" / "db" / "mole_master.sqlite").resolve()),
-            "logs_dir": str((root / "mole_das_data" / "logs").resolve()),
+            "db_path": str(Path(layout["db_path"]).resolve()),
+            "logs_dir": str(Path(layout["logs_dir"]).resolve()),
         },
     }
     (session_dir / "session_profile.json").write_text(json.dumps(session_profile, indent=2), encoding="utf-8")
@@ -153,7 +156,9 @@ def _find_integration_session(root: Path, explicit: Optional[Path] = None) -> Op
         return None
 
     candidates: List[Path] = []
-    for base in (root / "mole_das_data" / "sessions", root / "mole_das_data" / "training" / "sessions"):
+    prod_layout = resolve_runtime_storage_layout_from_root(root, env_mode="PRODUCTION", seed_if_missing=True)
+    train_layout = resolve_runtime_storage_layout_from_root(root, env_mode="TRAINING", seed_if_missing=True)
+    for base in (Path(prod_layout["sessions_dir"]).resolve(), Path(train_layout["sessions_dir"]).resolve()):
         if not base.exists():
             continue
         for cfg in base.rglob("runner_config.json"):
@@ -203,10 +208,10 @@ def _run_launcher_report_pack_integration(root: Path, code_dir: Path, integratio
 
     session_dir = _find_integration_session(root, explicit=integration_session_dir)
     if session_dir is None:
-        out["error"] = "no session fixture with runner_config.json found under mole_das_data"
+        out["error"] = "no session fixture with runner_config.json found under the resolved runtime data roots"
         return out
     try:
-        validation_fixture_root = (root / "mole_das_data" / "validation" / "_smoke").resolve()
+        validation_fixture_root = (Path(resolve_runtime_storage_layout_from_root(root, env_mode="PRODUCTION", seed_if_missing=True)["validation_dir"]).resolve() / "_smoke").resolve()
         out["session_source"] = "SEEDED_FIXTURE" if session_dir.resolve().is_relative_to(validation_fixture_root) else "SESSION_TREE"
     except Exception:
         out["session_source"] = "SESSION_TREE"
@@ -370,7 +375,7 @@ def _format_integration_report(result: Dict[str, Any]) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=None, help="Root folder containing mole_assets + mole_das_data + mole_config.json (default: auto from script location).")
+    ap.add_argument("--root", default=None, help="Root folder containing MOLE_code plus runtime assets/seed data (default: auto from script location).")
     ap.add_argument("--strict-hash", action="store_true", help="Verify sha256 hashes for assets (slower).")
     ap.add_argument("--no-compile", action="store_true", help="Skip py_compile step.")
     ap.add_argument("--no-policy-regression", action="store_true", help="Skip post-cal carry-forward regression checks.")

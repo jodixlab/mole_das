@@ -161,12 +161,18 @@ $publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
 $versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
 $versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
+$immutableAuditJsonName = "IMMUTABLE_PACKAGE_AUDIT.json"
+$immutableAuditTxtName = "IMMUTABLE_PACKAGE_AUDIT.txt"
 $verifiedReleaseManifestPath = Join-Path $OutputRoot $verifiedReleaseManifestName
 $shareVerifiedReleaseManifestPath = Join-Path $installRoot $verifiedReleaseManifestName
 $versionAuditJsonPath = Join-Path $OutputRoot $versionAuditJsonName
 $versionAuditTxtPath = Join-Path $OutputRoot $versionAuditTxtName
 $shareVersionAuditJsonPath = Join-Path $installRoot $versionAuditJsonName
 $shareVersionAuditTxtPath = Join-Path $installRoot $versionAuditTxtName
+$immutableAuditJsonPath = Join-Path $OutputRoot $immutableAuditJsonName
+$immutableAuditTxtPath = Join-Path $OutputRoot $immutableAuditTxtName
+$shareImmutableAuditJsonPath = Join-Path $installRoot $immutableAuditJsonName
+$shareImmutableAuditTxtPath = Join-Path $installRoot $immutableAuditTxtName
 $stableChannelManifestPath = $null
 try {
     $outputParent = Split-Path -Parent $OutputRoot
@@ -299,6 +305,93 @@ function Write-PackageVersionAudit {
 
     if ($status -ne "PASS") {
         throw "Package version audit failed. See $versionAuditTxtPath"
+    }
+}
+
+function Write-ImmutablePackageAudit {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedBundleLabel,
+        [Parameter(Mandatory = $true)][string]$RootPackagePath,
+        [Parameter(Mandatory = $true)][string]$SharePackagePath
+    )
+
+    $probes = @()
+    foreach ($scope in @(
+        @{ name = "root"; path = $RootPackagePath },
+        @{ name = "share"; path = $SharePackagePath }
+    )) {
+        $runtimePath = Join-Path $scope.path "runtime"
+        $probes += @(
+            @{ scope = $scope.name; label = "mutable_logs"; path = Join-Path $runtimePath "mole_das_data\logs" }
+            @{ scope = $scope.name; label = "mutable_backups"; path = Join-Path $runtimePath "mole_das_data\backups" }
+            @{ scope = $scope.name; label = "mutable_sessions"; path = Join-Path $runtimePath "mole_das_data\sessions" }
+            @{ scope = $scope.name; label = "mutable_daq_runs"; path = Join-Path $runtimePath "mole_das_data\daq_runs" }
+            @{ scope = $scope.name; label = "mutable_exports"; path = Join-Path $runtimePath "mole_das_data\exports" }
+            @{ scope = $scope.name; label = "mutable_validation"; path = Join-Path $runtimePath "mole_das_data\validation" }
+            @{ scope = $scope.name; label = "mutable_inbox_archive"; path = Join-Path $runtimePath "mole_das_data\inbox_archive" }
+            @{ scope = $scope.name; label = "mutable_inbox_packages"; path = Join-Path $runtimePath "mole_das_data\inbox_packages" }
+            @{ scope = $scope.name; label = "mutable_cache"; path = Join-Path $runtimePath "mole_das_data\cache" }
+            @{ scope = $scope.name; label = "mutable_training_sessions"; path = Join-Path $runtimePath "mole_das_data\training\sessions" }
+            @{ scope = $scope.name; label = "mutable_root_config"; path = Join-Path $scope.path "mole_config.json" }
+            @{ scope = $scope.name; label = "mutable_runtime_config"; path = Join-Path $runtimePath "config\mole_config.json" }
+            @{ scope = $scope.name; label = "mutable_runtime_training_config"; path = Join-Path $runtimePath "config\mole_config_training.json" }
+            @{ scope = $scope.name; label = "mutable_seed_config"; path = Join-Path $runtimePath "mole_das_data\configs\mole_config.json" }
+            @{ scope = $scope.name; label = "mutable_seed_training_config"; path = Join-Path $runtimePath "mole_das_data\configs\mole_config_training.json" }
+        )
+    }
+
+    $violations = @()
+    foreach ($probe in $probes) {
+        if (-not (Test-Path -LiteralPath $probe.path)) {
+            continue
+        }
+        $sample = @()
+        try {
+            $sample = Get-ChildItem -LiteralPath $probe.path -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 10 -ExpandProperty FullName
+        }
+        catch {
+            $sample = @()
+        }
+        $violations += [ordered]@{
+            scope = $probe.scope
+            label = $probe.label
+            path = $probe.path
+            sample = $sample
+        }
+    }
+
+    $status = if ($violations.Count -eq 0) { "PASS" } else { "FAIL" }
+    $payload = [ordered]@{
+        schema = "mole_immutable_package_audit_v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        package_label = $ExpectedBundleLabel
+        status = $status
+        violations = $violations
+    }
+    $summaryLines = @(
+        "MOLE-DAS Immutable Package Audit",
+        "================================",
+        "",
+        "Package label: $ExpectedBundleLabel",
+        "Status: $status",
+        ""
+    )
+    if ($violations.Count -eq 0) {
+        $summaryLines += "No mutable runtime artifacts were shipped inside the package payload."
+    }
+    else {
+        foreach ($violation in $violations) {
+            $summaryLines += ("[FAIL] {0}:{1}`n  path:   {2}`n  sample: {3}`n" -f $violation.scope, $violation.label, $violation.path, (($violation.sample | ForEach-Object { $_ }) -join "; "))
+        }
+    }
+
+    [System.IO.File]::WriteAllText($immutableAuditJsonPath, ($payload | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($immutableAuditTxtPath, ($summaryLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($shareImmutableAuditJsonPath, ($payload | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($shareImmutableAuditTxtPath, ($summaryLines -join [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+
+    if ($status -ne "PASS") {
+        throw "Immutable package audit failed. See $immutableAuditTxtPath"
     }
 }
 
@@ -695,6 +788,20 @@ function Assert-VersionAuditPass {
     }
 }
 
+function Assert-ImmutablePackageAuditPass {
+    param([string]$AuditPath)
+    if (-not (Test-Path -LiteralPath $AuditPath)) {
+        throw "Immutable package audit not found: $AuditPath"
+    }
+    $audit = Get-Content -LiteralPath $AuditPath -Raw | ConvertFrom-Json
+    if (-not $audit -or [string]$audit.schema -ne "mole_immutable_package_audit_v1") {
+        throw "Immutable package audit schema is invalid: $AuditPath"
+    }
+    if ([string]$audit.status -ne "PASS") {
+        throw "Immutable package audit is not PASS: $AuditPath"
+    }
+}
+
 function Assert-VerifiedReleasePackage {
     param([string]$PackageRoot)
     $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
@@ -718,6 +825,7 @@ function Assert-VerifiedReleasePackage {
     }
     $versionAuditPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.version_audit_json_path)
     Assert-VersionAuditPass -AuditPath $versionAuditPath
+    Assert-ImmutablePackageAuditPass -AuditPath (Join-Path $packageBase "IMMUTABLE_PACKAGE_AUDIT.json")
 
     $hashes = $manifest.hashes
     $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
@@ -790,6 +898,8 @@ $SourceSupportFiles = @(
     "latest_verified_release_v1.json",
     "PACKAGE_VERSION_AUDIT.json",
     "PACKAGE_VERSION_AUDIT.txt",
+    "IMMUTABLE_PACKAGE_AUDIT.json",
+    "IMMUTABLE_PACKAGE_AUDIT.txt",
     "PACKAGED_ACCEPTANCE_SUMMARY.json",
     "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 )
@@ -1135,6 +1245,7 @@ if (-not $SkipPackagedAcceptance) {
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
     Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
     Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
+    Write-ImmutablePackageAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
 }
 
 if (Test-Path -LiteralPath $shareZip) {
@@ -1158,7 +1269,9 @@ Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -
     $publishedAcceptanceTxtName,
     $verifiedReleaseManifestName,
     $versionAuditJsonName,
-    $versionAuditTxtName
+    $versionAuditTxtName,
+    $immutableAuditJsonName,
+    $immutableAuditTxtName
 )
 
 Copy-TreeRobust -Source $installRoot -Destination $installerStageRoot
