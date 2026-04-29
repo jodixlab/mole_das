@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
@@ -33,6 +34,146 @@ def _resolve_package_root(arg_value: str | None) -> Path:
     if (here.parent / "runtime").exists():
         return here.parent.resolve()
     return here
+
+
+def _extract_runtime_constant(package_root: Path, constant_name: str) -> str:
+    runtime_module = package_root / "runtime" / "MOLE_code" / "mole_runtime_durability_v1.py"
+    if not runtime_module.exists():
+        return ""
+    try:
+        text = runtime_module.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    pattern = re.compile(rf"^{re.escape(constant_name)}\s*=\s*[\"']([^\"']+)[\"']", re.MULTILINE)
+    match = pattern.search(text)
+    return str(match.group(1)).strip() if match else ""
+
+
+def _count_files(path: Path) -> int:
+    path = Path(path)
+    if not path.exists():
+        return 0
+    if path.is_file():
+        return 1
+    count = 0
+    try:
+        for item in path.rglob("*"):
+            if item.is_file():
+                count += 1
+    except Exception:
+        return count
+    return count
+
+
+def _summarize_mutable_payload(root: Path) -> Dict[str, Any]:
+    root = Path(root)
+    labels = (
+        "logs",
+        "backups",
+        "sessions",
+        "daq_runs",
+        "exports",
+        "validation",
+        "inbox_packages",
+        "inbox_archive",
+        "cache",
+    )
+    entries: List[Dict[str, Any]] = []
+    total_files = 0
+    for label in labels:
+        path = root / label
+        file_count = _count_files(path)
+        if file_count <= 0:
+            continue
+        total_files += file_count
+        entries.append(
+            {
+                "label": label,
+                "path": str(path),
+                "file_count": file_count,
+            }
+        )
+    return {
+        "root": str(root),
+        "has_payload": total_files > 0,
+        "file_count": total_files,
+        "entries": entries,
+    }
+
+
+def _build_upgrade_plan(package: Dict[str, Any], installed: Dict[str, Any]) -> Dict[str, Any]:
+    package_label = str(package.get("package_label") or "").strip()
+    installed_label = str(installed.get("bundle_label") or "").strip()
+    expected_schema = str(package.get("data_schema_version_expected") or "").strip()
+    installed_schema = str(installed.get("data_schema_version") or "").strip()
+    installed_exists = bool(installed.get("exists"))
+    data_manifest_present = bool(installed.get("data_manifest_present"))
+    portable_payload = bool(package.get("has_data_payload"))
+    legacy_payload = dict(installed.get("legacy_runtime_payload") or {})
+    legacy_has_payload = bool(legacy_payload.get("has_payload"))
+    legacy_entries = list(legacy_payload.get("entries") or [])
+    install_root = str(installed.get("install_root") or "").strip()
+    migration_backup_root = str(installed.get("migration_backup_root") or "").strip()
+
+    if not installed_exists:
+        action = "INSTALL"
+        summary = "Fresh install into a new root."
+    elif installed_label and package_label and installed_label != package_label:
+        action = "UPGRADE"
+        summary = "In-place upgrade of the installed copy."
+    elif legacy_has_payload or not data_manifest_present or (expected_schema and installed_schema and expected_schema != installed_schema):
+        action = "REPAIR"
+        summary = "Repair and normalize the installed data root."
+    else:
+        action = "RELAUNCH"
+        summary = "Installed copy already matches the selected package."
+
+    lines = [
+        f"Action: {action}",
+        f"Incoming package: {package_label or '(unknown)'}",
+        f"Installed package: {installed_label or '(none)'}",
+        f"Install root: {install_root or '(unset)'}",
+    ]
+    if expected_schema:
+        lines.append(f"Expected data schema: {expected_schema}")
+    if installed_schema:
+        lines.append(f"Installed data schema: {installed_schema}")
+    elif installed_exists:
+        lines.append("Installed data schema: missing")
+
+    if portable_payload:
+        lines.append("Package contains a portable data payload; installer will merge it into the installed data root.")
+    if not data_manifest_present and installed_exists:
+        lines.append("Installed data-root manifest is missing; first launch will create and stamp a new manifest.")
+    if legacy_has_payload:
+        lines.append(
+            f"Legacy mutable runtime payload detected: {legacy_payload.get('file_count', 0)} file(s) across {len(legacy_entries)} runtime folder(s)."
+        )
+        labels = ", ".join(str(entry.get("label") or "") for entry in legacy_entries if entry.get("label")) or "(unknown)"
+        lines.append(f"Legacy folders queued for migration: {labels}")
+        if migration_backup_root:
+            lines.append(f"Migration backup root: {migration_backup_root}")
+        lines.append("First launch after install will migrate those files into the external data root and remove them from runtime\\mole_das_data.")
+    elif installed_exists:
+        lines.append("No legacy mutable runtime payload was detected under runtime\\mole_das_data.")
+
+    if action == "UPGRADE":
+        lines.append("The existing install root will be updated in place, then the verified app will relaunch.")
+    elif action == "REPAIR":
+        lines.append("The install root already matches this package label; repair will re-run install logic and relaunch.")
+    elif action == "RELAUNCH":
+        lines.append("No upgrade is required; relaunch is optional unless you want to refresh shortcuts or repair manifests.")
+    else:
+        lines.append("A new install root will be created, verified, and launched.")
+
+    return {
+        "action": action,
+        "summary": summary,
+        "lines": lines,
+        "has_legacy_runtime_payload": legacy_has_payload,
+        "legacy_runtime_file_count": int(legacy_payload.get("file_count") or 0),
+        "portable_data_payload": portable_payload,
+    }
 
 
 def _package_summary(package_root: Path) -> Dict[str, Any]:
@@ -68,6 +209,8 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
         "version_audit_status": str(version_audit.get("status") or ""),
         "immutable_audit_status": str(immutable_audit.get("status") or ""),
         "verified_release_channel": str(verified_release.get("channel_name") or ""),
+        "data_schema_version_expected": _extract_runtime_constant(package_root, "DATA_ROOT_SCHEMA_VERSION"),
+        "data_manifest_schema_expected": _extract_runtime_constant(package_root, "DATA_ROOT_MANIFEST_SCHEMA"),
         "build_identity": build_identity,
         "verified_release": verified_release,
         "acceptance": acceptance,
@@ -81,6 +224,8 @@ def _installed_summary(install_root: Path) -> Dict[str, Any]:
     install_manifest_path = install_root / "mole_install_manifest_v1.json"
     build_identity_path = install_root / "runtime" / "config" / "mole_build_identity_v1.json"
     data_root_manifest_path = install_root / "data" / "data_root_manifest_v1.json"
+    data_root = install_root / "data"
+    legacy_runtime_data_root = install_root / "runtime" / "mole_das_data"
     wizard_exe = install_root / "runtime" / "MOLE_code" / "MOLE_DAS_Wizard.exe"
     uninstall_script = install_root / "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
     install_manifest = _load_json(install_manifest_path)
@@ -92,12 +237,19 @@ def _installed_summary(install_root: Path) -> Dict[str, Any]:
         "install_manifest_path": str(install_manifest_path),
         "build_identity_path": str(build_identity_path),
         "data_root_manifest_path": str(data_root_manifest_path),
+        "data_root": str(data_root),
+        "legacy_runtime_data_root": str(legacy_runtime_data_root),
+        "migration_backup_root": str(data_root / "backups" / "migrations"),
         "wizard_exe_path": str(wizard_exe),
         "uninstall_script_path": str(uninstall_script),
         "bundle_label": str(build_identity.get("bundle_label") or install_manifest.get("bundle_label") or ""),
         "installed_at": str(install_manifest.get("installed_at") or ""),
         "data_schema_version": str(data_manifest.get("data_schema_version") or ""),
         "data_manifest_present": data_root_manifest_path.exists(),
+        "install_manifest": install_manifest,
+        "build_identity": build_identity,
+        "data_manifest": data_manifest,
+        "legacy_runtime_payload": _summarize_mutable_payload(legacy_runtime_data_root),
     }
 
 
@@ -143,6 +295,7 @@ class InstallClient(tk.Tk):
         self.start_menu_var = tk.BooleanVar(value=True)
         self.uninstall_reg_var = tk.BooleanVar(value=True)
         self.current_install = _installed_summary(Path(self.install_root_var.get()))
+        self.upgrade_plan: Dict[str, Any] = {}
 
         self._build_ui()
         self._refresh_state()
@@ -176,6 +329,11 @@ class InstallClient(tk.Tk):
         self.install_text = tk.Text(install_box, height=11, width=48, wrap="word")
         self.install_text.pack(fill="both", expand=True, pady=(8, 0))
 
+        plan_box = ttk.LabelFrame(outer, text="Upgrade Plan", padding=12)
+        plan_box.pack(fill="x", pady=(12, 0))
+        self.plan_text = tk.Text(plan_box, height=8, wrap="word")
+        self.plan_text.pack(fill="both", expand=True)
+
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.pack(fill="x", pady=(12, 0))
         ttk.Checkbutton(options, text="Launch Wizard after install", variable=self.launch_after_install_var).pack(anchor="w")
@@ -189,7 +347,9 @@ class InstallClient(tk.Tk):
         row1.pack(fill="x")
         ttk.Button(row1, text="Refresh", command=self._refresh_state).pack(side="left")
         ttk.Button(row1, text="Validate Package", command=self._validate_package).pack(side="left", padx=(8, 0))
+        ttk.Button(row1, text="Preview Upgrade Plan", command=self._preview_upgrade_plan).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Install / Upgrade", command=self._install_package).pack(side="left", padx=(8, 0))
+        ttk.Button(row1, text="Upgrade + Relaunch", command=self._upgrade_and_relaunch).pack(side="left", padx=(8, 0))
         ttk.Button(row1, text="Repair Install", command=self._repair_install).pack(side="left", padx=(8, 0))
         row2 = ttk.Frame(actions)
         row2.pack(fill="x", pady=(8, 0))
@@ -225,6 +385,7 @@ class InstallClient(tk.Tk):
     def _refresh_state(self) -> None:
         self.package = _package_summary(self.package_root)
         self.current_install = _installed_summary(Path(self.install_root_var.get()))
+        self.upgrade_plan = _build_upgrade_plan(self.package, self.current_install)
         package_lines = [
             f"Package label: {self.package['package_label']}",
             f"Git commit: {self.package['git_commit']}",
@@ -233,6 +394,7 @@ class InstallClient(tk.Tk):
             f"Version audit: {self.package['version_audit_status'] or '(missing)'}",
             f"Immutable audit: {self.package['immutable_audit_status'] or '(missing)'}",
             f"Verified channel: {self.package['verified_release_channel'] or '(none)'}",
+            f"Expected data schema: {self.package['data_schema_version_expected'] or '(unknown)'}",
             f"Package root: {self.package['package_root']}",
             f"Runtime root: {self.package['runtime_root']}",
             f"Portable data payload present: {'yes' if self.package['has_data_payload'] else 'no'}",
@@ -244,12 +406,19 @@ class InstallClient(tk.Tk):
             f"Installed at: {self.current_install['installed_at'] or '(unknown)'}",
             f"Data manifest present: {'yes' if self.current_install['data_manifest_present'] else 'no'}",
             f"Data schema version: {self.current_install['data_schema_version'] or '(none)'}",
+            f"Legacy runtime payload present: {'yes' if self.current_install['legacy_runtime_payload'].get('has_payload') else 'no'}",
+            f"Data root: {self.current_install['data_root']}",
             f"Wizard path: {self.current_install['wizard_exe_path']}",
+        ]
+        plan_lines = [
+            f"Summary: {self.upgrade_plan.get('summary') or '(none)'}",
+            *list(self.upgrade_plan.get("lines") or []),
         ]
         self._write_text(self.package_text, "\n".join(package_lines))
         self._write_text(self.install_text, "\n".join(install_lines))
+        self._write_text(self.plan_text, "\n".join(plan_lines))
 
-    def _validate_package(self) -> None:
+    def _validate_package(self) -> bool:
         failures = []
         if self.package["acceptance_status"] != "PASS":
             failures.append("Packaged acceptance is not PASS.")
@@ -262,13 +431,14 @@ class InstallClient(tk.Tk):
         if failures:
             messagebox.showerror("Validate Package", "\n".join(failures))
             self._append_log("Package validation failed:\n" + "\n".join(failures))
-            return
+            return False
         self._append_log(f"Package validation passed for {self.package['package_label']}.")
         messagebox.showinfo("Validate Package", "Package validation passed.")
+        return True
 
-    def _install_args(self) -> list[str]:
+    def _install_args(self, *, force_launch: bool = False) -> list[str]:
         args = ["-InstallRoot", self.install_root_var.get()]
-        if not self.launch_after_install_var.get():
+        if not self.launch_after_install_var.get() and not force_launch:
             args.append("-NoLaunch")
         if not self.desktop_shortcut_var.get():
             args.append("-NoDesktopShortcut")
@@ -277,6 +447,13 @@ class InstallClient(tk.Tk):
         if not self.uninstall_reg_var.get():
             args.append("-NoUninstallRegistration")
         return args
+
+    def _preview_upgrade_plan(self) -> None:
+        self._refresh_state()
+        plan_lines = list(self.upgrade_plan.get("lines") or [])
+        detail = "\n".join(plan_lines).strip() or "No upgrade plan is available."
+        self._append_log("Upgrade plan preview:\n" + detail)
+        messagebox.showinfo("Upgrade Plan", detail)
 
     def _run_async(self, label: str, script_path: Path, args: list[str]) -> None:
         def worker() -> None:
@@ -298,6 +475,22 @@ class InstallClient(tk.Tk):
 
     def _install_package(self) -> None:
         self._run_async("Install / Upgrade", Path(self.package["installer_script_path"]), self._install_args())
+
+    def _upgrade_and_relaunch(self) -> None:
+        self._refresh_state()
+        if not self._validate_package():
+            return
+        plan_lines = list(self.upgrade_plan.get("lines") or [])
+        detail = "\n".join(plan_lines).strip() or "No upgrade plan is available."
+        ok = messagebox.askyesno(
+            "Upgrade + Relaunch",
+            detail + "\n\nContinue with the verified install and relaunch?",
+        )
+        if not ok:
+            self._append_log("Upgrade + Relaunch canceled by user.")
+            return
+        self._append_log("Upgrade + Relaunch confirmed.\n" + detail)
+        self._run_async("Upgrade + Relaunch", Path(self.package["installer_script_path"]), self._install_args(force_launch=True))
 
     def _repair_install(self) -> None:
         self._run_async("Repair Install", Path(self.package["installer_script_path"]), self._install_args())
@@ -327,6 +520,7 @@ def main() -> int:
     package_root = _resolve_package_root(args.package_root or None)
     package = _package_summary(package_root)
     installed = _installed_summary(_default_install_root())
+    upgrade_plan = _build_upgrade_plan(package, installed)
     if args.headless_summary:
         print(
             json.dumps(
@@ -334,6 +528,7 @@ def main() -> int:
                     "schema": "mole_install_client_summary_v1",
                     "package": package,
                     "installed": installed,
+                    "upgrade_plan": upgrade_plan,
                 },
                 indent=2,
             )
