@@ -38,7 +38,9 @@ function Invoke-Native {
 $repo = (Resolve-Path $RepoRoot).Path
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 if (-not $ScratchRoot) {
-    $ScratchRoot = Join-Path $env:TEMP "mole_rel_$stamp"
+    $scratchBase = Join-Path $env:SystemDrive "temp"
+    New-Item -ItemType Directory -Path $scratchBase -Force | Out-Null
+    $ScratchRoot = Join-Path $scratchBase "mrel_$stamp"
 }
 if (-not $ArtifactOutDir) {
     $ArtifactOutDir = Join-Path $repo "RELEASES\clean_release_workflow"

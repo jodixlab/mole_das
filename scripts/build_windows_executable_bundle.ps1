@@ -608,7 +608,8 @@ function Build-Executable {
 
     $exeWorkRoot = Join-Path $workRoot $Name
     $exeSpecRoot = Join-Path $specRoot $Name
-    New-Item -ItemType Directory -Path $exeWorkRoot, $exeSpecRoot -Force | Out-Null
+    $exeInnerWorkRoot = Join-Path $exeWorkRoot $Name
+    New-Item -ItemType Directory -Path $distRoot, $exeWorkRoot, $exeSpecRoot, $exeInnerWorkRoot -Force | Out-Null
 
     $args = @(
         "-m", "PyInstaller",
