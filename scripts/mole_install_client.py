@@ -24,6 +24,8 @@ _MUTABLE_DATA_LABELS = (
     "inbox_archive",
     "cache",
 )
+_UPGRADE_REPORT_LATEST_JSON = "upgrade_report__latest.json"
+_UPGRADE_REPORT_LATEST_TXT = "upgrade_report__latest.txt"
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
@@ -335,12 +337,20 @@ def _write_upgrade_report(report: Dict[str, Any], output_dir: Path) -> Dict[str,
     prefix = f"upgrade_report__{safe_label}__{stamp}"
     json_path = output_dir / f"{prefix}.json"
     txt_path = output_dir / f"{prefix}.txt"
-    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    txt_path.write_text(_render_upgrade_report_text(report), encoding="utf-8")
+    latest_json_path = output_dir / _UPGRADE_REPORT_LATEST_JSON
+    latest_txt_path = output_dir / _UPGRADE_REPORT_LATEST_TXT
+    json_text = json.dumps(report, indent=2)
+    txt_text = _render_upgrade_report_text(report)
+    json_path.write_text(json_text, encoding="utf-8")
+    txt_path.write_text(txt_text, encoding="utf-8")
+    latest_json_path.write_text(json_text, encoding="utf-8")
+    latest_txt_path.write_text(txt_text, encoding="utf-8")
     return {
         "output_dir": str(output_dir),
         "json_path": str(json_path),
         "txt_path": str(txt_path),
+        "latest_json_path": str(latest_json_path),
+        "latest_txt_path": str(latest_txt_path),
     }
 
 

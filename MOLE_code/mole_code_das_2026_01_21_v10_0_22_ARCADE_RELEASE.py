@@ -99,7 +99,7 @@ except Exception:
     mole_spike_recovery = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, resolve_runtime_storage_layout, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, backup_sqlite_database, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, package_upgrade_report_preview_paths, record_health_journal, resolve_runtime_storage_layout, runtime_upgrade_report_paths, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     backup_sqlite_database = None
@@ -109,7 +109,9 @@ except Exception:
     latest_matching_path = None
     load_latest_health_summary = None
     load_recent_health_history = None
+    package_upgrade_report_preview_paths = None
     record_health_journal = None
+    runtime_upgrade_report_paths = None
     verify_verified_release_reference = None
     write_recovery_snapshot = None
     write_startup_diagnostic = None
@@ -558,6 +560,10 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
         ("Packaged acceptance status", record.get("packaged_acceptance_status") or ""),
         ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
+        ("Latest upgrade report", record.get("upgrade_report_path") or ""),
+        ("Latest upgrade report JSON", record.get("upgrade_report_json_path") or ""),
+        ("Package upgrade preview", record.get("package_upgrade_report_preview_path") or ""),
+        ("Package upgrade preview JSON", record.get("package_upgrade_report_preview_json_path") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Package remediation path", record.get("package_remediation_path") or ""),
@@ -7562,6 +7568,8 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
         sprite_manifest_path = _welcome_asset_manifest_path(getattr(self, "base_dir", None))
         build_manifest_path = _build_identity_manifest_path(getattr(self, "base_dir", None))
         acceptance_paths = _packaged_acceptance_summary_paths(getattr(self, "base_dir", None))
+        runtime_upgrade_paths = runtime_upgrade_report_paths(getattr(self, "base_dir", _app_base_dir()), seed_if_missing=False) if runtime_upgrade_report_paths is not None else {"text": None, "json": None}
+        package_upgrade_preview_paths = package_upgrade_report_preview_paths(Path(getattr(self, "base_dir", _app_base_dir())).resolve().parent.parent) if package_upgrade_report_preview_paths is not None else {"text": None, "json": None}
         status_record = _runtime_package_status_record(base_dir=getattr(self, "base_dir", None), build_identity=self.build_identity)
         latest_path = self._wizard_startup_diagnostic_path()
         latest_bundle = self._wizard_latest_support_bundle_path()
@@ -7581,6 +7589,10 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
             "build_identity_manifest_path": str(build_manifest_path) if isinstance(build_manifest_path, Path) else "",
             "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
             "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
+            "upgrade_report_path": str(runtime_upgrade_paths.get("text")) if isinstance(runtime_upgrade_paths.get("text"), Path) else "",
+            "upgrade_report_json_path": str(runtime_upgrade_paths.get("json")) if isinstance(runtime_upgrade_paths.get("json"), Path) else "",
+            "package_upgrade_report_preview_path": str(package_upgrade_preview_paths.get("text")) if isinstance(package_upgrade_preview_paths.get("text"), Path) else "",
+            "package_upgrade_report_preview_json_path": str(package_upgrade_preview_paths.get("json")) if isinstance(package_upgrade_preview_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, self.build_identity, training=bool(getattr(self, "training_mode", False))),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
             "package_remediation_path": str(self._wizard_package_remediation_path()) if isinstance(self._wizard_package_remediation_path(), Path) and self._wizard_package_remediation_path().exists() else "",
@@ -8172,6 +8184,10 @@ f"Intake: {((proj.get('intake') or {}).get('status') or 'INCOMPLETE')} ({len((pr
                 "local_accepted_package_marker": Path(build_info.get("local_accepted_package_marker_path")) if str(build_info.get("local_accepted_package_marker_path") or "").strip() else None,
                 "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                 "packaged_acceptance_summary_json": acceptance_paths.get("json"),
+                "upgrade_report_latest_txt": Path(build_info.get("upgrade_report_path")) if str(build_info.get("upgrade_report_path") or "").strip() else None,
+                "upgrade_report_latest_json": Path(build_info.get("upgrade_report_json_path")) if str(build_info.get("upgrade_report_json_path") or "").strip() else None,
+                "upgrade_report_preview_txt": Path(build_info.get("package_upgrade_report_preview_path")) if str(build_info.get("package_upgrade_report_preview_path") or "").strip() else None,
+                "upgrade_report_preview_json": Path(build_info.get("package_upgrade_report_preview_json_path")) if str(build_info.get("package_upgrade_report_preview_json_path") or "").strip() else None,
                 "wizard_startup_diagnostic": self._wizard_startup_diagnostic_path(),
                 "wizard_package_remediation": self._wizard_package_remediation_path(),
                 "wizard_recovery_snapshot": self._latest_wizard_recovery_snapshot_path(),

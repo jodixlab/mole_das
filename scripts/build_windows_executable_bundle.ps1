@@ -158,8 +158,13 @@ $installerStageRoot = Join-Path $zipStageRoot "i"
 $acceptanceArtifacts = Join-Path $OutputRoot "_acceptance_artifacts"
 $acceptanceSummaryJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
 $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.txt"
+$upgradeReportArtifacts = Join-Path $acceptanceArtifacts "upgrade_reports"
+$upgradeReportLatestJson = Join-Path $upgradeReportArtifacts "upgrade_report__latest.json"
+$upgradeReportLatestTxt = Join-Path $upgradeReportArtifacts "upgrade_report__latest.txt"
 $publishedAcceptanceJsonName = "PACKAGED_ACCEPTANCE_SUMMARY.json"
 $publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+$publishedUpgradeReportJsonName = "UPGRADE_REPORT_PREVIEW.json"
+$publishedUpgradeReportTxtName = "UPGRADE_REPORT_PREVIEW.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
 $versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
 $versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
@@ -197,6 +202,20 @@ function Publish-PackagedAcceptanceSummary {
         New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
         Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedAcceptanceJsonName) -Force
         Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedAcceptanceTxtName) -Force
+    }
+}
+
+function Publish-UpgradeReportPreview {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceJson,
+        [Parameter(Mandatory = $true)][string]$SourceTxt,
+        [Parameter(Mandatory = $true)][string[]]$TargetRoots
+    )
+
+    foreach ($targetRoot in $TargetRoots) {
+        New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
+        Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedUpgradeReportJsonName) -Force
+        Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedUpgradeReportTxtName) -Force
     }
 }
 
@@ -432,6 +451,8 @@ function Write-VerifiedReleaseManifest {
         acceptance_generated_at = [string]($acceptanceSummary.generated_at)
         acceptance_summary_path = $publishedAcceptanceTxtName
         acceptance_summary_json_path = $publishedAcceptanceJsonName
+        upgrade_report_preview_path = $publishedUpgradeReportTxtName
+        upgrade_report_preview_json_path = $publishedUpgradeReportJsonName
         installer_script_path = "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
         version_audit_json_path = $versionAuditJsonName
         version_audit_txt_path = $versionAuditTxtName
@@ -445,6 +466,8 @@ function Write-VerifiedReleaseManifest {
             build_identity_sha256 = Get-FileHashValue $buildIdentityPath
             acceptance_summary_txt_sha256 = Get-FileHashValue $acceptanceSummaryTxt
             acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
+            upgrade_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportTxtName)
+            upgrade_report_preview_json_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportJsonName)
             installer_script_sha256 = Get-FileHashValue (Join-Path $OutputRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1")
             launcher_batch_sha256 = Get-FileHashValue (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat")
             wizard_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAS_Wizard.exe")
@@ -851,6 +874,8 @@ function Assert-VerifiedReleasePackage {
     $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
     $acceptanceTextPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_path)
     $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
+    $upgradeReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_path)
+    $upgradeReportPreviewJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_json_path)
     $installerScriptPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.installer_script_path)
     $launcherPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.launcher_path)
     $wizardExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.wizard_exe_path)
@@ -861,6 +886,8 @@ function Assert-VerifiedReleasePackage {
         @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
         @{ Label = "Packaged acceptance summary"; Path = $acceptanceTextPath; Hash = [string]$hashes.acceptance_summary_txt_sha256 }
         @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
+        @{ Label = "Upgrade report preview"; Path = $upgradeReportPreviewTxtPath; Hash = [string]$hashes.upgrade_report_preview_txt_sha256 }
+        @{ Label = "Upgrade report preview JSON"; Path = $upgradeReportPreviewJsonPath; Hash = [string]$hashes.upgrade_report_preview_json_sha256 }
         @{ Label = "Installer script"; Path = $installerScriptPath; Hash = [string]$hashes.installer_script_sha256 }
         @{ Label = "Launcher batch"; Path = $launcherPath; Hash = [string]$hashes.launcher_batch_sha256 }
         @{ Label = "Wizard executable"; Path = $wizardExePath; Hash = [string]$hashes.wizard_exe_sha256 }
@@ -922,6 +949,8 @@ $SourceSupportFiles = @(
     "PACKAGE_VERSION_AUDIT.txt",
     "IMMUTABLE_PACKAGE_AUDIT.json",
     "IMMUTABLE_PACKAGE_AUDIT.txt",
+    "UPGRADE_REPORT_PREVIEW.json",
+    "UPGRADE_REPORT_PREVIEW.txt",
     "PACKAGED_ACCEPTANCE_SUMMARY.json",
     "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 )
@@ -1214,6 +1243,10 @@ Packaged acceptance:
 - PACKAGED_ACCEPTANCE_SUMMARY.txt
 - PACKAGED_ACCEPTANCE_SUMMARY.json
 
+Upgrade provenance:
+- UPGRADE_REPORT_PREVIEW.txt
+- UPGRADE_REPORT_PREVIEW.json
+
 Layout requirement:
 - Keep the runtime folder structure intact.
 - The executables depend on sibling runtime content in runtime\MOLE_code and the package root data/assets/docs folders.
@@ -1278,7 +1311,10 @@ if (-not $SkipPackagedAcceptance) {
 
     Require-Path $acceptanceSummaryJson "Packaged acceptance summary JSON"
     Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
+    Require-Path $upgradeReportLatestJson "Upgrade report preview JSON"
+    Require-Path $upgradeReportLatestTxt "Upgrade report preview text"
     Publish-PackagedAcceptanceSummary -SourceJson $acceptanceSummaryJson -SourceTxt $acceptanceSummaryTxt -TargetRoots @($OutputRoot, $installRoot)
+    Publish-UpgradeReportPreview -SourceJson $upgradeReportLatestJson -SourceTxt $upgradeReportLatestTxt -TargetRoots @($OutputRoot, $installRoot)
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
     Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
     Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot

@@ -103,6 +103,8 @@ function Save-SummaryFiles {
         "report_pack_summary_path",
         "final_report_path",
         "final_report_index_path",
+        "upgrade_report_txt_path",
+        "upgrade_report_json_path",
         "support_bundle_path"
     )) {
         $value = $Summary[$key]
@@ -262,6 +264,8 @@ $summary = [ordered]@{
     report_pack_summary_path = ""
     final_report_path = ""
     final_report_index_path = ""
+    upgrade_report_txt_path = ""
+    upgrade_report_json_path = ""
     support_bundle_path = ""
     uninstall_validated = $false
 }
@@ -304,6 +308,7 @@ try {
     $installedPython = Join-Path $codeRoot ".venv\\Scripts\\python.exe"
     $installedWizard = Join-Path $codeRoot "MOLE_DAS_Wizard.exe"
     $installedRunner = Join-Path $codeRoot "MOLE_DAQ_Runner.exe"
+    $installedInstallClient = Join-Path $InstallRoot "MOLE_DAS_INSTALL_CLIENT.py"
     $buildIdentityPath = Join-Path $runtimeRoot "config\\mole_build_identity_v1.json"
     $welcomeManifestPath = Join-Path $runtimeRoot "config\\mole_welcome_asset_manifest_v1.json"
     $wizardStampPath = Join-Path $logsDir "wizard_startup__latest.json"
@@ -316,6 +321,7 @@ try {
         @{ path = $installedPython; label = "Installed runtime Python" },
         @{ path = $installedWizard; label = "Installed Wizard executable" },
         @{ path = $installedRunner; label = "Installed Runner executable" },
+        @{ path = $installedInstallClient; label = "Installed install client" },
         @{ path = $buildIdentityPath; label = "Installed build identity" },
         @{ path = $installManifestPath; label = "Installed install manifest" }
     )) {
@@ -484,6 +490,33 @@ print(json.dumps(payload))
         summary_path = $reportSummaryPath
     }
 
+    $upgradeReportDir = Join-Path $dataRoot "backups\\upgrade_reviews"
+    $upgradeReportArtifactDir = Join-Path $ArtifactOutDir "upgrade_reports"
+    New-Item -ItemType Directory -Path $upgradeReportArtifactDir -Force | Out-Null
+    $upgradeReportResult = Invoke-CapturedProcess `
+        -Label "export_upgrade_report" `
+        -FilePath $installedPython `
+        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--headless-export-upgrade-report", $upgradeReportDir) `
+        -WorkingDirectory $InstallRoot
+    try {
+        $upgradeReportInfo = $upgradeReportResult.stdout | ConvertFrom-Json
+    }
+    catch {
+        throw "Failed to parse upgrade report export output.`nSTDOUT:`n$($upgradeReportResult.stdout)`nSTDERR:`n$($upgradeReportResult.stderr)"
+    }
+    $summary.upgrade_report_txt_path = [string]($(if ($upgradeReportInfo.latest_txt_path) { $upgradeReportInfo.latest_txt_path } else { $upgradeReportInfo.txt_path }))
+    $summary.upgrade_report_json_path = [string]($(if ($upgradeReportInfo.latest_json_path) { $upgradeReportInfo.latest_json_path } else { $upgradeReportInfo.json_path }))
+    Require-Path -PathValue $summary.upgrade_report_txt_path -Label "Upgrade report text"
+    Require-Path -PathValue $summary.upgrade_report_json_path -Label "Upgrade report JSON"
+    Copy-Item -LiteralPath $summary.upgrade_report_txt_path -Destination (Join-Path $upgradeReportArtifactDir "upgrade_report__latest.txt") -Force
+    Copy-Item -LiteralPath $summary.upgrade_report_json_path -Destination (Join-Path $upgradeReportArtifactDir "upgrade_report__latest.json") -Force
+    Add-StepResult -Name "export_upgrade_report" -Status "PASS" -Detail "Installed bundle exported the upgrade preview report from the shipped install client." -Extra @{
+        stdout_path = $upgradeReportResult.stdout_path
+        stderr_path = $upgradeReportResult.stderr_path
+        upgrade_report_txt_path = $summary.upgrade_report_txt_path
+        upgrade_report_json_path = $summary.upgrade_report_json_path
+    }
+
     $supportBundleRoot = Join-Path $ArtifactOutDir "support_bundles"
     New-Item -ItemType Directory -Path $supportBundleRoot -Force | Out-Null
     $supportInfo = Invoke-EmbeddedPythonJson `
@@ -514,6 +547,8 @@ artifacts = {
     "report_pack_summary": Path(r'''$reportSummaryPath'''),
     "final_report_markdown": Path(r'''$finalReportPath'''),
     "final_report_index": Path(r'''$finalReportIndexPath'''),
+    "upgrade_report_txt": Path(r'''$($summary.upgrade_report_txt_path)'''),
+    "upgrade_report_json": Path(r'''$($summary.upgrade_report_json_path)'''),
 }
 zip_path = create_support_bundle(
     bundle_root,

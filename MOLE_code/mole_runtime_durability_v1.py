@@ -24,6 +24,11 @@ _UTC_STAMP_LAST_BASE = ""
 _UTC_STAMP_SEQ = 0
 DATA_ROOT_MANIFEST_SCHEMA = "mole_data_root_manifest_v1"
 DATA_ROOT_SCHEMA_VERSION = "2026_04_29_v1"
+UPGRADE_REPORT_SCHEMA = "mole_install_upgrade_report_v1"
+UPGRADE_REPORT_LATEST_JSON_NAME = "upgrade_report__latest.json"
+UPGRADE_REPORT_LATEST_TXT_NAME = "upgrade_report__latest.txt"
+PACKAGE_UPGRADE_REPORT_PREVIEW_JSON_NAME = "UPGRADE_REPORT_PREVIEW.json"
+PACKAGE_UPGRADE_REPORT_PREVIEW_TXT_NAME = "UPGRADE_REPORT_PREVIEW.txt"
 
 
 def _utc_stamp() -> str:
@@ -735,6 +740,43 @@ def _package_acceptance_paths(package_root: Optional[Path]) -> Dict[str, Optiona
     }
 
 
+def _runtime_upgrade_report_dir(layout: Mapping[str, Any]) -> Path:
+    return (Path(layout.get("backups_dir") or "") / "upgrade_reviews").resolve()
+
+
+def runtime_upgrade_report_paths(
+    runtime_base_dir: Path,
+    *,
+    env_mode: str = "PRODUCTION",
+    seed_if_missing: bool = False,
+) -> Dict[str, Optional[Path]]:
+    layout = resolve_runtime_storage_layout(runtime_base_dir, env_mode=env_mode, seed_if_missing=seed_if_missing)
+    report_root = _runtime_upgrade_report_dir(layout)
+    fallback_txt = latest_matching_path(report_root, "upgrade_report__*.txt") if latest_matching_path is not None else None
+    fallback_json = latest_matching_path(report_root, "upgrade_report__*.json") if latest_matching_path is not None else None
+    return {
+        "root": report_root,
+        "text": _first_existing_path(report_root / UPGRADE_REPORT_LATEST_TXT_NAME, fallback_txt),
+        "json": _first_existing_path(report_root / UPGRADE_REPORT_LATEST_JSON_NAME, fallback_json),
+    }
+
+
+def package_upgrade_report_preview_paths(package_root: Optional[Path]) -> Dict[str, Optional[Path]]:
+    root = _safe_path(package_root)
+    if not isinstance(root, Path):
+        return {"text": None, "json": None}
+    return {
+        "text": _first_existing_path(
+            root / PACKAGE_UPGRADE_REPORT_PREVIEW_TXT_NAME,
+            root / "_acceptance_artifacts" / "upgrade_reports" / UPGRADE_REPORT_LATEST_TXT_NAME,
+        ),
+        "json": _first_existing_path(
+            root / PACKAGE_UPGRADE_REPORT_PREVIEW_JSON_NAME,
+            root / "_acceptance_artifacts" / "upgrade_reports" / UPGRADE_REPORT_LATEST_JSON_NAME,
+        ),
+    }
+
+
 def _package_build_identity_path(package_root: Optional[Path]) -> Optional[Path]:
     root = _safe_path(package_root)
     if not isinstance(root, Path):
@@ -847,6 +889,16 @@ def _normalize_verified_release_manifest(
             root_fallback=package_root,
         ),
         "acceptance_status": str(payload.get("acceptance_status") or "").strip().upper(),
+        "upgrade_report_preview_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("upgrade_report_preview_path"),
+            root_fallback=package_root,
+        ),
+        "upgrade_report_preview_json_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("upgrade_report_preview_json_path"),
+            root_fallback=package_root,
+        ),
         "installer_script_path": _resolve_manifest_path(
             manifest_path,
             payload.get("installer_script_path"),
@@ -993,6 +1045,8 @@ def _find_latest_verified_package(search_root: Optional[Path]) -> Dict[str, Any]
         "acceptance_text_path": None,
         "acceptance_json_path": None,
         "acceptance_status": "",
+        "upgrade_report_preview_path": None,
+        "upgrade_report_preview_json_path": None,
         "installer_script_path": None,
         "installer_bundle_path": None,
     }
@@ -1020,12 +1074,15 @@ def _find_latest_verified_package(search_root: Optional[Path]) -> Dict[str, Any]
             if best_key is not None and sort_key <= best_key:
                 continue
             installers = _package_installer_targets(child)
+            preview_paths = package_upgrade_report_preview_paths(child)
             result = {
                 "package_root": child.resolve(),
                 "package_label": label,
                 "acceptance_text_path": acceptance_paths.get("text"),
                 "acceptance_json_path": acceptance_json,
                 "acceptance_status": "PASS",
+                "upgrade_report_preview_path": preview_paths.get("text"),
+                "upgrade_report_preview_json_path": preview_paths.get("json"),
                 "installer_script_path": installers.get("script"),
                 "installer_bundle_path": installers.get("bundle"),
             }
@@ -1182,6 +1239,7 @@ def evaluate_runtime_package_status(
     current_installers = _package_installer_targets(current_package_root)
     latest_verified_search_root = current_package_root.parent if isinstance(current_package_root, Path) else None
     latest_verified = _find_latest_verified_package(latest_verified_search_root)
+    latest_verified_preview = package_upgrade_report_preview_paths(latest_verified.get("package_root"))
     installed_executables = _runtime_executable_targets(installed_runtime_root)
 
     return {
@@ -1216,6 +1274,8 @@ def evaluate_runtime_package_status(
         "verified_release_release_summary_path": str(verified_release.get("acceptance_text_path")) if isinstance(verified_release.get("acceptance_text_path"), Path) else "",
         "verified_release_release_summary_json_path": str(verified_release.get("acceptance_json_path")) if isinstance(verified_release.get("acceptance_json_path"), Path) else "",
         "verified_release_acceptance_status": str(verified_release.get("acceptance_status") or "").strip(),
+        "verified_release_upgrade_report_preview_path": str(verified_release.get("upgrade_report_preview_path")) if isinstance(verified_release.get("upgrade_report_preview_path"), Path) else "",
+        "verified_release_upgrade_report_preview_json_path": str(verified_release.get("upgrade_report_preview_json_path")) if isinstance(verified_release.get("upgrade_report_preview_json_path"), Path) else "",
         "verified_release_installer_script_path": str(verified_release.get("installer_script_path")) if isinstance(verified_release.get("installer_script_path"), Path) else "",
         "verified_release_installer_bundle_path": str(verified_release.get("installer_bundle_path")) if isinstance(verified_release.get("installer_bundle_path"), Path) else "",
         "verified_release_portable_bundle_path": str(verified_release.get("portable_bundle_path")) if isinstance(verified_release.get("portable_bundle_path"), Path) else "",
@@ -1228,6 +1288,8 @@ def evaluate_runtime_package_status(
         "latest_verified_package_acceptance_summary_path": str(latest_verified.get("acceptance_text_path")) if isinstance(latest_verified.get("acceptance_text_path"), Path) else "",
         "latest_verified_package_acceptance_summary_json_path": str(latest_verified.get("acceptance_json_path")) if isinstance(latest_verified.get("acceptance_json_path"), Path) else "",
         "latest_verified_package_acceptance_status": str(latest_verified.get("acceptance_status") or "").strip(),
+        "latest_verified_package_upgrade_report_preview_path": str(latest_verified_preview.get("text")) if isinstance(latest_verified_preview.get("text"), Path) else "",
+        "latest_verified_package_upgrade_report_preview_json_path": str(latest_verified_preview.get("json")) if isinstance(latest_verified_preview.get("json"), Path) else "",
         "latest_verified_installer_script_path": str(latest_verified.get("installer_script_path")) if isinstance(latest_verified.get("installer_script_path"), Path) else "",
         "latest_verified_installer_bundle_path": str(latest_verified.get("installer_bundle_path")) if isinstance(latest_verified.get("installer_bundle_path"), Path) else "",
         "installed_wizard_executable_path": str(installed_executables.get("wizard")) if isinstance(installed_executables.get("wizard"), Path) else "",
@@ -1334,6 +1396,8 @@ def verify_verified_release_reference(
     build_identity_path = manifest.get("build_identity_path") if isinstance(manifest.get("build_identity_path"), Path) else None
     acceptance_text_path = manifest.get("acceptance_text_path") if isinstance(manifest.get("acceptance_text_path"), Path) else None
     acceptance_json_path = manifest.get("acceptance_json_path") if isinstance(manifest.get("acceptance_json_path"), Path) else None
+    upgrade_report_preview_path = manifest.get("upgrade_report_preview_path") if isinstance(manifest.get("upgrade_report_preview_path"), Path) else None
+    upgrade_report_preview_json_path = manifest.get("upgrade_report_preview_json_path") if isinstance(manifest.get("upgrade_report_preview_json_path"), Path) else None
     installer_script_path = manifest.get("installer_script_path") if isinstance(manifest.get("installer_script_path"), Path) else None
     version_audit_json_path = manifest.get("version_audit_json_path") if isinstance(manifest.get("version_audit_json_path"), Path) else None
 
@@ -1373,6 +1437,20 @@ def verify_verified_release_reference(
     _verify_release_hash(details, label="Build identity manifest", path=build_identity_path, expected_hash=hashes.get("build_identity_sha256", ""), required=True)
     _verify_release_hash(details, label="Packaged acceptance summary", path=acceptance_text_path, expected_hash=hashes.get("acceptance_summary_txt_sha256", ""), required=True)
     _verify_release_hash(details, label="Packaged acceptance summary JSON", path=acceptance_json_path, expected_hash=hashes.get("acceptance_summary_json_sha256", ""), required=True)
+    _verify_release_hash(
+        details,
+        label="Upgrade report preview",
+        path=upgrade_report_preview_path,
+        expected_hash=hashes.get("upgrade_report_preview_txt_sha256", ""),
+        required=bool(upgrade_report_preview_path or str(hashes.get("upgrade_report_preview_txt_sha256", "")).strip()),
+    )
+    _verify_release_hash(
+        details,
+        label="Upgrade report preview JSON",
+        path=upgrade_report_preview_json_path,
+        expected_hash=hashes.get("upgrade_report_preview_json_sha256", ""),
+        required=bool(upgrade_report_preview_json_path or str(hashes.get("upgrade_report_preview_json_sha256", "")).strip()),
+    )
 
     if purpose_key.startswith("INSTALL"):
         _verify_release_hash(details, label="Installer script", path=installer_script_path, expected_hash=hashes.get("installer_script_sha256", ""), required=True)

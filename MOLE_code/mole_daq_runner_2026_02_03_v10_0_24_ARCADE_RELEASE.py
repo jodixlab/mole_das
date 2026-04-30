@@ -436,6 +436,10 @@ def _format_build_info_text(record: Dict[str, Any]) -> str:
         ("Packaged acceptance summary JSON", record.get("packaged_acceptance_summary_json_path") or ""),
         ("Packaged acceptance status", record.get("packaged_acceptance_status") or ""),
         ("Packaged acceptance generated", record.get("packaged_acceptance_generated_at") or ""),
+        ("Latest upgrade report", record.get("upgrade_report_path") or ""),
+        ("Latest upgrade report JSON", record.get("upgrade_report_json_path") or ""),
+        ("Package upgrade preview", record.get("package_upgrade_report_preview_path") or ""),
+        ("Package upgrade preview JSON", record.get("package_upgrade_report_preview_json_path") or ""),
         ("Window title", record.get("window_title") or ""),
         ("Startup diagnostic path", record.get("startup_diagnostic_path") or ""),
         ("Package remediation path", record.get("package_remediation_path") or ""),
@@ -498,7 +502,7 @@ except Exception:
     mole_spec_engine = None
 
 try:
-    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, record_health_journal, resolve_runtime_storage_layout, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
+    from mole_runtime_durability_v1 import atomic_write_json, create_support_bundle, evaluate_runtime_action_policy, evaluate_runtime_package_status, latest_matching_path, load_latest_health_summary, load_recent_health_history, package_upgrade_report_preview_paths, record_health_journal, resolve_runtime_storage_layout, runtime_upgrade_report_paths, verify_verified_release_reference, write_recovery_snapshot, write_startup_diagnostic
 except Exception:
     atomic_write_json = None
     create_support_bundle = None
@@ -507,8 +511,10 @@ except Exception:
     latest_matching_path = None
     load_latest_health_summary = None
     load_recent_health_history = None
+    package_upgrade_report_preview_paths = None
     record_health_journal = None
     resolve_runtime_storage_layout = None
+    runtime_upgrade_report_paths = None
     verify_verified_release_reference = None
     write_recovery_snapshot = None
     write_startup_diagnostic = None
@@ -16690,6 +16696,8 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
         welcome_manifest = _welcome_asset_manifest_path()
         build_manifest = _build_identity_manifest_path()
         acceptance_paths = _packaged_acceptance_summary_paths()
+        runtime_upgrade_paths = runtime_upgrade_report_paths(_app_base_dir(), seed_if_missing=False) if runtime_upgrade_report_paths is not None else {"text": None, "json": None}
+        package_upgrade_preview_paths = package_upgrade_report_preview_paths(_app_base_dir().resolve().parent.parent) if package_upgrade_report_preview_paths is not None else {"text": None, "json": None}
         status_record = _runtime_package_status_record(build_identity)
         latest_bundle = _runner_latest_support_bundle_path(sess_local)
         training = (_mole_env_mode(sess_local) == "TRAINING")
@@ -16708,6 +16716,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
             "build_identity_manifest_path": str(build_manifest) if isinstance(build_manifest, Path) else "",
             "packaged_acceptance_summary_path": str(acceptance_paths.get("text")) if isinstance(acceptance_paths.get("text"), Path) else "",
             "packaged_acceptance_summary_json_path": str(acceptance_paths.get("json")) if isinstance(acceptance_paths.get("json"), Path) else "",
+            "upgrade_report_path": str(runtime_upgrade_paths.get("text")) if isinstance(runtime_upgrade_paths.get("text"), Path) else "",
+            "upgrade_report_json_path": str(runtime_upgrade_paths.get("json")) if isinstance(runtime_upgrade_paths.get("json"), Path) else "",
+            "package_upgrade_report_preview_path": str(package_upgrade_preview_paths.get("text")) if isinstance(package_upgrade_preview_paths.get("text"), Path) else "",
+            "package_upgrade_report_preview_json_path": str(package_upgrade_preview_paths.get("json")) if isinstance(package_upgrade_preview_paths.get("json"), Path) else "",
             "window_title": _format_window_title(APP_TITLE, build_identity, training=training),
             "startup_diagnostic_path": str(latest_path) if isinstance(latest_path, Path) and latest_path.exists() else "",
             "package_remediation_path": str(_runner_package_remediation_path(sess_local)) if isinstance(_runner_package_remediation_path(sess_local), Path) and _runner_package_remediation_path(sess_local).exists() else "",
@@ -17338,6 +17350,10 @@ def run_ui_shell(config_path: str | None = None, auto_start: bool = False) -> in
                     "local_accepted_package_marker": Path(build_info.get("local_accepted_package_marker_path")) if str(build_info.get("local_accepted_package_marker_path") or "").strip() else None,
                     "packaged_acceptance_summary_txt": acceptance_paths.get("text"),
                     "packaged_acceptance_summary_json": acceptance_paths.get("json"),
+                    "upgrade_report_latest_txt": Path(build_info.get("upgrade_report_path")) if str(build_info.get("upgrade_report_path") or "").strip() else None,
+                    "upgrade_report_latest_json": Path(build_info.get("upgrade_report_json_path")) if str(build_info.get("upgrade_report_json_path") or "").strip() else None,
+                    "upgrade_report_preview_txt": Path(build_info.get("package_upgrade_report_preview_path")) if str(build_info.get("package_upgrade_report_preview_path") or "").strip() else None,
+                    "upgrade_report_preview_json": Path(build_info.get("package_upgrade_report_preview_json_path")) if str(build_info.get("package_upgrade_report_preview_json_path") or "").strip() else None,
                     "runner_startup_diagnostic": _runner_startup_diagnostic_path(sess_local),
                     "runner_package_remediation": _runner_package_remediation_path(sess_local),
                     "runner_recovery_snapshot": _runner_recovery_snapshot_path(sess_local),
