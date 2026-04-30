@@ -178,6 +178,8 @@ try {
         $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")
         $portableZip = Join-Path $bundleRoot ($bundleLabel + "_portable_exe_bundle.zip")
         $verifiedReleaseManifest = Join-Path $bundleRoot "latest_verified_release_v1.json"
+        $verifiedReleaseSignature = Join-Path $bundleRoot "latest_verified_release_v1.signature.json"
+        $releaseSigningPublicKey = Join-Path $bundleRoot "mole_release_signing_public_key_v1.json"
         $versionAuditJson = Join-Path $bundleRoot "PACKAGE_VERSION_AUDIT.json"
         $versionAuditTxt = Join-Path $bundleRoot "PACKAGE_VERSION_AUDIT.txt"
         $upgradeReportPreviewJson = Join-Path $bundleRoot "UPGRADE_REPORT_PREVIEW.json"
@@ -192,6 +194,12 @@ try {
         }
         if (-not (Test-Path -LiteralPath $verifiedReleaseManifest)) {
             throw "Verified release manifest missing after bundle build: $verifiedReleaseManifest"
+        }
+        if (-not (Test-Path -LiteralPath $verifiedReleaseSignature)) {
+            throw "Verified release signature missing after bundle build: $verifiedReleaseSignature"
+        }
+        if (-not (Test-Path -LiteralPath $releaseSigningPublicKey)) {
+            throw "Release signing public key missing after bundle build: $releaseSigningPublicKey"
         }
         if (-not (Test-Path -LiteralPath $versionAuditJson)) {
             throw "Package version audit JSON missing after bundle build: $versionAuditJson"
@@ -226,6 +234,8 @@ try {
         Copy-Item -LiteralPath $installerZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($installerZip))) -Force
         Copy-Item -LiteralPath $portableZip -Destination (Join-Path $releaseOutDir ([System.IO.Path]::GetFileName($portableZip))) -Force
         Copy-Item -LiteralPath $verifiedReleaseManifest -Destination (Join-Path $releaseOutDir "latest_verified_release_v1.json") -Force
+        Copy-Item -LiteralPath $verifiedReleaseSignature -Destination (Join-Path $releaseOutDir "latest_verified_release_v1.signature.json") -Force
+        Copy-Item -LiteralPath $releaseSigningPublicKey -Destination (Join-Path $releaseOutDir "mole_release_signing_public_key_v1.json") -Force
         Copy-Item -LiteralPath $versionAuditJson -Destination (Join-Path $releaseOutDir "PACKAGE_VERSION_AUDIT.json") -Force
         Copy-Item -LiteralPath $versionAuditTxt -Destination (Join-Path $releaseOutDir "PACKAGE_VERSION_AUDIT.txt") -Force
         Copy-Item -LiteralPath $upgradeReportPreviewJson -Destination (Join-Path $releaseOutDir "UPGRADE_REPORT_PREVIEW.json") -Force

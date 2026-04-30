@@ -600,7 +600,7 @@ print(json.dumps(payload))
     $rollbackApplyResult = Invoke-CapturedProcess `
         -Label "apply_rollback_restore" `
         -FilePath $installedPython `
-        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-apply-rollback") `
+        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-apply-rollback", "--bootstrap-package-verification") `
         -WorkingDirectory $InstallRoot
     try {
         $rollbackApplyInfo = $rollbackApplyResult.stdout | ConvertFrom-Json

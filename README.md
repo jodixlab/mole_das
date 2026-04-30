@@ -17,7 +17,7 @@ MOLE-DAS Data Acquisition System
 - Generated release checklist artifacts appear under `RELEASES/clean_release_workflow/`
 - Generated clean-workspace ZIP, release cert, and package hygiene reports also appear under `RELEASES/clean_release_workflow/`
 - Generated executable bundle ZIPs and packaged-acceptance summaries also appear under `RELEASES/clean_release_workflow/`
-- The canonical verified release channel manifest `latest_verified_release_v1.json` is emitted with executable bundle builds and copied into `RELEASES/clean_release_workflow/`
+- The canonical verified release channel manifest `latest_verified_release_v1.json`, its signature `latest_verified_release_v1.signature.json`, and the public key `mole_release_signing_public_key_v1.json` are emitted with executable bundle builds and copied into `RELEASES/clean_release_workflow/`
 - The executable bundle builder also emits `PACKAGE_VERSION_AUDIT.json` and `PACKAGE_VERSION_AUDIT.txt`, and the clean release workflow copies both into `RELEASES/clean_release_workflow/`
 - Portable and installer bundle ZIPs are now distinct payloads: the portable ZIP contains the direct-run shareable payload without installer scripts, while the installer ZIP contains the curated root install package
 - Dependency manifests, release bundle summary, and release artifact contract are also emitted under `RELEASES/clean_release_workflow/`

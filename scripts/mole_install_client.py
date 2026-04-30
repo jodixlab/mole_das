@@ -929,6 +929,8 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
     runtime_root = package_root / "runtime"
     build_identity_path = runtime_root / "config" / "mole_build_identity_v1.json"
     verified_release_path = package_root / "latest_verified_release_v1.json"
+    verified_release_signature_path = package_root / "latest_verified_release_v1.signature.json"
+    signing_public_key_path = package_root / "mole_release_signing_public_key_v1.json"
     acceptance_json_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
     version_audit_path = package_root / "PACKAGE_VERSION_AUDIT.json"
     immutable_audit_path = package_root / "IMMUTABLE_PACKAGE_AUDIT.json"
@@ -937,6 +939,8 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
     launcher_path = package_root / "LAUNCH_MOLE_DAS_EXE.bat"
     build_identity = _load_json(build_identity_path)
     verified_release = _load_json(verified_release_path)
+    verified_release_signature = _load_json(verified_release_signature_path)
+    signing_public_key = _load_json(signing_public_key_path)
     acceptance = _load_json(acceptance_json_path)
     version_audit = _load_json(version_audit_path)
     immutable_audit = _load_json(immutable_audit_path)
@@ -945,6 +949,8 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
         "runtime_root": str(runtime_root),
         "build_identity_path": str(build_identity_path),
         "verified_release_path": str(verified_release_path),
+        "verified_release_signature_path": str(verified_release_signature_path),
+        "signing_public_key_path": str(signing_public_key_path),
         "acceptance_json_path": str(acceptance_json_path),
         "version_audit_path": str(version_audit_path),
         "immutable_audit_path": str(immutable_audit_path),
@@ -958,10 +964,14 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
         "version_audit_status": str(version_audit.get("status") or ""),
         "immutable_audit_status": str(immutable_audit.get("status") or ""),
         "verified_release_channel": str(verified_release.get("channel_name") or ""),
+        "signature_key_id": str(verified_release_signature.get("key_id") or signing_public_key.get("key_id") or ""),
+        "signature_status": str(verified_release_signature.get("schema") or ""),
         "data_schema_version_expected": _extract_runtime_constant(package_root, "DATA_ROOT_SCHEMA_VERSION"),
         "data_manifest_schema_expected": _extract_runtime_constant(package_root, "DATA_ROOT_MANIFEST_SCHEMA"),
         "build_identity": build_identity,
         "verified_release": verified_release,
+        "verified_release_signature": verified_release_signature,
+        "signing_public_key": signing_public_key,
         "acceptance": acceptance,
         "version_audit": version_audit,
         "immutable_audit": immutable_audit,
@@ -1035,6 +1045,32 @@ def _run_powershell(script_path: Path, args: list[str], cwd: Path) -> subprocess
         *args,
     ]
     return subprocess.run(command, cwd=str(cwd), capture_output=True, text=True)
+
+
+def _verify_package_with_installer(
+    package: Dict[str, Any], package_root: Path, *, bootstrap_package_verification: bool = False
+) -> tuple[bool, Dict[str, Any], str]:
+    installer_script = Path(str(package.get("installer_script_path") or ""))
+    if not installer_script.exists():
+        return False, {}, f"Installer script is missing:\n{installer_script}"
+    args = ["-VerifyPackageOnly", "-Quiet"]
+    if bootstrap_package_verification:
+        args.append("-BootstrapPackageVerification")
+    result = _run_powershell(installer_script, args, package_root)
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    payload: Dict[str, Any] = {}
+    if stdout:
+        try:
+            payload = json.loads(stdout)
+        except Exception:
+            payload = {}
+    if result.returncode != 0:
+        detail = stderr or stdout or f"Exit code: {result.returncode}"
+        return False, payload, detail
+    if payload and str(payload.get("status") or "") != "PASS":
+        return False, payload, stdout or "Signed package verification did not return PASS."
+    return True, payload, stdout or "Signed package verification passed."
 
 
 class InstallClient(tk.Tk):
@@ -1209,6 +1245,8 @@ class InstallClient(tk.Tk):
             f"Version audit: {self.package['version_audit_status'] or '(missing)'}",
             f"Immutable audit: {self.package['immutable_audit_status'] or '(missing)'}",
             f"Verified channel: {self.package['verified_release_channel'] or '(none)'}",
+            f"Signing key: {self.package['signature_key_id'] or '(missing)'}",
+            f"Signature schema: {self.package['signature_status'] or '(missing)'}",
             f"Expected data schema: {self.package['data_schema_version_expected'] or '(unknown)'}",
             f"Package root: {self.package['package_root']}",
             f"Runtime root: {self.package['runtime_root']}",
@@ -1262,8 +1300,26 @@ class InstallClient(tk.Tk):
             messagebox.showerror("Validate Package", "\n".join(failures))
             self._append_log("Package validation failed:\n" + "\n".join(failures))
             return False
-        self._append_log(f"Package validation passed for {self.package['package_label']}.")
-        messagebox.showinfo("Validate Package", "Package validation passed.")
+        ok, payload, detail = _verify_package_with_installer(self.package, self.package_root)
+        if not ok:
+            messagebox.showerror("Validate Package", f"Signed package verification failed.\n\n{detail}")
+            self._append_log("Signed package verification failed:\n" + detail)
+            return False
+        verified_label = str(payload.get("package_label") or self.package["package_label"])
+        verified_key = str(payload.get("key_id") or self.package["signature_key_id"] or "(unknown)")
+        self._append_log(f"Package validation passed for {verified_label} using signing key {verified_key}.")
+        messagebox.showinfo("Validate Package", f"Package validation passed.\n\nSigning key: {verified_key}")
+        return True
+
+    def _ensure_signed_package(self, action_label: str) -> bool:
+        ok, payload, detail = _verify_package_with_installer(self.package, self.package_root)
+        if not ok:
+            messagebox.showerror(action_label, f"Signed package verification failed.\n\n{detail}")
+            self._append_log(f"{action_label}: signed package verification failed.\n{detail}")
+            return False
+        verified_label = str(payload.get("package_label") or self.package["package_label"])
+        verified_key = str(payload.get("key_id") or self.package["signature_key_id"] or "(unknown)")
+        self._append_log(f"{action_label}: signed package verification passed for {verified_label} using signing key {verified_key}.")
         return True
 
     def _install_args(self, *, force_launch: bool = False) -> list[str]:
@@ -1375,6 +1431,8 @@ class InstallClient(tk.Tk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _install_package(self) -> None:
+        if not self._ensure_signed_package("Install / Upgrade"):
+            return
         self._run_async("Install / Upgrade", Path(self.package["installer_script_path"]), self._install_args())
 
     def _upgrade_and_relaunch(self) -> None:
@@ -1404,6 +1462,8 @@ class InstallClient(tk.Tk):
 
     def _rollback_restore(self) -> None:
         self._refresh_state()
+        if not self._ensure_signed_package("Rollback / Restore"):
+            return
         if str(self.rollback_plan.get("action") or "") != "ROLLBACK":
             messagebox.showwarning("Rollback / Restore", self.rollback_plan.get("summary") or "No restore point is available.")
             self._append_log("Rollback / Restore unavailable: " + str(self.rollback_plan.get("summary") or "No restore point is available."))
@@ -1444,6 +1504,8 @@ class InstallClient(tk.Tk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _repair_install(self) -> None:
+        if not self._ensure_signed_package("Repair Install"):
+            return
         self._run_async("Repair Install", Path(self.package["installer_script_path"]), self._install_args())
 
     def _uninstall_install(self) -> None:
@@ -1454,6 +1516,8 @@ class InstallClient(tk.Tk):
         self._run_async("Uninstall", uninstall_script, ["-InstallRoot", self.install_root_var.get()])
 
     def _launch_installed(self) -> None:
+        if not self._ensure_signed_package("Launch Installed App"):
+            return
         wizard = Path(self.current_install["wizard_exe_path"])
         if not wizard.exists():
             messagebox.showwarning("Launch Installed App", f"Installed Wizard not found:\n{wizard}")
@@ -1467,9 +1531,11 @@ def main() -> int:
     parser.add_argument("--package-root", default="", help="Override package root")
     parser.add_argument("--install-root", default="", help="Override installed root to inspect or mutate")
     parser.add_argument("--headless-summary", action="store_true", help="Print package/install summary JSON and exit")
+    parser.add_argument("--headless-verify-package", action="store_true", help="Run the signed package verification flow and print the result as JSON")
     parser.add_argument("--headless-export-upgrade-report", default="", help="Write upgrade report files to the given directory and print the output paths as JSON")
     parser.add_argument("--headless-export-rollback-report", default="", help="Write rollback report files to the given directory and print the output paths as JSON")
     parser.add_argument("--headless-apply-rollback", action="store_true", help="Apply the latest rollback restore point and print the result as JSON")
+    parser.add_argument("--bootstrap-package-verification", action="store_true", help="Use signature-only bootstrap verification for pre-acceptance installer validation flows")
     args = parser.parse_args()
 
     package_root = _resolve_package_root(args.package_root or None)
@@ -1496,6 +1562,21 @@ def main() -> int:
             )
         )
         return 0
+    if args.headless_verify_package:
+        ok, payload, detail = _verify_package_with_installer(
+            package, package_root, bootstrap_package_verification=args.bootstrap_package_verification
+        )
+        result_payload = {
+            "schema": "mole_install_client_verify_package_v1",
+            "status": "PASS" if ok else "FAIL",
+            "detail": detail,
+            "package_label": package.get("package_label") or "",
+            "git_commit": package.get("git_commit") or "",
+            "git_branch": package.get("git_branch") or "",
+        }
+        result_payload.update(payload or {})
+        print(json.dumps(result_payload, indent=2))
+        return 0 if ok else 1
     if args.headless_export_upgrade_report:
         report = _build_upgrade_report(package, installed, upgrade_plan, upgrade_delta)
         result = _write_upgrade_report(report, Path(args.headless_export_upgrade_report))
@@ -1507,6 +1588,11 @@ def main() -> int:
         print(json.dumps(result, indent=2))
         return 0
     if args.headless_apply_rollback:
+        ok, payload, detail = _verify_package_with_installer(
+            package, package_root, bootstrap_package_verification=args.bootstrap_package_verification
+        )
+        if not ok:
+            raise RuntimeError(f"Signed package verification failed before rollback restore.\n{detail}")
         report_dir = _default_rollback_report_dir(package_root, install_root)
         _write_rollback_report(_build_rollback_report(package, installed, rollback_plan, rollback_delta), report_dir)
         result = _apply_rollback_restore(package, installed, rollback_plan, rollback_delta, relaunch=False)

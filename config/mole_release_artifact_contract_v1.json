@@ -86,6 +86,20 @@
       "description": "Canonical verified release channel manifest emitted by the executable bundle and release workflow."
     },
     {
+      "id": "latest_verified_release_signature_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "latest_verified_release_v1.signature.json",
+      "description": "Cryptographic signature for the canonical verified release channel manifest."
+    },
+    {
+      "id": "release_signing_public_key_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "mole_release_signing_public_key_v1.json",
+      "description": "Public signing key used to verify the canonical verified release channel manifest."
+    },
+    {
       "id": "package_version_audit_json",
       "required": true,
       "match": "exact",

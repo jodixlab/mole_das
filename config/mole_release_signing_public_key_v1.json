@@ -1,0 +1,8 @@
+{
+  "schema": "mole_release_signing_public_key_v1",
+  "key_id": "mole_release_signing_key_v1",
+  "algorithm": "RSA-SHA256",
+  "created_at": "2026-04-30T00:00:00Z",
+  "public_key_sha256": "A5E7E4BE22A8CAE717CF6B23AA989D155809A9CEF42F890D7BB107EE47004398",
+  "public_key_xml": "<RSAKeyValue><Modulus>0bJd4jhPedCBfxbDhJXG1+fIZDRkWW4KFDLc+TeNc7ZT2DLxr276Sfis7cZ17d69ULmKX7zS/gx7FdWEDP26htqXpLuYt6e4C3odKT8mDOQslg8A/bL7ljDlT7gUpPm0y0qT+HN9fyZ62SDE6O4lKtz5BZMbDGKY4u6JXwGPF6Es8W41ckqCncu5eZ/usj1Wr36xGdjnOM9nix7jbG0SkH4G3MXSGQgOK3rtpTqQ3XQS3SczJmHvY6VwQe5c7f/NDjTXXilwSBtXrnCVozbUoYerpiBmuYadRRitV+v5tT2AwSt/uAId9LfwOHgsDAnmcJ7Vl3fg3yw2yOh2SXcMnbzyTWcq89jqow1B0XXw0Qg7AerL5Mytzba3HUPRHlr7rpBRZfpWNvRedZ0tNqSp99sfLcmPwY3Ec0BAcQcB1ucxWjSgEWD/omflzAwdltb6MwTwB9CGUAfizrAkc8E0fJM/R2PFbExT40W3zJ1cWFZGGjyE+xnWvZQEIEsPyM4vTHG+aYvp70xSTbyx2coJRlyEWwss+gXot2vNpLjH5LV3PIUlM+dS3YyKW2HOeEpKdVt62zMFfadNcgkE1pW2YsLEJGk4+XgrWQiY+XZvSF5lmkiFhNPjze+pd9xESQkX6awY49O99iIYUu6dmL/I6HNeRj3E/uKK6EOb6Yjhixk=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>"
+}

@@ -11,6 +11,8 @@ param(
 
     [string]$GitBranch = "",
 
+    [string]$ReleaseSigningPrivateKeyPath = "",
+
     [switch]$SkipPackagedAcceptance
 )
 
@@ -171,12 +173,19 @@ $publishedUpgradeReportTxtName = "UPGRADE_REPORT_PREVIEW.txt"
 $publishedRollbackReportJsonName = "ROLLBACK_REPORT_PREVIEW.json"
 $publishedRollbackReportTxtName = "ROLLBACK_REPORT_PREVIEW.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
+$verifiedReleaseSignatureName = "latest_verified_release_v1.signature.json"
+$releaseSigningPublicKeyName = "mole_release_signing_public_key_v1.json"
 $versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
 $versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
 $immutableAuditJsonName = "IMMUTABLE_PACKAGE_AUDIT.json"
 $immutableAuditTxtName = "IMMUTABLE_PACKAGE_AUDIT.txt"
 $verifiedReleaseManifestPath = Join-Path $OutputRoot $verifiedReleaseManifestName
+$verifiedReleaseSignaturePath = Join-Path $OutputRoot $verifiedReleaseSignatureName
 $shareVerifiedReleaseManifestPath = Join-Path $installRoot $verifiedReleaseManifestName
+$shareVerifiedReleaseSignaturePath = Join-Path $installRoot $verifiedReleaseSignatureName
+$releaseSigningPublicKeySourcePath = Join-Path $RepoRoot ("config\" + $releaseSigningPublicKeyName)
+$releaseSigningPublicKeyOutputPath = Join-Path $OutputRoot $releaseSigningPublicKeyName
+$releaseSigningPublicKeySharePath = Join-Path $installRoot $releaseSigningPublicKeyName
 $versionAuditJsonPath = Join-Path $OutputRoot $versionAuditJsonName
 $versionAuditTxtPath = Join-Path $OutputRoot $versionAuditTxtName
 $shareVersionAuditJsonPath = Join-Path $installRoot $versionAuditJsonName
@@ -190,10 +199,14 @@ try {
     $outputParent = Split-Path -Parent $OutputRoot
     if ($outputParent) {
         $stableChannelManifestPath = Join-Path $outputParent $verifiedReleaseManifestName
+        $stableChannelSignaturePath = Join-Path $outputParent $verifiedReleaseSignatureName
+        $stableChannelPublicKeyPath = Join-Path $outputParent $releaseSigningPublicKeyName
     }
 }
 catch {
     $stableChannelManifestPath = $null
+    $stableChannelSignaturePath = $null
+    $stableChannelPublicKeyPath = $null
 }
 
 function Publish-PackagedAcceptanceSummary {
@@ -267,6 +280,256 @@ function Get-FileHashValue {
     }
     catch {
         return ""
+    }
+}
+
+function Resolve-ReleaseSigningPrivateKeyPath {
+    if ($ReleaseSigningPrivateKeyPath) {
+        return [System.IO.Path]::GetFullPath($ReleaseSigningPrivateKeyPath)
+    }
+    if ($env:MOLE_DAS_RELEASE_SIGNING_PRIVATE_KEY) {
+        return [System.IO.Path]::GetFullPath($env:MOLE_DAS_RELEASE_SIGNING_PRIVATE_KEY)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $env:USERPROFILE ".mole_das_signing\mole_release_signing_private_key_v1.xml"))
+}
+
+function Get-ReleaseSigningPublicKeyPayload {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+    Require-Path $PathValue "Release signing public key"
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_release_signing_public_key_v1") {
+        throw "Release signing public key schema is invalid: $PathValue"
+    }
+    if ([string]$payload.algorithm -ne "RSA-SHA256") {
+        throw "Release signing public key algorithm is invalid: $PathValue"
+    }
+    if (-not [string]$payload.public_key_xml) {
+        throw "Release signing public key XML is missing: $PathValue"
+    }
+    return $payload
+}
+
+function New-RsaProviderFromXml {
+    param([Parameter(Mandatory = $true)][string]$XmlValue)
+    $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+    $rsa.PersistKeyInCsp = $false
+    $rsa.FromXmlString($XmlValue)
+    return $rsa
+}
+
+function Write-VerifiedReleaseSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath
+    )
+
+    $publicKey = Get-ReleaseSigningPublicKeyPayload -PathValue $releaseSigningPublicKeySourcePath
+    $privateKeyPath = Resolve-ReleaseSigningPrivateKeyPath
+    Require-Path $privateKeyPath "Release signing private key"
+    $privateKeyXml = Get-Content -LiteralPath $privateKeyPath -Raw
+    $manifestBytes = [System.IO.File]::ReadAllBytes($ManifestPath)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue $privateKeyXml
+    try {
+        $signatureBytes = $rsa.SignData($manifestBytes, $sha256)
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+
+    $payload = [ordered]@{
+        schema = "mole_release_signature_v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        key_id = [string]$publicKey.key_id
+        algorithm = "RSA-SHA256"
+        manifest_path = [System.IO.Path]::GetFileName($ManifestPath)
+        public_key_path = [System.IO.Path]::GetFileName($releaseSigningPublicKeySourcePath)
+        public_key_sha256 = [string]$publicKey.public_key_sha256
+        manifest_sha256 = Get-FileHashValue $ManifestPath
+        signature_base64 = [Convert]::ToBase64String($signatureBytes)
+    }
+
+    [System.IO.File]::WriteAllText(
+        $SignaturePath,
+        ($payload | ConvertTo-Json -Depth 6),
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+}
+
+function Assert-VerifiedReleaseSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath,
+        [Parameter(Mandatory = $true)][string]$PublicKeyPath
+    )
+
+    Require-Path $ManifestPath "Verified release manifest"
+    Require-Path $SignaturePath "Verified release signature"
+    $publicKey = Get-ReleaseSigningPublicKeyPayload -PathValue $PublicKeyPath
+    $signature = Get-Content -LiteralPath $SignaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_release_signature_v1") {
+        throw "Verified release signature schema is invalid: $SignaturePath"
+    }
+    if ([string]$signature.algorithm -ne "RSA-SHA256") {
+        throw "Verified release signature algorithm is invalid: $SignaturePath"
+    }
+    if ([string]$signature.key_id -ne [string]$publicKey.key_id) {
+        throw "Verified release signature key_id does not match the public key: $SignaturePath"
+    }
+    $actualPublicKeyHash = [string]$publicKey.public_key_sha256
+    if ($actualPublicKeyHash -and [string]$signature.public_key_sha256 -and $actualPublicKeyHash -ne [string]$signature.public_key_sha256) {
+        throw "Verified release public key SHA256 mismatch: $PublicKeyPath"
+    }
+    $actualManifestHash = Get-FileHashValue $ManifestPath
+    if (-not $actualManifestHash) {
+        throw "Verified release manifest SHA256 could not be computed: $ManifestPath"
+    }
+    if ($actualManifestHash -ne [string]$signature.manifest_sha256) {
+        throw "Verified release manifest SHA256 mismatch. Expected $([string]$signature.manifest_sha256), got $actualManifestHash."
+    }
+    $manifestBytes = [System.IO.File]::ReadAllBytes($ManifestPath)
+    $signatureBytes = [Convert]::FromBase64String([string]$signature.signature_base64)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue ([string]$publicKey.public_key_xml)
+    try {
+        if (-not $rsa.VerifyData($manifestBytes, $sha256, $signatureBytes)) {
+            throw "Verified release signature check failed: $SignaturePath"
+        }
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+}
+
+function Resolve-ManifestPath {
+    param(
+        [string]$BaseRoot,
+        [string]$PathValue
+    )
+    if (-not $PathValue) {
+        return $null
+    }
+    try {
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path $BaseRoot $PathValue))
+    }
+    catch {
+        return $null
+    }
+    return $candidate
+}
+
+function Assert-VersionAuditPass {
+    param([string]$AuditPath)
+    if (-not (Test-Path -LiteralPath $AuditPath)) {
+        throw "Package version audit not found: $AuditPath"
+    }
+    $audit = Get-Content -LiteralPath $AuditPath -Raw | ConvertFrom-Json
+    if (-not $audit -or [string]$audit.schema -ne "mole_package_version_audit_v1") {
+        throw "Package version audit schema is invalid: $AuditPath"
+    }
+    if ([string]$audit.status -ne "PASS") {
+        throw "Package version audit is not PASS: $AuditPath"
+    }
+}
+
+function Assert-ImmutablePackageAuditPass {
+    param([string]$AuditPath)
+    if (-not (Test-Path -LiteralPath $AuditPath)) {
+        throw "Immutable package audit not found: $AuditPath"
+    }
+    $audit = Get-Content -LiteralPath $AuditPath -Raw | ConvertFrom-Json
+    if (-not $audit -or [string]$audit.schema -ne "mole_immutable_package_audit_v1") {
+        throw "Immutable package audit schema is invalid: $AuditPath"
+    }
+    if ([string]$audit.status -ne "PASS") {
+        throw "Immutable package audit is not PASS: $AuditPath"
+    }
+}
+
+function Assert-VerifiedReleasePackage {
+    param([string]$PackageRoot)
+    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
+    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
+    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        throw "Verified release manifest not found: $manifestPath"
+    }
+    Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (-not $manifest -or [string]$manifest.schema -ne "mole_latest_verified_release_v1") {
+        throw "Verified release manifest schema is invalid: $manifestPath"
+    }
+    if ([string]$manifest.acceptance_status -ne "PASS") {
+        throw "Verified release manifest acceptance_status is not PASS: $manifestPath"
+    }
+    $packageLabel = [string]$manifest.package_label
+    if (-not $packageLabel) {
+        throw "Verified release manifest package_label is missing: $manifestPath"
+    }
+    $packageBase = Resolve-ManifestPath -BaseRoot $PackageRoot -PathValue ([string]$manifest.package_root)
+    if (-not $packageBase -or -not (Test-Path -LiteralPath $packageBase)) {
+        throw "Verified release package_root is invalid: $manifestPath"
+    }
+    $versionAuditPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.version_audit_json_path)
+    Assert-VersionAuditPass -AuditPath $versionAuditPath
+    Assert-ImmutablePackageAuditPass -AuditPath (Join-Path $packageBase "IMMUTABLE_PACKAGE_AUDIT.json")
+
+    $hashes = $manifest.hashes
+    $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
+    $acceptanceTextPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_path)
+    $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
+    $upgradeReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_path)
+    $upgradeReportPreviewJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_json_path)
+    $rollbackReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.rollback_report_preview_path)
+    $rollbackReportPreviewJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.rollback_report_preview_json_path)
+    $installerScriptPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.installer_script_path)
+    $launcherPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.launcher_path)
+    $wizardExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.wizard_exe_path)
+    $runnerExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.runner_exe_path)
+    $scriptRunnerExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.script_runner_exe_path)
+
+    $targets = @(
+        @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
+        @{ Label = "Packaged acceptance summary"; Path = $acceptanceTextPath; Hash = [string]$hashes.acceptance_summary_txt_sha256 }
+        @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
+        @{ Label = "Upgrade report preview"; Path = $upgradeReportPreviewTxtPath; Hash = [string]$hashes.upgrade_report_preview_txt_sha256 }
+        @{ Label = "Upgrade report preview JSON"; Path = $upgradeReportPreviewJsonPath; Hash = [string]$hashes.upgrade_report_preview_json_sha256 }
+        @{ Label = "Rollback report preview"; Path = $rollbackReportPreviewTxtPath; Hash = [string]$hashes.rollback_report_preview_txt_sha256 }
+        @{ Label = "Rollback report preview JSON"; Path = $rollbackReportPreviewJsonPath; Hash = [string]$hashes.rollback_report_preview_json_sha256 }
+        @{ Label = "Installer script"; Path = $installerScriptPath; Hash = [string]$hashes.installer_script_sha256 }
+        @{ Label = "Launcher batch"; Path = $launcherPath; Hash = [string]$hashes.launcher_batch_sha256 }
+        @{ Label = "Wizard executable"; Path = $wizardExePath; Hash = [string]$hashes.wizard_exe_sha256 }
+        @{ Label = "Runner executable"; Path = $runnerExePath; Hash = [string]$hashes.runner_exe_sha256 }
+        @{ Label = "ScriptRunner executable"; Path = $scriptRunnerExePath; Hash = [string]$hashes.script_runner_exe_sha256 }
+    )
+    foreach ($target in $targets) {
+        if (-not $target.Path -or -not (Test-Path -LiteralPath $target.Path)) {
+            throw "$($target.Label) is missing: $($target.Path)"
+        }
+        if (-not $target.Hash) {
+            throw "Verified release manifest is missing $($target.Label) SHA256."
+        }
+        $actualHash = Get-FileHashValue -PathValue $target.Path
+        if (-not $actualHash) {
+            throw "$($target.Label) SHA256 could not be computed: $($target.Path)"
+        }
+        if ($actualHash -ne $target.Hash) {
+            throw "$($target.Label) SHA256 mismatch. Expected $($target.Hash), got $actualHash."
+        }
+    }
+
+    $buildIdentity = Get-Content -LiteralPath $buildIdentityPath -Raw | ConvertFrom-Json
+    if ([string]$buildIdentity.bundle_label -ne $packageLabel) {
+        throw "Build identity bundle_label does not match verified release package_label."
+    }
+    $acceptanceSummary = Get-Content -LiteralPath $acceptanceJsonPath -Raw | ConvertFrom-Json
+    if ([string]$acceptanceSummary.status -ne "PASS") {
+        throw "Packaged acceptance summary JSON is not PASS."
+    }
+    if ([string]$acceptanceSummary.package_label -ne $packageLabel) {
+        throw "Packaged acceptance summary package_label does not match verified release package_label."
     }
 }
 
@@ -466,6 +729,8 @@ function Write-VerifiedReleaseManifest {
         runtime_root = "runtime"
         runtime_code_root = "runtime\\MOLE_code"
         build_identity_path = "runtime\\config\\mole_build_identity_v1.json"
+        signature_path = $verifiedReleaseSignatureName
+        public_key_path = $releaseSigningPublicKeyName
         acceptance_status = [string]($acceptanceSummary.status)
         acceptance_generated_at = [string]($acceptanceSummary.generated_at)
         acceptance_summary_path = $publishedAcceptanceTxtName
@@ -737,6 +1002,7 @@ param(
     [switch]$NoStartMenuShortcut,
     [switch]$NoUninstallRegistration,
     [switch]$BootstrapPackageVerification,
+    [switch]$VerifyPackageOnly,
     [switch]$Quiet
 )
 
@@ -909,6 +1175,78 @@ function Get-FileHashValue {
     return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash
 }
 
+function Get-ReleaseSigningPublicKeyPayload {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        throw "Release signing public key not found: $PathValue"
+    }
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_release_signing_public_key_v1") {
+        throw "Release signing public key schema is invalid: $PathValue"
+    }
+    if ([string]$payload.algorithm -ne "RSA-SHA256") {
+        throw "Release signing public key algorithm is invalid: $PathValue"
+    }
+    if (-not [string]$payload.public_key_xml) {
+        throw "Release signing public key XML is missing: $PathValue"
+    }
+    return $payload
+}
+
+function New-RsaProviderFromXml {
+    param([Parameter(Mandatory = $true)][string]$XmlValue)
+    $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+    $rsa.PersistKeyInCsp = $false
+    $rsa.FromXmlString($XmlValue)
+    return $rsa
+}
+
+function Assert-VerifiedReleaseSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath,
+        [Parameter(Mandatory = $true)][string]$PublicKeyPath
+    )
+
+    if (-not (Test-Path -LiteralPath $SignaturePath)) {
+        throw "Verified release signature not found: $SignaturePath"
+    }
+    $publicKey = Get-ReleaseSigningPublicKeyPayload -PathValue $PublicKeyPath
+    $signature = Get-Content -LiteralPath $SignaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_release_signature_v1") {
+        throw "Verified release signature schema is invalid: $SignaturePath"
+    }
+    if ([string]$signature.algorithm -ne "RSA-SHA256") {
+        throw "Verified release signature algorithm is invalid: $SignaturePath"
+    }
+    if ([string]$signature.key_id -ne [string]$publicKey.key_id) {
+        throw "Verified release signature key_id does not match the public key: $SignaturePath"
+    }
+    if ([string]$signature.public_key_sha256 -and [string]$signature.public_key_sha256 -ne [string]$publicKey.public_key_sha256) {
+        throw "Verified release public key SHA256 mismatch: $PublicKeyPath"
+    }
+    $actualManifestHash = Get-FileHashValue -PathValue $ManifestPath
+    if (-not $actualManifestHash) {
+        throw "Verified release manifest SHA256 could not be computed: $ManifestPath"
+    }
+    if ($actualManifestHash -ne [string]$signature.manifest_sha256) {
+        throw "Verified release manifest SHA256 mismatch. Expected $([string]$signature.manifest_sha256), got $actualManifestHash."
+    }
+    $manifestBytes = [System.IO.File]::ReadAllBytes($ManifestPath)
+    $signatureBytes = [Convert]::FromBase64String([string]$signature.signature_base64)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue ([string]$publicKey.public_key_xml)
+    try {
+        if (-not $rsa.VerifyData($manifestBytes, $sha256, $signatureBytes)) {
+            throw "Verified release signature check failed: $SignaturePath"
+        }
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+}
+
 function Resolve-ManifestPath {
     param(
         [string]$BaseRoot,
@@ -957,9 +1295,12 @@ function Assert-ImmutablePackageAuditPass {
 function Assert-VerifiedReleasePackage {
     param([string]$PackageRoot)
     $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
+    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
+    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
     if (-not (Test-Path -LiteralPath $manifestPath)) {
         throw "Verified release manifest not found: $manifestPath"
     }
+    Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if (-not $manifest -or [string]$manifest.schema -ne "mole_latest_verified_release_v1") {
         throw "Verified release manifest schema is invalid: $manifestPath"
@@ -1058,6 +1399,8 @@ $SourceSupportFiles = @(
     "README_EXECUTABLE_BUNDLE.txt",
     "MOLE_DAS.ico",
     "latest_verified_release_v1.json",
+    "latest_verified_release_v1.signature.json",
+    "mole_release_signing_public_key_v1.json",
     "PACKAGE_VERSION_AUDIT.json",
     "PACKAGE_VERSION_AUDIT.txt",
     "IMMUTABLE_PACKAGE_AUDIT.json",
@@ -1091,12 +1434,49 @@ $SourceDataRoot = Join-Path $PackageRoot "data"
 $InstalledDataRoot = Join-Path $InstallRoot "data"
 $InstalledDataRootManifestPath = Join-Path $InstalledDataRoot "data_root_manifest_v1.json"
 
+if ($VerifyPackageOnly) {
+    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
+    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
+    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
+    $verificationMode = "full_verified_release"
+    if ($BootstrapPackageVerification) {
+        Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
+        $verificationMode = "bootstrap_signature_only"
+    }
+    else {
+        Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $signature = Get-Content -LiteralPath $signaturePath -Raw | ConvertFrom-Json
+    $buildIdentity = Get-Content -LiteralPath (Join-Path $SourceRuntime "config\\mole_build_identity_v1.json") -Raw | ConvertFrom-Json
+    [pscustomobject]@{
+        schema = "mole_verified_release_check_v1"
+        status = "PASS"
+        verification_mode = $verificationMode
+        package_root = $PackageRoot
+        package_label = [string]$manifest.package_label
+        git_commit = [string]$buildIdentity.git_commit
+        git_branch = [string]$buildIdentity.git_branch
+        signature_path = $signaturePath
+        public_key_path = $publicKeyPath
+        key_id = [string]$signature.key_id
+        manifest_sha256 = [string]$signature.manifest_sha256
+    } | ConvertTo-Json -Depth 5
+    exit 0
+}
+
 Write-Status ""
 Write-Status "Installing MOLE-DAS executable bundle"
 Write-Status "  Package root: $PackageRoot"
 Write-Status "  Install root: $InstallRoot"
 
-if (-not $BootstrapPackageVerification) {
+if ($BootstrapPackageVerification) {
+    Assert-VerifiedReleaseSignature `
+        -ManifestPath (Join-Path $PackageRoot "latest_verified_release_v1.json") `
+        -SignaturePath (Join-Path $PackageRoot "latest_verified_release_v1.signature.json") `
+        -PublicKeyPath (Join-Path $PackageRoot "mole_release_signing_public_key_v1.json")
+}
+else {
     Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
 }
 
@@ -1423,6 +1803,12 @@ else:
 "@
 ) -WorkingDirectory $RepoRoot
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $installRoot "MOLE_DAS.ico") -Force
+Require-Path $releaseSigningPublicKeySourcePath "Release signing public key"
+Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $releaseSigningPublicKeyOutputPath -Force
+Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $releaseSigningPublicKeySharePath -Force
+if ($stableChannelPublicKeyPath) {
+    Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $stableChannelPublicKeyPath -Force
+}
 
 $shell = New-Object -ComObject WScript.Shell
 foreach ($targetRoot in @($OutputRoot, $installRoot)) {
@@ -1444,7 +1830,9 @@ if (-not $SkipPackagedAcceptance) {
     $acceptanceScript = Join-Path $RepoRoot "scripts\run_packaged_acceptance.ps1"
     Require-Path $acceptanceScript "Packaged acceptance runner"
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-VerifiedReleaseSignature -ManifestPath $verifiedReleaseManifestPath -SignaturePath $verifiedReleaseSignaturePath
     Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-VerifiedReleaseSignature -ManifestPath $shareVerifiedReleaseManifestPath -SignaturePath $shareVerifiedReleaseSignaturePath
 
     Write-Host ""
     Write-Host "==> Run packaged acceptance"
@@ -1467,6 +1855,8 @@ if (-not $SkipPackagedAcceptance) {
     Publish-RollbackReportPreview -SourceJson $rollbackReportLatestJson -SourceTxt $rollbackReportLatestTxt -TargetRoots @($OutputRoot, $installRoot)
     Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
     Write-ImmutablePackageAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
+    Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-VerifiedReleaseSignature -ManifestPath $shareVerifiedReleaseManifestPath -SignaturePath $shareVerifiedReleaseSignaturePath
 }
 
 if (Test-Path -LiteralPath $shareZip) {
@@ -1492,6 +1882,8 @@ Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -
     $publishedAcceptanceJsonName,
     $publishedAcceptanceTxtName,
     $verifiedReleaseManifestName,
+    $verifiedReleaseSignatureName,
+    $releaseSigningPublicKeyName,
     $versionAuditJsonName,
     $versionAuditTxtName,
     $immutableAuditJsonName,
@@ -1509,10 +1901,17 @@ Write-ZipFromDirectory -SourceRoot $installerStageRoot -DestinationZip $installe
 
 if (-not $SkipPackagedAcceptance) {
     Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "release_channel" -PackageRootRef "." -IncludeBundleHashes
+    Write-VerifiedReleaseSignature -ManifestPath $verifiedReleaseManifestPath -SignaturePath $verifiedReleaseSignaturePath
     if ($stableChannelManifestPath) {
         Write-VerifiedReleaseManifest -DestinationPath $stableChannelManifestPath -ManifestKind "release_channel" -PackageRootRef ([System.IO.Path]::GetFileName($OutputRoot)) -IncludeBundleHashes
+        Write-VerifiedReleaseSignature -ManifestPath $stableChannelManifestPath -SignaturePath $stableChannelSignaturePath
     }
     Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot -StableManifestPath $stableChannelManifestPath
+    Assert-VerifiedReleasePackage -PackageRoot $OutputRoot
+    Assert-VerifiedReleasePackage -PackageRoot $installRoot
+    if ($stableChannelManifestPath) {
+        Assert-VerifiedReleasePackage -PackageRoot (Split-Path -Parent $stableChannelManifestPath)
+    }
 }
 
 Write-Host ""
