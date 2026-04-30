@@ -182,6 +182,8 @@ try {
         $versionAuditTxt = Join-Path $bundleRoot "PACKAGE_VERSION_AUDIT.txt"
         $upgradeReportPreviewJson = Join-Path $bundleRoot "UPGRADE_REPORT_PREVIEW.json"
         $upgradeReportPreviewTxt = Join-Path $bundleRoot "UPGRADE_REPORT_PREVIEW.txt"
+        $rollbackReportPreviewJson = Join-Path $bundleRoot "ROLLBACK_REPORT_PREVIEW.json"
+        $rollbackReportPreviewTxt = Join-Path $bundleRoot "ROLLBACK_REPORT_PREVIEW.txt"
         if (-not (Test-Path -LiteralPath $installerZip)) {
             throw "Installer ZIP missing after bundle build: $installerZip"
         }
@@ -203,6 +205,12 @@ try {
         if (-not (Test-Path -LiteralPath $upgradeReportPreviewTxt)) {
             throw "Upgrade report preview text summary missing after bundle build: $upgradeReportPreviewTxt"
         }
+        if (-not (Test-Path -LiteralPath $rollbackReportPreviewJson)) {
+            throw "Rollback report preview JSON missing after bundle build: $rollbackReportPreviewJson"
+        }
+        if (-not (Test-Path -LiteralPath $rollbackReportPreviewTxt)) {
+            throw "Rollback report preview text summary missing after bundle build: $rollbackReportPreviewTxt"
+        }
 
         $acceptanceArtifacts = Join-Path $bundleRoot "_acceptance_artifacts"
         $acceptanceJson = Join-Path $acceptanceArtifacts "packaged_acceptance_summary.json"
@@ -222,6 +230,8 @@ try {
         Copy-Item -LiteralPath $versionAuditTxt -Destination (Join-Path $releaseOutDir "PACKAGE_VERSION_AUDIT.txt") -Force
         Copy-Item -LiteralPath $upgradeReportPreviewJson -Destination (Join-Path $releaseOutDir "UPGRADE_REPORT_PREVIEW.json") -Force
         Copy-Item -LiteralPath $upgradeReportPreviewTxt -Destination (Join-Path $releaseOutDir "UPGRADE_REPORT_PREVIEW.txt") -Force
+        Copy-Item -LiteralPath $rollbackReportPreviewJson -Destination (Join-Path $releaseOutDir "ROLLBACK_REPORT_PREVIEW.json") -Force
+        Copy-Item -LiteralPath $rollbackReportPreviewTxt -Destination (Join-Path $releaseOutDir "ROLLBACK_REPORT_PREVIEW.txt") -Force
         Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
         Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
         $supportBundleDir = Join-Path $acceptanceArtifacts "support_bundles"

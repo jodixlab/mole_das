@@ -29,6 +29,11 @@ UPGRADE_REPORT_LATEST_JSON_NAME = "upgrade_report__latest.json"
 UPGRADE_REPORT_LATEST_TXT_NAME = "upgrade_report__latest.txt"
 PACKAGE_UPGRADE_REPORT_PREVIEW_JSON_NAME = "UPGRADE_REPORT_PREVIEW.json"
 PACKAGE_UPGRADE_REPORT_PREVIEW_TXT_NAME = "UPGRADE_REPORT_PREVIEW.txt"
+ROLLBACK_REPORT_SCHEMA = "mole_install_rollback_report_v1"
+ROLLBACK_REPORT_LATEST_JSON_NAME = "rollback_report__latest.json"
+ROLLBACK_REPORT_LATEST_TXT_NAME = "rollback_report__latest.txt"
+PACKAGE_ROLLBACK_REPORT_PREVIEW_JSON_NAME = "ROLLBACK_REPORT_PREVIEW.json"
+PACKAGE_ROLLBACK_REPORT_PREVIEW_TXT_NAME = "ROLLBACK_REPORT_PREVIEW.txt"
 
 
 def _utc_stamp() -> str:
@@ -773,6 +778,43 @@ def package_upgrade_report_preview_paths(package_root: Optional[Path]) -> Dict[s
         "json": _first_existing_path(
             root / PACKAGE_UPGRADE_REPORT_PREVIEW_JSON_NAME,
             root / "_acceptance_artifacts" / "upgrade_reports" / UPGRADE_REPORT_LATEST_JSON_NAME,
+        ),
+    }
+
+
+def _runtime_rollback_report_dir(layout: Mapping[str, Any]) -> Path:
+    return (Path(layout.get("backups_dir") or "") / "rollback_reviews").resolve()
+
+
+def runtime_rollback_report_paths(
+    runtime_base_dir: Path,
+    *,
+    env_mode: str = "PRODUCTION",
+    seed_if_missing: bool = False,
+) -> Dict[str, Optional[Path]]:
+    layout = resolve_runtime_storage_layout(runtime_base_dir, env_mode=env_mode, seed_if_missing=seed_if_missing)
+    report_root = _runtime_rollback_report_dir(layout)
+    fallback_txt = latest_matching_path(report_root, "rollback_report__*.txt") if latest_matching_path is not None else None
+    fallback_json = latest_matching_path(report_root, "rollback_report__*.json") if latest_matching_path is not None else None
+    return {
+        "root": report_root,
+        "text": _first_existing_path(report_root / ROLLBACK_REPORT_LATEST_TXT_NAME, fallback_txt),
+        "json": _first_existing_path(report_root / ROLLBACK_REPORT_LATEST_JSON_NAME, fallback_json),
+    }
+
+
+def package_rollback_report_preview_paths(package_root: Optional[Path]) -> Dict[str, Optional[Path]]:
+    root = _safe_path(package_root)
+    if not isinstance(root, Path):
+        return {"text": None, "json": None}
+    return {
+        "text": _first_existing_path(
+            root / PACKAGE_ROLLBACK_REPORT_PREVIEW_TXT_NAME,
+            root / "_acceptance_artifacts" / "rollback_reports" / ROLLBACK_REPORT_LATEST_TXT_NAME,
+        ),
+        "json": _first_existing_path(
+            root / PACKAGE_ROLLBACK_REPORT_PREVIEW_JSON_NAME,
+            root / "_acceptance_artifacts" / "rollback_reports" / ROLLBACK_REPORT_LATEST_JSON_NAME,
         ),
     }
 

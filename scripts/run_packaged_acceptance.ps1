@@ -105,6 +105,8 @@ function Save-SummaryFiles {
         "final_report_index_path",
         "upgrade_report_txt_path",
         "upgrade_report_json_path",
+        "rollback_report_txt_path",
+        "rollback_report_json_path",
         "support_bundle_path"
     )) {
         $value = $Summary[$key]
@@ -266,6 +268,8 @@ $summary = [ordered]@{
     final_report_index_path = ""
     upgrade_report_txt_path = ""
     upgrade_report_json_path = ""
+    rollback_report_txt_path = ""
+    rollback_report_json_path = ""
     support_bundle_path = ""
     uninstall_validated = $false
 }
@@ -496,7 +500,7 @@ print(json.dumps(payload))
     $upgradeReportResult = Invoke-CapturedProcess `
         -Label "export_upgrade_report" `
         -FilePath $installedPython `
-        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--headless-export-upgrade-report", $upgradeReportDir) `
+        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-export-upgrade-report", $upgradeReportDir) `
         -WorkingDirectory $InstallRoot
     try {
         $upgradeReportInfo = $upgradeReportResult.stdout | ConvertFrom-Json
@@ -515,6 +519,106 @@ print(json.dumps(payload))
         stderr_path = $upgradeReportResult.stderr_path
         upgrade_report_txt_path = $summary.upgrade_report_txt_path
         upgrade_report_json_path = $summary.upgrade_report_json_path
+    }
+
+    $rollbackProbePath = Join-Path $dataRoot "configs\\rollback_restore_probe.json"
+    New-Item -ItemType Directory -Path (Split-Path -Parent $rollbackProbePath) -Force | Out-Null
+    $rollbackBaseline = [ordered]@{
+        state = "baseline_before_restore"
+        package_label = $summary.package_label
+        git_commit = $summary.git_commit
+    }
+    Write-JsonUtf8 -PathValue $rollbackProbePath -Payload $rollbackBaseline
+    Add-StepResult -Name "seed_rollback_probe" -Status "PASS" -Detail "Seeded rollback probe file in the external data root." -Extra @{
+        rollback_probe_path = $rollbackProbePath
+    }
+
+    $repairResult = Invoke-CapturedProcess `
+        -Label "repair_bundle_for_rollback" `
+        -FilePath "powershell.exe" `
+        -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", (Join-Path $InstallRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"),
+            "-InstallRoot", $InstallRoot,
+            "-NoStartMenuShortcut",
+            "-NoDesktopShortcut",
+            "-NoUninstallRegistration",
+            "-BootstrapPackageVerification",
+            "-NoLaunch",
+            "-Quiet"
+        ) `
+        -WorkingDirectory $InstallRoot
+    $restorePointsRoot = Join-Path $InstallRoot "_data_restore_points"
+    $restorePointManifest = Get-ChildItem -LiteralPath $restorePointsRoot -Filter "restore_point_manifest_v1.json" -Recurse -File -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+    if (-not $restorePointManifest) {
+        throw "Repair pass did not create a restore point under $restorePointsRoot"
+    }
+    Add-StepResult -Name "capture_restore_point" -Status "PASS" -Detail "Repair pass captured a rollback restore point before reapplying the installed payload during bootstrap acceptance validation." -Extra @{
+        stdout_path = $repairResult.stdout_path
+        stderr_path = $repairResult.stderr_path
+        restore_point_manifest_path = $restorePointManifest.FullName
+    }
+
+    $rollbackMutated = [ordered]@{
+        state = "mutated_after_restore_point"
+        package_label = $summary.package_label
+        git_commit = $summary.git_commit
+    }
+    Write-JsonUtf8 -PathValue $rollbackProbePath -Payload $rollbackMutated
+    Add-StepResult -Name "mutate_rollback_probe" -Status "PASS" -Detail "Mutated rollback probe after restore-point capture so rollback can prove restoration." -Extra @{
+        rollback_probe_path = $rollbackProbePath
+    }
+
+    $rollbackReportDir = Join-Path $InstallRoot "_rollback_reports"
+    $rollbackReportArtifactDir = Join-Path $ArtifactOutDir "rollback_reports"
+    New-Item -ItemType Directory -Path $rollbackReportArtifactDir -Force | Out-Null
+    $rollbackReportResult = Invoke-CapturedProcess `
+        -Label "export_rollback_report" `
+        -FilePath $installedPython `
+        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-export-rollback-report", $rollbackReportDir) `
+        -WorkingDirectory $InstallRoot
+    try {
+        $rollbackReportInfo = $rollbackReportResult.stdout | ConvertFrom-Json
+    }
+    catch {
+        throw "Failed to parse rollback report export output.`nSTDOUT:`n$($rollbackReportResult.stdout)`nSTDERR:`n$($rollbackReportResult.stderr)"
+    }
+    $summary.rollback_report_txt_path = [string]($(if ($rollbackReportInfo.latest_txt_path) { $rollbackReportInfo.latest_txt_path } else { $rollbackReportInfo.txt_path }))
+    $summary.rollback_report_json_path = [string]($(if ($rollbackReportInfo.latest_json_path) { $rollbackReportInfo.latest_json_path } else { $rollbackReportInfo.json_path }))
+    Require-Path -PathValue $summary.rollback_report_txt_path -Label "Rollback report text"
+    Require-Path -PathValue $summary.rollback_report_json_path -Label "Rollback report JSON"
+    Copy-Item -LiteralPath $summary.rollback_report_txt_path -Destination (Join-Path $rollbackReportArtifactDir "rollback_report__latest.txt") -Force
+    Copy-Item -LiteralPath $summary.rollback_report_json_path -Destination (Join-Path $rollbackReportArtifactDir "rollback_report__latest.json") -Force
+    Add-StepResult -Name "export_rollback_report" -Status "PASS" -Detail "Installed bundle exported the rollback preview report from the shipped install client." -Extra @{
+        stdout_path = $rollbackReportResult.stdout_path
+        stderr_path = $rollbackReportResult.stderr_path
+        rollback_report_txt_path = $summary.rollback_report_txt_path
+        rollback_report_json_path = $summary.rollback_report_json_path
+    }
+
+    $rollbackApplyResult = Invoke-CapturedProcess `
+        -Label "apply_rollback_restore" `
+        -FilePath $installedPython `
+        -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-apply-rollback") `
+        -WorkingDirectory $InstallRoot
+    try {
+        $rollbackApplyInfo = $rollbackApplyResult.stdout | ConvertFrom-Json
+    }
+    catch {
+        throw "Failed to parse rollback apply output.`nSTDOUT:`n$($rollbackApplyResult.stdout)`nSTDERR:`n$($rollbackApplyResult.stderr)"
+    }
+    Require-Path -PathValue $rollbackProbePath -Label "Rollback probe after restore"
+    $rollbackProbePayload = Get-Content -LiteralPath $rollbackProbePath -Raw | ConvertFrom-Json
+    if ([string]$rollbackProbePayload.state -ne "baseline_before_restore") {
+        throw "Rollback did not restore the expected probe state."
+    }
+    Add-StepResult -Name "apply_rollback_restore" -Status "PASS" -Detail "Rollback restored the external data root from the latest restore point." -Extra @{
+        stdout_path = $rollbackApplyResult.stdout_path
+        stderr_path = $rollbackApplyResult.stderr_path
+        rollback_probe_path = $rollbackProbePath
+        restore_point_manifest_path = [string]$rollbackApplyInfo.restore_point_manifest_path
+        pre_restore_point_manifest_path = [string]$rollbackApplyInfo.pre_restore_point_manifest_path
     }
 
     $supportBundleRoot = Join-Path $ArtifactOutDir "support_bundles"
@@ -540,6 +644,7 @@ artifacts = {
     "build_identity": Path(r'''$buildIdentityPath'''),
     "welcome_manifest": Path(r'''$welcomeManifestPath''') if r'''$welcomeManifestPath''' else None,
     "data_root_manifest": Path(r'''$dataRootManifestPath'''),
+    "restore_point_manifest": Path(r'''$($restorePointManifest.FullName)''') if r'''$($restorePointManifest.FullName)''' else None,
     "wizard_startup": Path(r'''$wizardStampPath'''),
     "runner_startup": Path(r'''$runnerStampPath'''),
     "runner_config": Path(r'''$($summary.runner_config_path)'''),
@@ -549,6 +654,8 @@ artifacts = {
     "final_report_index": Path(r'''$finalReportIndexPath'''),
     "upgrade_report_txt": Path(r'''$($summary.upgrade_report_txt_path)'''),
     "upgrade_report_json": Path(r'''$($summary.upgrade_report_json_path)'''),
+    "rollback_report_txt": Path(r'''$($summary.rollback_report_txt_path)'''),
+    "rollback_report_json": Path(r'''$($summary.rollback_report_json_path)'''),
 }
 zip_path = create_support_bundle(
     bundle_root,

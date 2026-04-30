@@ -161,10 +161,15 @@ $acceptanceSummaryTxt = Join-Path $acceptanceArtifacts "packaged_acceptance_summ
 $upgradeReportArtifacts = Join-Path $acceptanceArtifacts "upgrade_reports"
 $upgradeReportLatestJson = Join-Path $upgradeReportArtifacts "upgrade_report__latest.json"
 $upgradeReportLatestTxt = Join-Path $upgradeReportArtifacts "upgrade_report__latest.txt"
+$rollbackReportArtifacts = Join-Path $acceptanceArtifacts "rollback_reports"
+$rollbackReportLatestJson = Join-Path $rollbackReportArtifacts "rollback_report__latest.json"
+$rollbackReportLatestTxt = Join-Path $rollbackReportArtifacts "rollback_report__latest.txt"
 $publishedAcceptanceJsonName = "PACKAGED_ACCEPTANCE_SUMMARY.json"
 $publishedAcceptanceTxtName = "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 $publishedUpgradeReportJsonName = "UPGRADE_REPORT_PREVIEW.json"
 $publishedUpgradeReportTxtName = "UPGRADE_REPORT_PREVIEW.txt"
+$publishedRollbackReportJsonName = "ROLLBACK_REPORT_PREVIEW.json"
+$publishedRollbackReportTxtName = "ROLLBACK_REPORT_PREVIEW.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
 $versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
 $versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
@@ -216,6 +221,20 @@ function Publish-UpgradeReportPreview {
         New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
         Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedUpgradeReportJsonName) -Force
         Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedUpgradeReportTxtName) -Force
+    }
+}
+
+function Publish-RollbackReportPreview {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceJson,
+        [Parameter(Mandatory = $true)][string]$SourceTxt,
+        [Parameter(Mandatory = $true)][string[]]$TargetRoots
+    )
+
+    foreach ($targetRoot in $TargetRoots) {
+        New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
+        Copy-Item -LiteralPath $SourceJson -Destination (Join-Path $targetRoot $publishedRollbackReportJsonName) -Force
+        Copy-Item -LiteralPath $SourceTxt -Destination (Join-Path $targetRoot $publishedRollbackReportTxtName) -Force
     }
 }
 
@@ -453,6 +472,8 @@ function Write-VerifiedReleaseManifest {
         acceptance_summary_json_path = $publishedAcceptanceJsonName
         upgrade_report_preview_path = $publishedUpgradeReportTxtName
         upgrade_report_preview_json_path = $publishedUpgradeReportJsonName
+        rollback_report_preview_path = $publishedRollbackReportTxtName
+        rollback_report_preview_json_path = $publishedRollbackReportJsonName
         installer_script_path = "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
         version_audit_json_path = $versionAuditJsonName
         version_audit_txt_path = $versionAuditTxtName
@@ -468,6 +489,8 @@ function Write-VerifiedReleaseManifest {
             acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
             upgrade_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportTxtName)
             upgrade_report_preview_json_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportJsonName)
+            rollback_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedRollbackReportTxtName)
+            rollback_report_preview_json_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedRollbackReportJsonName)
             installer_script_sha256 = Get-FileHashValue (Join-Path $OutputRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1")
             launcher_batch_sha256 = Get-FileHashValue (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat")
             wizard_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAS_Wizard.exe")
@@ -793,6 +816,91 @@ function Test-PathHasFiles {
     return ($null -ne $first)
 }
 
+function Get-UtcStamp {
+    return (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssfffffffZ")
+}
+
+function Write-JsonUtf8 {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)]$Payload
+    )
+    [System.IO.File]::WriteAllText(
+        $PathValue,
+        ($Payload | ConvertTo-Json -Depth 10),
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+}
+
+function Get-FileCount {
+    param([string]$PathValue)
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        return 0
+    }
+    $count = Get-ChildItem -LiteralPath $PathValue -Recurse -File -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count
+    return [int]$count
+}
+
+function New-DataRestorePoint {
+    param(
+        [Parameter(Mandatory = $true)][string]$InstallRoot,
+        [Parameter(Mandatory = $true)][string]$DataRoot,
+        [Parameter(Mandatory = $true)][string]$LegacyRuntimeRoot,
+        [Parameter(Mandatory = $true)][string]$InstallManifestPath,
+        [Parameter(Mandatory = $true)][string]$BuildIdentityPath,
+        [Parameter(Mandatory = $true)][string]$DataRootManifestPath,
+        [Parameter(Mandatory = $true)][string]$Reason
+    )
+    $restorePointsRoot = Join-Path $InstallRoot "_data_restore_points"
+    New-Item -ItemType Directory -Path $restorePointsRoot -Force | Out-Null
+    $pointRoot = Join-Path $restorePointsRoot ("restore_point__" + (Get-UtcStamp))
+    $dataSnapshotRoot = Join-Path $pointRoot "data"
+    $legacySnapshotRoot = Join-Path $pointRoot "legacy_runtime"
+    $manifestPath = Join-Path $pointRoot "restore_point_manifest_v1.json"
+
+    if (Test-PathHasFiles $DataRoot) {
+        Copy-TreeRobust -Source $DataRoot -Destination $dataSnapshotRoot
+    }
+    if (Test-PathHasFiles $LegacyRuntimeRoot) {
+        Copy-TreeRobust -Source $LegacyRuntimeRoot -Destination $legacySnapshotRoot
+    }
+
+    $installManifest = if (Test-Path -LiteralPath $InstallManifestPath) { Get-Content -LiteralPath $InstallManifestPath -Raw | ConvertFrom-Json } else { $null }
+    $buildIdentity = if (Test-Path -LiteralPath $BuildIdentityPath) { Get-Content -LiteralPath $BuildIdentityPath -Raw | ConvertFrom-Json } else { $null }
+    $dataRootManifest = if (Test-Path -LiteralPath $DataRootManifestPath) { Get-Content -LiteralPath $DataRootManifestPath -Raw | ConvertFrom-Json } else { $null }
+
+    $payload = [ordered]@{
+        schema = "mole_install_restore_point_v1"
+        created_at = (Get-Date).ToUniversalTime().ToString("o")
+        reason = $Reason
+        install_root = $InstallRoot
+        data_root = $DataRoot
+        legacy_runtime_root = $LegacyRuntimeRoot
+        bundle_label = if ($buildIdentity) { [string]$buildIdentity.bundle_label } elseif ($installManifest) { [string]$installManifest.bundle_label } else { "" }
+        installed_at = if ($installManifest) { [string]$installManifest.installed_at } else { "" }
+        data_schema_version = if ($dataRootManifest) { [string]$dataRootManifest.data_schema_version } else { "" }
+        data_snapshot_rel_path = "data"
+        legacy_runtime_snapshot_rel_path = "legacy_runtime"
+        data_root_file_count = Get-FileCount $DataRoot
+        legacy_runtime_file_count = Get-FileCount $LegacyRuntimeRoot
+        install_manifest_path = $InstallManifestPath
+        build_identity_path = $BuildIdentityPath
+        data_root_manifest_path = $DataRootManifestPath
+        install_manifest = $installManifest
+        build_identity = $buildIdentity
+        data_root_manifest = $dataRootManifest
+        point_root = $pointRoot
+    }
+    Write-JsonUtf8 -PathValue $manifestPath -Payload $payload
+
+    $keep = 8
+    $restorePointDirs = Get-ChildItem -LiteralPath $restorePointsRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    foreach ($oldDir in @($restorePointDirs | Select-Object -Skip $keep)) {
+        Remove-Item -LiteralPath $oldDir.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    return $manifestPath
+}
+
 function Get-FileHashValue {
     param([string]$PathValue)
     if (-not $PathValue -or -not (Test-Path -LiteralPath $PathValue)) {
@@ -877,6 +985,8 @@ function Assert-VerifiedReleasePackage {
     $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
     $upgradeReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_path)
     $upgradeReportPreviewJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_json_path)
+    $rollbackReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.rollback_report_preview_path)
+    $rollbackReportPreviewJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.rollback_report_preview_json_path)
     $installerScriptPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.installer_script_path)
     $launcherPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.launcher_path)
     $wizardExePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.wizard_exe_path)
@@ -889,6 +999,8 @@ function Assert-VerifiedReleasePackage {
         @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
         @{ Label = "Upgrade report preview"; Path = $upgradeReportPreviewTxtPath; Hash = [string]$hashes.upgrade_report_preview_txt_sha256 }
         @{ Label = "Upgrade report preview JSON"; Path = $upgradeReportPreviewJsonPath; Hash = [string]$hashes.upgrade_report_preview_json_sha256 }
+        @{ Label = "Rollback report preview"; Path = $rollbackReportPreviewTxtPath; Hash = [string]$hashes.rollback_report_preview_txt_sha256 }
+        @{ Label = "Rollback report preview JSON"; Path = $rollbackReportPreviewJsonPath; Hash = [string]$hashes.rollback_report_preview_json_sha256 }
         @{ Label = "Installer script"; Path = $installerScriptPath; Hash = [string]$hashes.installer_script_sha256 }
         @{ Label = "Launcher batch"; Path = $launcherPath; Hash = [string]$hashes.launcher_batch_sha256 }
         @{ Label = "Wizard executable"; Path = $wizardExePath; Hash = [string]$hashes.wizard_exe_sha256 }
@@ -952,6 +1064,8 @@ $SourceSupportFiles = @(
     "IMMUTABLE_PACKAGE_AUDIT.txt",
     "UPGRADE_REPORT_PREVIEW.json",
     "UPGRADE_REPORT_PREVIEW.txt",
+    "ROLLBACK_REPORT_PREVIEW.json",
+    "ROLLBACK_REPORT_PREVIEW.txt",
     "PACKAGED_ACCEPTANCE_SUMMARY.json",
     "PACKAGED_ACCEPTANCE_SUMMARY.txt"
 )
@@ -965,6 +1079,8 @@ $StartMenuLaunch = Join-Path $StartMenuDir "MOLE-DAS.lnk"
 $StartMenuUninstall = Join-Path $StartMenuDir "Uninstall MOLE-DAS.lnk"
 $InstallManifestPath = Join-Path $InstallRoot "mole_install_manifest_v1.json"
 $BuildIdentityPath = Join-Path $ActiveRuntime "config\mole_build_identity_v1.json"
+$LegacyRuntimeDataRoot = Join-Path $ActiveRuntime "mole_das_data"
+$RestorePointsRoot = Join-Path $InstallRoot "_data_restore_points"
 $InstalledLauncher = Join-Path $InstallRoot "LAUNCH_MOLE_DAS_EXE.bat"
 $InstalledUninstallPs1 = Join-Path $InstallRoot "UNINSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
 $InstalledUninstallBat = Join-Path $InstallRoot "UNINSTALL_MOLE_DAS_EXE_BUNDLE.bat"
@@ -973,6 +1089,7 @@ $InstalledWizard = Join-Path $ActiveRuntime "MOLE_code\MOLE_DAS_Wizard.exe"
 $InstalledRunner = Join-Path $ActiveRuntime "MOLE_code\MOLE_DAQ_Runner.exe"
 $SourceDataRoot = Join-Path $PackageRoot "data"
 $InstalledDataRoot = Join-Path $InstallRoot "data"
+$InstalledDataRootManifestPath = Join-Path $InstalledDataRoot "data_root_manifest_v1.json"
 
 Write-Status ""
 Write-Status "Installing MOLE-DAS executable bundle"
@@ -991,6 +1108,24 @@ if (Test-Path -LiteralPath $IncomingRuntime) {
 }
 if (Test-Path -LiteralPath $PreviousRuntime) {
     Remove-Item -LiteralPath $PreviousRuntime -Recurse -Force
+}
+
+$latestRestorePointManifest = ""
+if (
+    (Test-PathHasFiles $InstalledDataRoot) -or
+    (Test-PathHasFiles $LegacyRuntimeDataRoot) -or
+    (Test-Path -LiteralPath $InstallManifestPath)
+) {
+    Write-Status "Capturing data restore point..."
+    $latestRestorePointManifest = New-DataRestorePoint `
+        -InstallRoot $InstallRoot `
+        -DataRoot $InstalledDataRoot `
+        -LegacyRuntimeRoot $LegacyRuntimeDataRoot `
+        -InstallManifestPath $InstallManifestPath `
+        -BuildIdentityPath $BuildIdentityPath `
+        -DataRootManifestPath $InstalledDataRootManifestPath `
+        -Reason "PRE_INSTALL_MUTATION"
+    Write-Status "  Restore point: $latestRestorePointManifest"
 }
 
 Write-Status "Staging runtime payload..."
@@ -1023,7 +1158,10 @@ if (Test-Path -LiteralPath $PreviousRuntime) {
 foreach ($name in $SourceSupportFiles) {
     $src = Join-Path $PackageRoot $name
     if (Test-Path -LiteralPath $src) {
-        Copy-Item -LiteralPath $src -Destination (Join-Path $InstallRoot $name) -Force
+        $dest = Join-Path $InstallRoot $name
+        if ([System.IO.Path]::GetFullPath($src) -ne [System.IO.Path]::GetFullPath($dest)) {
+            Copy-Item -LiteralPath $src -Destination $dest -Force
+        }
     }
 }
 
@@ -1055,6 +1193,8 @@ $installManifest = [ordered]@{
     launcher = $InstalledLauncher
     uninstall_script = $InstalledUninstallPs1
     data_root = $InstalledDataRoot
+    restore_points_root = $RestorePointsRoot
+    latest_restore_point_manifest = $latestRestorePointManifest
     bundle_label = $displayVersion
     git_commit = if ($buildIdentity) { $buildIdentity.git_commit } else { $null }
     git_branch = if ($buildIdentity) { $buildIdentity.git_branch } else { $null }
@@ -1248,6 +1388,10 @@ Upgrade provenance:
 - UPGRADE_REPORT_PREVIEW.txt
 - UPGRADE_REPORT_PREVIEW.json
 
+Rollback provenance:
+- ROLLBACK_REPORT_PREVIEW.txt
+- ROLLBACK_REPORT_PREVIEW.json
+
 Layout requirement:
 - Keep the runtime folder structure intact.
 - The executables depend on sibling runtime content in runtime\MOLE_code and the package root data/assets/docs folders.
@@ -1299,6 +1443,8 @@ foreach ($targetRoot in @($OutputRoot, $installRoot)) {
 if (-not $SkipPackagedAcceptance) {
     $acceptanceScript = Join-Path $RepoRoot "scripts\run_packaged_acceptance.ps1"
     Require-Path $acceptanceScript "Packaged acceptance runner"
+    Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
 
     Write-Host ""
     Write-Host "==> Run packaged acceptance"
@@ -1314,10 +1460,11 @@ if (-not $SkipPackagedAcceptance) {
     Require-Path $acceptanceSummaryTxt "Packaged acceptance summary text"
     Require-Path $upgradeReportLatestJson "Upgrade report preview JSON"
     Require-Path $upgradeReportLatestTxt "Upgrade report preview text"
+    Require-Path $rollbackReportLatestJson "Rollback report preview JSON"
+    Require-Path $rollbackReportLatestTxt "Rollback report preview text"
     Publish-PackagedAcceptanceSummary -SourceJson $acceptanceSummaryJson -SourceTxt $acceptanceSummaryTxt -TargetRoots @($OutputRoot, $installRoot)
     Publish-UpgradeReportPreview -SourceJson $upgradeReportLatestJson -SourceTxt $upgradeReportLatestTxt -TargetRoots @($OutputRoot, $installRoot)
-    Write-VerifiedReleaseManifest -DestinationPath $verifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
-    Write-VerifiedReleaseManifest -DestinationPath $shareVerifiedReleaseManifestPath -ManifestKind "package_root" -PackageRootRef "."
+    Publish-RollbackReportPreview -SourceJson $rollbackReportLatestJson -SourceTxt $rollbackReportLatestTxt -TargetRoots @($OutputRoot, $installRoot)
     Write-PackageVersionAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
     Write-ImmutablePackageAudit -ExpectedBundleLabel $BundleLabel -RootPackagePath $OutputRoot -SharePackagePath $installRoot
 }
@@ -1348,7 +1495,11 @@ Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -
     $versionAuditJsonName,
     $versionAuditTxtName,
     $immutableAuditJsonName,
-    $immutableAuditTxtName
+    $immutableAuditTxtName,
+    $publishedUpgradeReportJsonName,
+    $publishedUpgradeReportTxtName,
+    $publishedRollbackReportJsonName,
+    $publishedRollbackReportTxtName
 )
 
 Copy-TreeRobust -Source $installRoot -Destination $installerStageRoot
