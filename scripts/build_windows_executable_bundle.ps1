@@ -2270,6 +2270,34 @@ function Remove-ShortcutIfExists {
     }
 }
 
+function ConvertTo-LongPath {
+    param([string]$Path)
+    if ($Path.StartsWith("\\?\", [System.StringComparison]::Ordinal)) {
+        return $Path
+    }
+    if ($Path.StartsWith("\\", [System.StringComparison]::Ordinal)) {
+        return "\\?\UNC\" + $Path.TrimStart("\")
+    }
+    return "\\?\" + $Path
+}
+
+function Remove-InstallRoot {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+    }
+    catch {}
+    if (Test-Path -LiteralPath $Path) {
+        [System.IO.Directory]::Delete((ConvertTo-LongPath -Path $Path), $true)
+    }
+    if (Test-Path -LiteralPath $Path) {
+        throw "Failed to remove install root: $Path"
+    }
+}
+
 if (-not $InstallRoot) {
     $InstallRoot = $PSScriptRoot
 }
@@ -2313,11 +2341,7 @@ Remove-ShortcutIfExists -Path $DesktopShortcut
 
 Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\MOLE_DAS" -Recurse -Force -ErrorAction SilentlyContinue
 
-if (Test-Path -LiteralPath $InstallRoot) {
-    $deleteArgs = '/d /c rmdir /s /q "' + $InstallRoot + '"'
-    $deleteProc = Start-Process -FilePath "cmd.exe" -ArgumentList $deleteArgs -WorkingDirectory $env:TEMP -WindowStyle Hidden -PassThru
-    $deleteProc.WaitForExit()
-}
+Remove-InstallRoot -Path $InstallRoot
 
 Write-Status "Uninstall complete."
 Write-Status "  Root removed: $InstallRoot"
