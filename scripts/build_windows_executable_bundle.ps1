@@ -1029,6 +1029,29 @@ function Write-VerifiedReleaseManifest {
         }
     }
 
+    $manifestRoot = Split-Path -Parent $DestinationPath
+    $hashRoot = [System.IO.Path]::GetFullPath((Join-Path $manifestRoot $PackageRootRef))
+    $hashRuntimeRoot = Join-Path $hashRoot "runtime"
+    $hashRuntimeCodeRoot = Join-Path $hashRuntimeRoot "MOLE_code"
+    $hashBuildIdentityPath = Join-Path $hashRuntimeRoot "config\\mole_build_identity_v1.json"
+    $hashReleaseSigningPublicKeyPath = Join-Path $hashRoot $releaseSigningPublicKeyName
+    $hashTrustedReleaseKeysPath = Join-Path $hashRoot $trustedReleaseKeysName
+    $hashTrustedReleaseKeysSignaturePath = Join-Path $hashRoot $trustedReleaseKeysSignatureName
+    $hashReleaseTrustRootPublicKeyPath = Join-Path $hashRoot $releaseTrustRootPublicKeyName
+    $hashAcceptanceSummaryTxtPath = Join-Path $hashRoot $publishedAcceptanceTxtName
+    $hashAcceptanceSummaryJsonPath = Join-Path $hashRoot $publishedAcceptanceJsonName
+    $hashUpgradeReportPreviewTxtPath = Join-Path $hashRoot $publishedUpgradeReportTxtName
+    $hashUpgradeReportPreviewJsonPath = Join-Path $hashRoot $publishedUpgradeReportJsonName
+    $hashRollbackReportPreviewTxtPath = Join-Path $hashRoot $publishedRollbackReportTxtName
+    $hashRollbackReportPreviewJsonPath = Join-Path $hashRoot $publishedRollbackReportJsonName
+    $hashInstallerScriptPath = Join-Path $hashRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+    $hashLauncherBatchPath = Join-Path $hashRoot "LAUNCH_MOLE_DAS_EXE.bat"
+    $hashVersionAuditJsonPath = Join-Path $hashRoot $versionAuditJsonName
+    $hashVersionAuditTxtPath = Join-Path $hashRoot $versionAuditTxtName
+    $hashWizardExePath = Join-Path $hashRuntimeCodeRoot "MOLE_DAS_Wizard.exe"
+    $hashRunnerExePath = Join-Path $hashRuntimeCodeRoot "MOLE_DAQ_Runner.exe"
+    $hashScriptRunnerExePath = Join-Path $hashRuntimeCodeRoot "MOLE_ScriptRunner.exe"
+
     $payload = [ordered]@{
         schema = "mole_latest_verified_release_v1"
         manifest_kind = $ManifestKind
@@ -1065,22 +1088,22 @@ function Write-VerifiedReleaseManifest {
         installer_bundle_path = ""
         portable_bundle_path = ""
         hashes = [ordered]@{
-            build_identity_sha256 = Get-FileHashValue $buildIdentityPath
-            public_key_sha256 = Get-FileHashValue $releaseSigningPublicKeyOutputPath
-            trusted_keys_sha256 = Get-FileHashValue $trustedReleaseKeysOutputPath
-            trusted_keys_signature_sha256 = Get-FileHashValue $trustedReleaseKeysSignaturePath
-            trust_root_public_key_sha256 = Get-FileHashValue $releaseTrustRootPublicKeyOutputPath
-            acceptance_summary_txt_sha256 = Get-FileHashValue $acceptanceSummaryTxt
-            acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
-            upgrade_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportTxtName)
-            upgrade_report_preview_json_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportJsonName)
-            rollback_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedRollbackReportTxtName)
-            rollback_report_preview_json_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedRollbackReportJsonName)
-            installer_script_sha256 = Get-FileHashValue (Join-Path $OutputRoot "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1")
-            launcher_batch_sha256 = Get-FileHashValue (Join-Path $OutputRoot "LAUNCH_MOLE_DAS_EXE.bat")
-            wizard_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAS_Wizard.exe")
-            runner_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_DAQ_Runner.exe")
-            script_runner_exe_sha256 = Get-FileHashValue (Join-Path $runtimeCodeRoot "MOLE_ScriptRunner.exe")
+            build_identity_sha256 = Get-FileHashValue $hashBuildIdentityPath
+            public_key_sha256 = Get-FileHashValue $hashReleaseSigningPublicKeyPath
+            trusted_keys_sha256 = Get-FileHashValue $hashTrustedReleaseKeysPath
+            trusted_keys_signature_sha256 = Get-FileHashValue $hashTrustedReleaseKeysSignaturePath
+            trust_root_public_key_sha256 = Get-FileHashValue $hashReleaseTrustRootPublicKeyPath
+            acceptance_summary_txt_sha256 = Get-FileHashValue $hashAcceptanceSummaryTxtPath
+            acceptance_summary_json_sha256 = Get-FileHashValue $hashAcceptanceSummaryJsonPath
+            upgrade_report_preview_txt_sha256 = Get-FileHashValue $hashUpgradeReportPreviewTxtPath
+            upgrade_report_preview_json_sha256 = Get-FileHashValue $hashUpgradeReportPreviewJsonPath
+            rollback_report_preview_txt_sha256 = Get-FileHashValue $hashRollbackReportPreviewTxtPath
+            rollback_report_preview_json_sha256 = Get-FileHashValue $hashRollbackReportPreviewJsonPath
+            installer_script_sha256 = Get-FileHashValue $hashInstallerScriptPath
+            launcher_batch_sha256 = Get-FileHashValue $hashLauncherBatchPath
+            wizard_exe_sha256 = Get-FileHashValue $hashWizardExePath
+            runner_exe_sha256 = Get-FileHashValue $hashRunnerExePath
+            script_runner_exe_sha256 = Get-FileHashValue $hashScriptRunnerExePath
             installer_bundle_sha256 = ""
             portable_bundle_sha256 = ""
         }
