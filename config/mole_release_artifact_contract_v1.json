@@ -100,6 +100,27 @@
       "description": "Public signing key used to verify the canonical verified release channel manifest."
     },
     {
+      "id": "trusted_release_keys_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "trusted_release_keys_v1.json",
+      "description": "Signed trusted release key store authorizing active release-signing keys."
+    },
+    {
+      "id": "trusted_release_keys_signature_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "trusted_release_keys_v1.signature.json",
+      "description": "Cryptographic signature for the trusted release key store."
+    },
+    {
+      "id": "release_trust_root_public_key_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "mole_release_trust_root_public_key_v1.json",
+      "description": "Pinned trust-root public key used to verify the trusted release key store."
+    },
+    {
       "id": "package_version_audit_json",
       "required": true,
       "match": "exact",

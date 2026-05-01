@@ -6,10 +6,12 @@ import os
 import re
 import sqlite3
 import shutil
+import subprocess
 import sys
 import threading
 import zipfile
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
 
@@ -34,6 +36,12 @@ ROLLBACK_REPORT_LATEST_JSON_NAME = "rollback_report__latest.json"
 ROLLBACK_REPORT_LATEST_TXT_NAME = "rollback_report__latest.txt"
 PACKAGE_ROLLBACK_REPORT_PREVIEW_JSON_NAME = "ROLLBACK_REPORT_PREVIEW.json"
 PACKAGE_ROLLBACK_REPORT_PREVIEW_TXT_NAME = "ROLLBACK_REPORT_PREVIEW.txt"
+VERIFIED_RELEASE_MANIFEST_NAME = "latest_verified_release_v1.json"
+VERIFIED_RELEASE_SIGNATURE_NAME = "latest_verified_release_v1.signature.json"
+RELEASE_SIGNING_PUBLIC_KEY_NAME = "mole_release_signing_public_key_v1.json"
+TRUSTED_RELEASE_KEYS_NAME = "trusted_release_keys_v1.json"
+TRUSTED_RELEASE_KEYS_SIGNATURE_NAME = "trusted_release_keys_v1.signature.json"
+RELEASE_TRUST_ROOT_PUBLIC_KEY_NAME = "mole_release_trust_root_public_key_v1.json"
 
 
 def _utc_stamp() -> str:
@@ -892,6 +900,123 @@ def _resolve_manifest_path(
         return candidate
 
 
+def _verification_details_from_payload(payload: Mapping[str, Any]) -> list[str]:
+    details = payload.get("details")
+    if isinstance(details, list):
+        return [str(item).strip() for item in details if str(item).strip()]
+    summary = str(payload.get("summary") or "").strip()
+    return [summary] if summary else []
+
+
+@lru_cache(maxsize=64)
+def _cached_verified_release_check(package_root_text: str, bootstrap_package_verification: bool) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "schema": "mole_verified_release_check_v1",
+        "status": "FAIL",
+        "verification_mode": "",
+        "package_root": package_root_text,
+        "package_label": "",
+        "git_commit": "",
+        "git_branch": "",
+        "signature_path": "",
+        "public_key_path": "",
+        "trusted_keys_path": "",
+        "trusted_keys_signature_path": "",
+        "trust_root_public_key_path": "",
+        "trust_source": "",
+        "trust_root_public_key_sha256": "",
+        "trusted_key_id": "",
+        "trusted_key_status": "",
+        "trusted_key_valid_from": "",
+        "trusted_key_expires_at": "",
+        "trusted_key_revoked_at": "",
+        "trusted_key_revocation_reason": "",
+        "key_id": "",
+        "manifest_sha256": "",
+        "summary": "",
+        "details": [],
+    }
+    package_root = _safe_path(package_root_text)
+    if not isinstance(package_root, Path):
+        result["summary"] = "Package root is unavailable for verified-release trust checks."
+        result["details"] = [result["summary"]]
+        return result
+    installer_script = package_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+    if not installer_script.exists():
+        result["summary"] = f"Installer verification script is missing: {installer_script}"
+        result["details"] = [result["summary"]]
+        return result
+    command = [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(installer_script),
+        "-VerifyPackageOnly",
+        "-Quiet",
+    ]
+    if bootstrap_package_verification:
+        command.append("-BootstrapPackageVerification")
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=str(package_root),
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+    except Exception as exc:
+        result["summary"] = f"Verified-release trust check could not be executed: {exc}"
+        result["details"] = [result["summary"]]
+        return result
+    stdout = (proc.stdout or "").strip()
+    stderr = (proc.stderr or "").strip()
+    payload: Dict[str, Any] = {}
+    if stdout:
+        try:
+            candidate = json.loads(stdout)
+            if isinstance(candidate, dict):
+                payload = candidate
+        except Exception:
+            payload = {}
+    if payload:
+        result.update(payload)
+    if proc.returncode == 0 and str(result.get("status") or "").strip().upper() == "PASS":
+        result["details"] = _verification_details_from_payload(result)
+        result["summary"] = str(result.get("summary") or "Verified release trust checks passed.").strip()
+        return result
+    failure_summary = stderr or stdout or f"Verified-release trust check failed with exit code {proc.returncode}."
+    result["status"] = str(result.get("status") or "FAIL").strip().upper() or "FAIL"
+    result["summary"] = str(result.get("summary") or failure_summary).strip() or failure_summary
+    details = _verification_details_from_payload(result)
+    if not details:
+        details = [result["summary"]]
+    result["details"] = details
+    return result
+
+
+def _verified_release_check(
+    package_root: Optional[Path],
+    *,
+    bootstrap_package_verification: bool = False,
+) -> Dict[str, Any]:
+    package_root_path = _safe_path(package_root)
+    if not isinstance(package_root_path, Path):
+        summary = "Package root is unavailable for verified-release trust checks."
+        return {
+            "schema": "mole_verified_release_check_v1",
+            "status": "FAIL",
+            "summary": summary,
+            "details": [summary],
+        }
+    try:
+        package_root_text = str(package_root_path.resolve())
+    except Exception:
+        package_root_text = str(package_root_path)
+    return dict(_cached_verified_release_check(package_root_text, bool(bootstrap_package_verification)))
+
+
 def _normalize_verified_release_manifest(
     manifest_path: Optional[Path],
     payload: Mapping[str, Any],
@@ -920,6 +1045,31 @@ def _normalize_verified_release_manifest(
         "generated_at": str(payload.get("generated_at") or "").strip(),
         "package_root": package_root,
         "package_label": str(payload.get("package_label") or "").strip(),
+        "signature_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("signature_path"),
+            root_fallback=package_root,
+        ),
+        "public_key_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("public_key_path"),
+            root_fallback=package_root,
+        ),
+        "trusted_keys_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("trusted_keys_path"),
+            root_fallback=package_root,
+        ),
+        "trusted_keys_signature_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("trusted_keys_signature_path"),
+            root_fallback=package_root,
+        ),
+        "trust_root_public_key_path": _resolve_manifest_path(
+            manifest_path,
+            payload.get("trust_root_public_key_path"),
+            root_fallback=package_root,
+        ),
         "acceptance_text_path": _resolve_manifest_path(
             manifest_path,
             payload.get("acceptance_summary_path"),
@@ -1047,6 +1197,16 @@ def _load_latest_verified_release(
         "git_commit": "",
         "git_branch": "",
         "built_at": "",
+        "trust_check_status": "",
+        "trust_check_summary": "",
+        "trust_check_details": [],
+        "trust_source": "",
+        "trusted_key_id": "",
+        "trusted_key_status": "",
+        "trusted_key_valid_from": "",
+        "trusted_key_expires_at": "",
+        "trusted_key_revoked_at": "",
+        "trusted_key_revocation_reason": "",
     }
     current_root = _safe_path(current_package_root)
     installed_root = _safe_path(install_root)
@@ -1058,11 +1218,32 @@ def _load_latest_verified_release(
             root_fallback=(manifest_path.parent if manifest_path.name.lower() == "latest_verified_release_v1.json" else None),
         )
         if normalized and str(normalized.get("acceptance_status") or "").upper() == "PASS":
+            trust_check = _verified_release_check(normalized.get("package_root"))
+            normalized.update(
+                {
+                    "trust_check_status": str(trust_check.get("status") or "").strip().upper(),
+                    "trust_check_summary": str(trust_check.get("summary") or "").strip(),
+                    "trust_check_details": _verification_details_from_payload(trust_check),
+                    "trust_source": str(trust_check.get("trust_source") or "").strip(),
+                    "signature_path": _safe_path(trust_check.get("signature_path")) or normalized.get("signature_path"),
+                    "public_key_path": _safe_path(trust_check.get("public_key_path")) or normalized.get("public_key_path"),
+                    "trusted_keys_path": _safe_path(trust_check.get("trusted_keys_path")) or normalized.get("trusted_keys_path"),
+                    "trusted_keys_signature_path": _safe_path(trust_check.get("trusted_keys_signature_path")) or normalized.get("trusted_keys_signature_path"),
+                    "trust_root_public_key_path": _safe_path(trust_check.get("trust_root_public_key_path")) or normalized.get("trust_root_public_key_path"),
+                    "trusted_key_id": str(trust_check.get("trusted_key_id") or "").strip(),
+                    "trusted_key_status": str(trust_check.get("trusted_key_status") or "").strip(),
+                    "trusted_key_valid_from": str(trust_check.get("trusted_key_valid_from") or "").strip(),
+                    "trusted_key_expires_at": str(trust_check.get("trusted_key_expires_at") or "").strip(),
+                    "trusted_key_revoked_at": str(trust_check.get("trusted_key_revoked_at") or "").strip(),
+                    "trusted_key_revocation_reason": str(trust_check.get("trusted_key_revocation_reason") or "").strip(),
+                }
+            )
             return normalized
 
     search_root = current_root.parent if isinstance(current_root, Path) else None
     fallback = _find_latest_verified_package(search_root)
     if str(fallback.get("acceptance_status") or "").strip().upper() == "PASS":
+        trust_check = _verified_release_check(fallback.get("package_root"))
         result.update(
             {
                 "manifest_kind": "fallback_search",
@@ -1074,6 +1255,21 @@ def _load_latest_verified_release(
                 "acceptance_status": "PASS",
                 "installer_script_path": fallback.get("installer_script_path"),
                 "installer_bundle_path": fallback.get("installer_bundle_path"),
+                "trust_check_status": str(trust_check.get("status") or "").strip().upper(),
+                "trust_check_summary": str(trust_check.get("summary") or "").strip(),
+                "trust_check_details": _verification_details_from_payload(trust_check),
+                "trust_source": str(trust_check.get("trust_source") or "").strip(),
+                "signature_path": _safe_path(trust_check.get("signature_path")),
+                "public_key_path": _safe_path(trust_check.get("public_key_path")),
+                "trusted_keys_path": _safe_path(trust_check.get("trusted_keys_path")),
+                "trusted_keys_signature_path": _safe_path(trust_check.get("trusted_keys_signature_path")),
+                "trust_root_public_key_path": _safe_path(trust_check.get("trust_root_public_key_path")),
+                "trusted_key_id": str(trust_check.get("trusted_key_id") or "").strip(),
+                "trusted_key_status": str(trust_check.get("trusted_key_status") or "").strip(),
+                "trusted_key_valid_from": str(trust_check.get("trusted_key_valid_from") or "").strip(),
+                "trusted_key_expires_at": str(trust_check.get("trusted_key_expires_at") or "").strip(),
+                "trusted_key_revoked_at": str(trust_check.get("trusted_key_revoked_at") or "").strip(),
+                "trusted_key_revocation_reason": str(trust_check.get("trusted_key_revocation_reason") or "").strip(),
             }
         )
     return result
@@ -1221,15 +1417,19 @@ def evaluate_runtime_package_status(
     )
     acceptance_missing = not (isinstance(current_acceptance_path, Path) and current_acceptance_path.exists())
     acceptance_failed = bool(current_acceptance and current_acceptance_status and current_acceptance_status != "PASS")
+    current_trust_check = _verified_release_check(current_package_root)
+    current_trust_status = str(current_trust_check.get("status") or "").strip().upper()
+    current_trust_summary = str(current_trust_check.get("summary") or "").strip()
 
     verified_release = _load_latest_verified_release(current_package_root, local_install_root)
+    verified_release_trust_status = str(verified_release.get("trust_check_status") or "").strip().upper()
     verified_release_label = str(verified_release.get("package_label") or "").strip()
     verified_release_built_at = _parse_iso_datetime(verified_release.get("built_at"))
     stale_due_to_release_label = bool(
-        verified_release_label and current_bundle_label and verified_release_label != current_bundle_label
+        verified_release_trust_status == "PASS" and verified_release_label and current_bundle_label and verified_release_label != current_bundle_label
     )
     stale_due_to_release_time = bool(
-        current_built_at is not None and verified_release_built_at is not None and current_built_at < verified_release_built_at
+        verified_release_trust_status == "PASS" and current_built_at is not None and verified_release_built_at is not None and current_built_at < verified_release_built_at
     )
     stale_launch = False
     if stale_due_to_release_label or stale_due_to_release_time:
@@ -1245,6 +1445,8 @@ def evaluate_runtime_package_status(
         details.append("Packaged acceptance summary is missing.")
     elif acceptance_failed:
         details.append(f"Packaged acceptance summary is {current_acceptance_status}, not PASS.")
+    if current_trust_status and current_trust_status != "PASS":
+        details.append(current_trust_summary or "Verified-release trust checks did not pass for the running package.")
     if build_identity_runtime_mismatch:
         details.append("Build identity runtime path does not match the running runtime path.")
     if install_manifest_runtime_mismatch:
@@ -1265,7 +1467,7 @@ def evaluate_runtime_package_status(
     else:
         details.append("No installed root was detected on this machine.")
 
-    if acceptance_missing or acceptance_failed or build_identity_runtime_mismatch or install_manifest_runtime_mismatch or installed_label_mismatch:
+    if acceptance_missing or acceptance_failed or current_trust_status != "PASS" or build_identity_runtime_mismatch or install_manifest_runtime_mismatch or installed_label_mismatch:
         status = "UNVERIFIED"
         summary = "Package verification or runtime identity is incomplete."
     elif stale_launch:
@@ -1307,15 +1509,46 @@ def evaluate_runtime_package_status(
         "current_package_root_path": str(current_package_root) if isinstance(current_package_root, Path) else "",
         "current_installer_script_path": str(current_installers.get("script")) if isinstance(current_installers.get("script"), Path) else "",
         "current_installer_bundle_path": str(current_installers.get("bundle")) if isinstance(current_installers.get("bundle"), Path) else "",
+        "current_trust_check_status": current_trust_status,
+        "current_trust_check_summary": current_trust_summary,
+        "current_trust_check_details": _verification_details_from_payload(current_trust_check),
+        "current_verified_release_signature_path": str(_safe_path(current_trust_check.get("signature_path")) or ""),
+        "current_release_signing_public_key_path": str(_safe_path(current_trust_check.get("public_key_path")) or ""),
+        "current_trusted_release_keys_path": str(_safe_path(current_trust_check.get("trusted_keys_path")) or ""),
+        "current_trusted_release_keys_signature_path": str(_safe_path(current_trust_check.get("trusted_keys_signature_path")) or ""),
+        "current_trust_root_public_key_path": str(_safe_path(current_trust_check.get("trust_root_public_key_path")) or ""),
+        "current_trust_source": str(current_trust_check.get("trust_source") or "").strip(),
+        "current_trust_root_public_key_sha256": str(current_trust_check.get("trust_root_public_key_sha256") or "").strip(),
+        "current_trusted_key_id": str(current_trust_check.get("trusted_key_id") or "").strip(),
+        "current_trusted_key_status": str(current_trust_check.get("trusted_key_status") or "").strip(),
+        "current_trusted_key_valid_from": str(current_trust_check.get("trusted_key_valid_from") or "").strip(),
+        "current_trusted_key_expires_at": str(current_trust_check.get("trusted_key_expires_at") or "").strip(),
+        "current_trusted_key_revoked_at": str(current_trust_check.get("trusted_key_revoked_at") or "").strip(),
+        "current_trusted_key_revocation_reason": str(current_trust_check.get("trusted_key_revocation_reason") or "").strip(),
         "verified_release_manifest_path": str(verified_release.get("manifest_path")) if isinstance(verified_release.get("manifest_path"), Path) else "",
         "verified_release_manifest_kind": str(verified_release.get("manifest_kind") or "").strip(),
         "verified_release_channel_name": str(verified_release.get("channel_name") or "").strip(),
         "verified_release_generated_at": str(verified_release.get("generated_at") or "").strip(),
         "verified_release_package_root_path": str(verified_release.get("package_root")) if isinstance(verified_release.get("package_root"), Path) else "",
         "verified_release_package_label": str(verified_release.get("package_label") or "").strip(),
+        "verified_release_signature_path": str(verified_release.get("signature_path")) if isinstance(verified_release.get("signature_path"), Path) else "",
+        "verified_release_public_key_path": str(verified_release.get("public_key_path")) if isinstance(verified_release.get("public_key_path"), Path) else "",
+        "verified_release_trusted_keys_path": str(verified_release.get("trusted_keys_path")) if isinstance(verified_release.get("trusted_keys_path"), Path) else "",
+        "verified_release_trusted_keys_signature_path": str(verified_release.get("trusted_keys_signature_path")) if isinstance(verified_release.get("trusted_keys_signature_path"), Path) else "",
+        "verified_release_trust_root_public_key_path": str(verified_release.get("trust_root_public_key_path")) if isinstance(verified_release.get("trust_root_public_key_path"), Path) else "",
         "verified_release_release_summary_path": str(verified_release.get("acceptance_text_path")) if isinstance(verified_release.get("acceptance_text_path"), Path) else "",
         "verified_release_release_summary_json_path": str(verified_release.get("acceptance_json_path")) if isinstance(verified_release.get("acceptance_json_path"), Path) else "",
         "verified_release_acceptance_status": str(verified_release.get("acceptance_status") or "").strip(),
+        "verified_release_trust_check_status": verified_release_trust_status,
+        "verified_release_trust_check_summary": str(verified_release.get("trust_check_summary") or "").strip(),
+        "verified_release_trust_check_details": list(verified_release.get("trust_check_details") or []),
+        "verified_release_trust_source": str(verified_release.get("trust_source") or "").strip(),
+        "verified_release_trusted_key_id": str(verified_release.get("trusted_key_id") or "").strip(),
+        "verified_release_trusted_key_status": str(verified_release.get("trusted_key_status") or "").strip(),
+        "verified_release_trusted_key_valid_from": str(verified_release.get("trusted_key_valid_from") or "").strip(),
+        "verified_release_trusted_key_expires_at": str(verified_release.get("trusted_key_expires_at") or "").strip(),
+        "verified_release_trusted_key_revoked_at": str(verified_release.get("trusted_key_revoked_at") or "").strip(),
+        "verified_release_trusted_key_revocation_reason": str(verified_release.get("trusted_key_revocation_reason") or "").strip(),
         "verified_release_upgrade_report_preview_path": str(verified_release.get("upgrade_report_preview_path")) if isinstance(verified_release.get("upgrade_report_preview_path"), Path) else "",
         "verified_release_upgrade_report_preview_json_path": str(verified_release.get("upgrade_report_preview_json_path")) if isinstance(verified_release.get("upgrade_report_preview_json_path"), Path) else "",
         "verified_release_installer_script_path": str(verified_release.get("installer_script_path")) if isinstance(verified_release.get("installer_script_path"), Path) else "",
@@ -1434,8 +1667,14 @@ def verify_verified_release_reference(
     package_label = str(manifest.get("package_label") or "").strip()
     package_root = manifest.get("package_root") if isinstance(manifest.get("package_root"), Path) else None
     hashes = dict(manifest.get("hashes") or {})
+    trust_check = _verified_release_check(package_root)
 
     build_identity_path = manifest.get("build_identity_path") if isinstance(manifest.get("build_identity_path"), Path) else None
+    signature_path = manifest.get("signature_path") if isinstance(manifest.get("signature_path"), Path) else None
+    public_key_path = manifest.get("public_key_path") if isinstance(manifest.get("public_key_path"), Path) else None
+    trusted_keys_path = manifest.get("trusted_keys_path") if isinstance(manifest.get("trusted_keys_path"), Path) else None
+    trusted_keys_signature_path = manifest.get("trusted_keys_signature_path") if isinstance(manifest.get("trusted_keys_signature_path"), Path) else None
+    trust_root_public_key_path = manifest.get("trust_root_public_key_path") if isinstance(manifest.get("trust_root_public_key_path"), Path) else None
     acceptance_text_path = manifest.get("acceptance_text_path") if isinstance(manifest.get("acceptance_text_path"), Path) else None
     acceptance_json_path = manifest.get("acceptance_json_path") if isinstance(manifest.get("acceptance_json_path"), Path) else None
     upgrade_report_preview_path = manifest.get("upgrade_report_preview_path") if isinstance(manifest.get("upgrade_report_preview_path"), Path) else None
@@ -1447,6 +1686,14 @@ def verify_verified_release_reference(
         _append_release_verification_issue(details, "Verified release manifest is missing package_label.")
     if not isinstance(package_root, Path) or not package_root.exists():
         _append_release_verification_issue(details, "Verified release package root is missing.")
+    if str(trust_check.get("status") or "").strip().upper() != "PASS":
+        _append_release_verification_issue(
+            details,
+            str(trust_check.get("summary") or "Verified-release trust checks did not pass."),
+        )
+        for issue in _verification_details_from_payload(trust_check):
+            if issue not in details:
+                _append_release_verification_issue(details, issue)
 
     audit_payload = _load_json_dict(version_audit_json_path)
     if not audit_payload:
@@ -1477,6 +1724,11 @@ def verify_verified_release_reference(
             _append_release_verification_issue(details, "Packaged acceptance package label does not match the verified release label.")
 
     _verify_release_hash(details, label="Build identity manifest", path=build_identity_path, expected_hash=hashes.get("build_identity_sha256", ""), required=True)
+    _verify_release_hash(details, label="Verified release signature", path=signature_path, expected_hash=hashes.get("verified_release_signature_sha256", ""), required=True)
+    _verify_release_hash(details, label="Packaged release signing public key", path=public_key_path, expected_hash=hashes.get("public_key_sha256", ""), required=True)
+    _verify_release_hash(details, label="Trusted release key store", path=trusted_keys_path, expected_hash=hashes.get("trusted_keys_sha256", ""), required=True)
+    _verify_release_hash(details, label="Trusted release key store signature", path=trusted_keys_signature_path, expected_hash=hashes.get("trusted_keys_signature_sha256", ""), required=True)
+    _verify_release_hash(details, label="Release trust-root public key", path=trust_root_public_key_path, expected_hash=hashes.get("trust_root_public_key_sha256", ""), required=True)
     _verify_release_hash(details, label="Packaged acceptance summary", path=acceptance_text_path, expected_hash=hashes.get("acceptance_summary_txt_sha256", ""), required=True)
     _verify_release_hash(details, label="Packaged acceptance summary JSON", path=acceptance_json_path, expected_hash=hashes.get("acceptance_summary_json_sha256", ""), required=True)
     _verify_release_hash(

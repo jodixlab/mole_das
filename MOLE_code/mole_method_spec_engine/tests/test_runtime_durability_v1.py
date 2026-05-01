@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import sqlite3
@@ -21,6 +22,48 @@ class RuntimeDurabilityTests(unittest.TestCase):
     @staticmethod
     def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+    @staticmethod
+    def _passing_trust_check() -> dict:
+        return {
+            "schema": "mole_verified_release_check_v1",
+            "status": "PASS",
+            "summary": "Verified release trust checks passed.",
+            "details": [],
+            "trust_source": "external_channel",
+            "trusted_key_id": "mole_release_signing_key_v1",
+            "trusted_key_status": "ACTIVE",
+        }
+
+    @staticmethod
+    def _failing_trust_check(summary: str = "Trusted release signing key is revoked.") -> dict:
+        return {
+            "schema": "mole_verified_release_check_v1",
+            "status": "FAIL",
+            "summary": summary,
+            "details": [summary],
+            "trust_source": "external_channel",
+            "trusted_key_id": "mole_release_signing_key_v1",
+            "trusted_key_status": "REVOKED",
+            "trusted_key_revocation_reason": summary,
+        }
+
+    @contextmanager
+    def _patched_trust_check(self, payload_or_func):
+        original = durability._verified_release_check
+        if callable(payload_or_func):
+            replacement = payload_or_func
+        else:
+            payload = dict(payload_or_func)
+
+            def replacement(package_root, *, bootstrap_package_verification=False):
+                return dict(payload)
+
+        durability._verified_release_check = replacement
+        try:
+            yield
+        finally:
+            durability._verified_release_check = original
 
     def test_packaged_runtime_layout_uses_external_data_root_and_seeds(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -149,15 +192,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 "display_version": "MOLE_DAS_2026_04_23_v3",
             }
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_23_v3",
-                        "built_at": "2026-04-23T18:26:02Z",
-                        "runtime_root": str(runtime_root),
-                    },
-                    current_acceptance_summary_path=acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_23_v3",
+                            "built_at": "2026-04-23T18:26:02Z",
+                            "runtime_root": str(runtime_root),
+                        },
+                        current_acceptance_summary_path=acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
@@ -200,15 +244,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
             original = durability.load_uninstall_registration
             durability.load_uninstall_registration = lambda: {}
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_23_v4",
-                        "built_at": "2026-04-23T19:07:12Z",
-                        "runtime_root": str(runtime_root),
-                    },
-                    current_acceptance_summary_path=acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_23_v4",
+                            "built_at": "2026-04-23T19:07:12Z",
+                            "runtime_root": str(runtime_root),
+                        },
+                        current_acceptance_summary_path=acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
@@ -236,19 +281,57 @@ class RuntimeDurabilityTests(unittest.TestCase):
             original = durability.load_uninstall_registration
             durability.load_uninstall_registration = lambda: {}
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_23_v3",
-                        "built_at": "2026-04-23T18:26:02Z",
-                        "runtime_root": str(runtime_root),
-                    },
-                    current_acceptance_summary_path=acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_23_v3",
+                            "built_at": "2026-04-23T18:26:02Z",
+                            "runtime_root": str(runtime_root),
+                        },
+                        current_acceptance_summary_path=acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
             self.assertEqual(result["package_status"], "PORTABLE")
+
+    def test_package_status_unverified_when_current_trust_check_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            runtime_root = root / "portable" / "runtime"
+            runtime_root.mkdir(parents=True, exist_ok=True)
+            acceptance_path = root / "portable" / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": "MOLE_DAS_2026_04_30_v2",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            original = durability.load_uninstall_registration
+            durability.load_uninstall_registration = lambda: {}
+            try:
+                with self._patched_trust_check(self._failing_trust_check("Trusted release signing key was revoked.")):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_30_v2",
+                            "built_at": "2026-04-30T17:22:27Z",
+                            "runtime_root": str(runtime_root),
+                        },
+                        current_acceptance_summary_path=acceptance_path,
+                    )
+            finally:
+                durability.load_uninstall_registration = original
+
+            self.assertEqual(result["package_status"], "UNVERIFIED")
+            self.assertEqual(result["current_trust_check_status"], "FAIL")
+            self.assertIn("revoked", result["package_status_details"][0].lower())
 
     def test_package_status_stale_for_older_portable_against_installed_root(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -311,15 +394,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 "display_version": "MOLE_DAS_2026_04_23_v5",
             }
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=portable_runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_23_v3",
-                        "built_at": "2026-04-23T18:26:02Z",
-                        "runtime_root": str(portable_runtime_root),
-                    },
-                    current_acceptance_summary_path=current_acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=portable_runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_23_v3",
+                            "built_at": "2026-04-23T18:26:02Z",
+                            "runtime_root": str(portable_runtime_root),
+                        },
+                        current_acceptance_summary_path=current_acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
@@ -401,15 +485,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
             original = durability.load_uninstall_registration
             durability.load_uninstall_registration = lambda: {}
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=current_runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_27_v1",
-                        "built_at": "2026-04-27T18:30:00Z",
-                        "runtime_root": str(current_runtime_root),
-                    },
-                    current_acceptance_summary_path=current_acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=current_runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_27_v1",
+                            "built_at": "2026-04-27T18:30:00Z",
+                            "runtime_root": str(current_runtime_root),
+                        },
+                        current_acceptance_summary_path=current_acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
@@ -479,15 +564,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
             original = durability.load_uninstall_registration
             durability.load_uninstall_registration = lambda: {}
             try:
-                result = evaluate_runtime_package_status(
-                    current_runtime_root=current_runtime_root,
-                    current_build_identity={
-                        "bundle_label": "MOLE_DAS_2026_04_27_v3",
-                        "built_at": "2026-04-27T18:55:00Z",
-                        "runtime_root": str(current_runtime_root),
-                    },
-                    current_acceptance_summary_path=current_acceptance_path,
-                )
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=current_runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_27_v3",
+                            "built_at": "2026-04-27T18:55:00Z",
+                            "runtime_root": str(current_runtime_root),
+                        },
+                        current_acceptance_summary_path=current_acceptance_path,
+                    )
             finally:
                 durability.load_uninstall_registration = original
 
@@ -551,6 +637,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
             launcher_path.write_text("@echo off\r\n", encoding="utf-8")
             installer_script = package_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
             installer_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            signature_path = package_root / "latest_verified_release_v1.signature.json"
+            signature_path.write_text("sig", encoding="utf-8")
+            public_key_path = package_root / "mole_release_signing_public_key_v1.json"
+            public_key_path.write_text("pub", encoding="utf-8")
+            trusted_keys_path = package_root / "trusted_release_keys_v1.json"
+            trusted_keys_path.write_text("keys", encoding="utf-8")
+            trusted_keys_signature_path = package_root / "trusted_release_keys_v1.signature.json"
+            trusted_keys_signature_path.write_text("keysig", encoding="utf-8")
+            trust_root_public_key_path = package_root / "mole_release_trust_root_public_key_v1.json"
+            trust_root_public_key_path.write_text("trustroot", encoding="utf-8")
             wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
             wizard_exe.write_bytes(b"wizard-binary")
             runner_exe = code_root / "MOLE_DAQ_Runner.exe"
@@ -570,6 +666,11 @@ class RuntimeDurabilityTests(unittest.TestCase):
                         "git_commit": "6781524",
                         "git_branch": "codex/report-context-phase1",
                         "built_at": "2026-04-27T20:30:00Z",
+                        "signature_path": "latest_verified_release_v1.signature.json",
+                        "public_key_path": "mole_release_signing_public_key_v1.json",
+                        "trusted_keys_path": "trusted_release_keys_v1.json",
+                        "trusted_keys_signature_path": "trusted_release_keys_v1.signature.json",
+                        "trust_root_public_key_path": "mole_release_trust_root_public_key_v1.json",
                         "acceptance_status": "PASS",
                         "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
                         "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
@@ -583,6 +684,11 @@ class RuntimeDurabilityTests(unittest.TestCase):
                         "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
                         "hashes": {
                             "build_identity_sha256": self._sha256(build_identity_path),
+                            "verified_release_signature_sha256": self._sha256(signature_path),
+                            "public_key_sha256": self._sha256(public_key_path),
+                            "trusted_keys_sha256": self._sha256(trusted_keys_path),
+                            "trusted_keys_signature_sha256": self._sha256(trusted_keys_signature_path),
+                            "trust_root_public_key_sha256": self._sha256(trust_root_public_key_path),
                             "acceptance_summary_txt_sha256": self._sha256(acceptance_txt_path),
                             "acceptance_summary_json_sha256": self._sha256(acceptance_json_path),
                             "installer_script_sha256": self._sha256(installer_script),
@@ -596,11 +702,12 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = verify_verified_release_reference(
-                {"verified_release_manifest_path": str(manifest_path)},
-                purpose="INSTALL",
-                target="WIZARD",
-            )
+            with self._patched_trust_check(self._passing_trust_check()):
+                result = verify_verified_release_reference(
+                    {"verified_release_manifest_path": str(manifest_path)},
+                    purpose="INSTALL",
+                    target="WIZARD",
+                )
 
             self.assertEqual(result["status"], "PASS")
             self.assertEqual(result["package_label"], bundle_label)
@@ -659,6 +766,16 @@ class RuntimeDurabilityTests(unittest.TestCase):
             launcher_path.write_text("@echo off\r\n", encoding="utf-8")
             installer_script = install_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
             installer_script.write_text("Write-Host 'install'\n", encoding="utf-8")
+            signature_path = install_root / "latest_verified_release_v1.signature.json"
+            signature_path.write_text("sig", encoding="utf-8")
+            public_key_path = install_root / "mole_release_signing_public_key_v1.json"
+            public_key_path.write_text("pub", encoding="utf-8")
+            trusted_keys_path = install_root / "trusted_release_keys_v1.json"
+            trusted_keys_path.write_text("keys", encoding="utf-8")
+            trusted_keys_signature_path = install_root / "trusted_release_keys_v1.signature.json"
+            trusted_keys_signature_path.write_text("keysig", encoding="utf-8")
+            trust_root_public_key_path = install_root / "mole_release_trust_root_public_key_v1.json"
+            trust_root_public_key_path.write_text("trustroot", encoding="utf-8")
             wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
             wizard_exe.write_bytes(b"wizard-binary")
             runner_exe = code_root / "MOLE_DAQ_Runner.exe"
@@ -678,6 +795,11 @@ class RuntimeDurabilityTests(unittest.TestCase):
                         "git_commit": "6781524",
                         "git_branch": "codex/report-context-phase1",
                         "built_at": "2026-04-27T20:40:00Z",
+                        "signature_path": "latest_verified_release_v1.signature.json",
+                        "public_key_path": "mole_release_signing_public_key_v1.json",
+                        "trusted_keys_path": "trusted_release_keys_v1.json",
+                        "trusted_keys_signature_path": "trusted_release_keys_v1.signature.json",
+                        "trust_root_public_key_path": "mole_release_trust_root_public_key_v1.json",
                         "acceptance_status": "PASS",
                         "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
                         "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
@@ -691,6 +813,11 @@ class RuntimeDurabilityTests(unittest.TestCase):
                         "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
                         "hashes": {
                             "build_identity_sha256": self._sha256(build_identity_path),
+                            "verified_release_signature_sha256": self._sha256(signature_path),
+                            "public_key_sha256": self._sha256(public_key_path),
+                            "trusted_keys_sha256": self._sha256(trusted_keys_path),
+                            "trusted_keys_signature_sha256": self._sha256(trusted_keys_signature_path),
+                            "trust_root_public_key_sha256": self._sha256(trust_root_public_key_path),
                             "acceptance_summary_txt_sha256": self._sha256(acceptance_txt_path),
                             "acceptance_summary_json_sha256": self._sha256(acceptance_json_path),
                             "installer_script_sha256": self._sha256(installer_script),
@@ -704,17 +831,18 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = verify_verified_release_reference(
-                {
-                    "install_root_path": str(install_root),
-                    "installed_runtime_path": str(runtime_root),
-                    "installed_wizard_executable_path": str(wizard_exe),
-                    "build_identity_manifest_path": str(build_identity_path),
-                    "verified_release_manifest_path": str(manifest_path),
-                },
-                purpose="RELAUNCH",
-                target="WIZARD",
-            )
+            with self._patched_trust_check(self._passing_trust_check()):
+                result = verify_verified_release_reference(
+                    {
+                        "install_root_path": str(install_root),
+                        "installed_runtime_path": str(runtime_root),
+                        "installed_wizard_executable_path": str(wizard_exe),
+                        "build_identity_manifest_path": str(build_identity_path),
+                        "verified_release_manifest_path": str(manifest_path),
+                    },
+                    purpose="RELAUNCH",
+                    target="WIZARD",
+                )
 
             self.assertEqual(result["status"], "PASS")
             self.assertEqual(result["package_label"], bundle_label)
@@ -814,14 +942,151 @@ class RuntimeDurabilityTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = verify_verified_release_reference(
-                {"verified_release_manifest_path": str(manifest_path)},
-                purpose="INSTALL",
-                target="WIZARD",
-            )
+            with self._patched_trust_check(self._passing_trust_check()):
+                result = verify_verified_release_reference(
+                    {"verified_release_manifest_path": str(manifest_path)},
+                    purpose="INSTALL",
+                    target="WIZARD",
+                )
 
             self.assertEqual(result["status"], "FAIL")
             self.assertTrue(any("SHA256 mismatch" in detail for detail in result["details"]))
+
+    def test_verify_verified_release_reference_fails_on_revoked_trust_key(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package_root = root / "MOLE_DAS_2026_04_27_v10"
+            runtime_root = package_root / "runtime"
+            code_root = runtime_root / "MOLE_code"
+            config_root = runtime_root / "config"
+            code_root.mkdir(parents=True, exist_ok=True)
+            config_root.mkdir(parents=True, exist_ok=True)
+
+            bundle_label = "MOLE_DAS_2026_04_27_v10"
+            build_identity_path = config_root / "mole_build_identity_v1.json"
+            build_identity_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_build_identity_v1",
+                        "bundle_label": bundle_label,
+                        "built_at": "2026-04-27T21:10:00Z",
+                        "runtime_root": str(runtime_root),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_txt = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.txt"
+            acceptance_txt.write_text("status=PASS\n", encoding="utf-8")
+            acceptance_json = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            acceptance_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            version_audit_json = package_root / "PACKAGE_VERSION_AUDIT.json"
+            version_audit_json.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_package_version_audit_v1",
+                        "status": "PASS",
+                        "expected_bundle_label": bundle_label,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (package_root / "PACKAGE_VERSION_AUDIT.txt").write_text("PASS", encoding="utf-8")
+            installer_script = package_root / "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1"
+            installer_script.write_text("# installer", encoding="utf-8")
+            launcher = package_root / "LAUNCH_MOLE_DAS_EXE.bat"
+            launcher.write_text("@echo off\n", encoding="utf-8")
+            wizard_exe = code_root / "MOLE_DAS_Wizard.exe"
+            wizard_exe.write_text("wizard", encoding="utf-8")
+            runner_exe = code_root / "MOLE_DAQ_Runner.exe"
+            runner_exe.write_text("runner", encoding="utf-8")
+            script_runner_exe = code_root / "MOLE_ScriptRunner.exe"
+            script_runner_exe.write_text("script", encoding="utf-8")
+            signature_path = package_root / "latest_verified_release_v1.signature.json"
+            signature_path.write_text("sig", encoding="utf-8")
+            public_key_path = package_root / "mole_release_signing_public_key_v1.json"
+            public_key_path.write_text("pub", encoding="utf-8")
+            trusted_keys_path = package_root / "trusted_release_keys_v1.json"
+            trusted_keys_path.write_text("keys", encoding="utf-8")
+            trusted_keys_signature_path = package_root / "trusted_release_keys_v1.signature.json"
+            trusted_keys_signature_path.write_text("keysig", encoding="utf-8")
+            trust_root_public_key_path = package_root / "mole_release_trust_root_public_key_v1.json"
+            trust_root_public_key_path.write_text("trustroot", encoding="utf-8")
+            upgrade_preview_txt = package_root / "UPGRADE_REPORT_PREVIEW.txt"
+            upgrade_preview_txt.write_text("upgrade", encoding="utf-8")
+            upgrade_preview_json = package_root / "UPGRADE_REPORT_PREVIEW.json"
+            upgrade_preview_json.write_text("{}", encoding="utf-8")
+
+            manifest_path = package_root / "latest_verified_release_v1.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_latest_verified_release_v1",
+                        "manifest_kind": "package_root",
+                        "channel_name": "LOCAL_VERIFIED",
+                        "generated_at": "2026-04-27T21:11:00Z",
+                        "package_root": ".",
+                        "package_label": bundle_label,
+                        "git_commit": "6781524",
+                        "git_branch": "codex/report-context-phase1",
+                        "built_at": "2026-04-27T21:10:00Z",
+                        "signature_path": "latest_verified_release_v1.signature.json",
+                        "public_key_path": "mole_release_signing_public_key_v1.json",
+                        "trusted_keys_path": "trusted_release_keys_v1.json",
+                        "trusted_keys_signature_path": "trusted_release_keys_v1.signature.json",
+                        "trust_root_public_key_path": "mole_release_trust_root_public_key_v1.json",
+                        "acceptance_status": "PASS",
+                        "acceptance_summary_path": "PACKAGED_ACCEPTANCE_SUMMARY.txt",
+                        "acceptance_summary_json_path": "PACKAGED_ACCEPTANCE_SUMMARY.json",
+                        "installer_script_path": "INSTALL_MOLE_DAS_EXE_BUNDLE.ps1",
+                        "version_audit_json_path": "PACKAGE_VERSION_AUDIT.json",
+                        "version_audit_txt_path": "PACKAGE_VERSION_AUDIT.txt",
+                        "launcher_path": "LAUNCH_MOLE_DAS_EXE.bat",
+                        "wizard_exe_path": "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe",
+                        "runner_exe_path": "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe",
+                        "script_runner_exe_path": "runtime\\MOLE_code\\MOLE_ScriptRunner.exe",
+                        "build_identity_path": "runtime\\config\\mole_build_identity_v1.json",
+                        "upgrade_report_preview_path": "UPGRADE_REPORT_PREVIEW.txt",
+                        "upgrade_report_preview_json_path": "UPGRADE_REPORT_PREVIEW.json",
+                        "hashes": {
+                            "build_identity_sha256": self._sha256(build_identity_path),
+                            "verified_release_signature_sha256": self._sha256(signature_path),
+                            "public_key_sha256": self._sha256(public_key_path),
+                            "trusted_keys_sha256": self._sha256(trusted_keys_path),
+                            "trusted_keys_signature_sha256": self._sha256(trusted_keys_signature_path),
+                            "trust_root_public_key_sha256": self._sha256(trust_root_public_key_path),
+                            "acceptance_summary_txt_sha256": self._sha256(acceptance_txt),
+                            "acceptance_summary_json_sha256": self._sha256(acceptance_json),
+                            "upgrade_report_preview_txt_sha256": self._sha256(upgrade_preview_txt),
+                            "upgrade_report_preview_json_sha256": self._sha256(upgrade_preview_json),
+                            "installer_script_sha256": self._sha256(installer_script),
+                            "launcher_batch_sha256": self._sha256(launcher),
+                            "wizard_exe_sha256": self._sha256(wizard_exe),
+                            "runner_exe_sha256": self._sha256(runner_exe),
+                            "script_runner_exe_sha256": self._sha256(script_runner_exe),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self._patched_trust_check(self._failing_trust_check()):
+                result = verify_verified_release_reference(
+                    {"verified_release_manifest_path": str(manifest_path)},
+                    purpose="INSTALL",
+                    target="WIZARD",
+                )
+
+            self.assertEqual(result["status"], "FAIL")
+            self.assertTrue(any("revoked" in detail.lower() for detail in result["details"]))
 
     def test_runtime_action_policy_blocks_unverified_compliance(self) -> None:
         result = evaluate_runtime_action_policy(

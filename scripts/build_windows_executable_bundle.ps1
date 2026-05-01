@@ -13,6 +13,8 @@ param(
 
     [string]$ReleaseSigningPrivateKeyPath = "",
 
+    [string]$ReleaseTrustRootPrivateKeyPath = "",
+
     [switch]$SkipPackagedAcceptance
 )
 
@@ -175,6 +177,9 @@ $publishedRollbackReportTxtName = "ROLLBACK_REPORT_PREVIEW.txt"
 $verifiedReleaseManifestName = "latest_verified_release_v1.json"
 $verifiedReleaseSignatureName = "latest_verified_release_v1.signature.json"
 $releaseSigningPublicKeyName = "mole_release_signing_public_key_v1.json"
+$trustedReleaseKeysName = "trusted_release_keys_v1.json"
+$trustedReleaseKeysSignatureName = "trusted_release_keys_v1.signature.json"
+$releaseTrustRootPublicKeyName = "mole_release_trust_root_public_key_v1.json"
 $versionAuditJsonName = "PACKAGE_VERSION_AUDIT.json"
 $versionAuditTxtName = "PACKAGE_VERSION_AUDIT.txt"
 $immutableAuditJsonName = "IMMUTABLE_PACKAGE_AUDIT.json"
@@ -186,6 +191,14 @@ $shareVerifiedReleaseSignaturePath = Join-Path $installRoot $verifiedReleaseSign
 $releaseSigningPublicKeySourcePath = Join-Path $RepoRoot ("config\" + $releaseSigningPublicKeyName)
 $releaseSigningPublicKeyOutputPath = Join-Path $OutputRoot $releaseSigningPublicKeyName
 $releaseSigningPublicKeySharePath = Join-Path $installRoot $releaseSigningPublicKeyName
+$trustedReleaseKeysSourcePath = Join-Path $RepoRoot ("config\" + $trustedReleaseKeysName)
+$trustedReleaseKeysOutputPath = Join-Path $OutputRoot $trustedReleaseKeysName
+$trustedReleaseKeysSharePath = Join-Path $installRoot $trustedReleaseKeysName
+$trustedReleaseKeysSignaturePath = Join-Path $OutputRoot $trustedReleaseKeysSignatureName
+$trustedReleaseKeysShareSignaturePath = Join-Path $installRoot $trustedReleaseKeysSignatureName
+$releaseTrustRootPublicKeySourcePath = Join-Path $RepoRoot ("config\" + $releaseTrustRootPublicKeyName)
+$releaseTrustRootPublicKeyOutputPath = Join-Path $OutputRoot $releaseTrustRootPublicKeyName
+$releaseTrustRootPublicKeySharePath = Join-Path $installRoot $releaseTrustRootPublicKeyName
 $versionAuditJsonPath = Join-Path $OutputRoot $versionAuditJsonName
 $versionAuditTxtPath = Join-Path $OutputRoot $versionAuditTxtName
 $shareVersionAuditJsonPath = Join-Path $installRoot $versionAuditJsonName
@@ -201,12 +214,18 @@ try {
         $stableChannelManifestPath = Join-Path $outputParent $verifiedReleaseManifestName
         $stableChannelSignaturePath = Join-Path $outputParent $verifiedReleaseSignatureName
         $stableChannelPublicKeyPath = Join-Path $outputParent $releaseSigningPublicKeyName
+        $stableChannelTrustedKeysPath = Join-Path $outputParent $trustedReleaseKeysName
+        $stableChannelTrustedKeysSignaturePath = Join-Path $outputParent $trustedReleaseKeysSignatureName
+        $stableChannelTrustRootPublicKeyPath = Join-Path $outputParent $releaseTrustRootPublicKeyName
     }
 }
 catch {
     $stableChannelManifestPath = $null
     $stableChannelSignaturePath = $null
     $stableChannelPublicKeyPath = $null
+    $stableChannelTrustedKeysPath = $null
+    $stableChannelTrustedKeysSignaturePath = $null
+    $stableChannelTrustRootPublicKeyPath = $null
 }
 
 function Publish-PackagedAcceptanceSummary {
@@ -293,6 +312,30 @@ function Resolve-ReleaseSigningPrivateKeyPath {
     return [System.IO.Path]::GetFullPath((Join-Path $env:USERPROFILE ".mole_das_signing\mole_release_signing_private_key_v1.xml"))
 }
 
+function Resolve-ReleaseTrustRootPrivateKeyPath {
+    if ($ReleaseTrustRootPrivateKeyPath) {
+        return [System.IO.Path]::GetFullPath($ReleaseTrustRootPrivateKeyPath)
+    }
+    if ($env:MOLE_DAS_RELEASE_TRUST_ROOT_PRIVATE_KEY) {
+        return [System.IO.Path]::GetFullPath($env:MOLE_DAS_RELEASE_TRUST_ROOT_PRIVATE_KEY)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $env:USERPROFILE ".mole_das_signing\mole_release_trust_root_private_key_v1.xml"))
+}
+
+function Convert-ToUtcDateOrNull {
+    param([string]$Value)
+    $text = [string]$Value
+    if (-not $text) {
+        return $null
+    }
+    try {
+        return ([datetimeoffset]::Parse($text)).UtcDateTime
+    }
+    catch {
+        return $null
+    }
+}
+
 function Get-ReleaseSigningPublicKeyPayload {
     param([Parameter(Mandatory = $true)][string]$PathValue)
     Require-Path $PathValue "Release signing public key"
@@ -309,12 +352,275 @@ function Get-ReleaseSigningPublicKeyPayload {
     return $payload
 }
 
+function Get-ReleaseTrustRootPublicKeyPayload {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+    Require-Path $PathValue "Release trust-root public key"
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_release_trust_root_public_key_v1") {
+        throw "Release trust-root public key schema is invalid: $PathValue"
+    }
+    if ([string]$payload.algorithm -ne "RSA-SHA256") {
+        throw "Release trust-root public key algorithm is invalid: $PathValue"
+    }
+    if (-not [string]$payload.public_key_xml) {
+        throw "Release trust-root public key XML is missing: $PathValue"
+    }
+    return $payload
+}
+
+function Get-TrustedReleaseKeysPayload {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [string]$ExpectedTrustRootKeyId = ""
+    )
+    Require-Path $PathValue "Trusted release key store"
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_trusted_release_keys_v1") {
+        throw "Trusted release key store schema is invalid: $PathValue"
+    }
+    if ($ExpectedTrustRootKeyId -and [string]$payload.trust_root_key_id -ne $ExpectedTrustRootKeyId) {
+        throw "Trusted release key store trust_root_key_id does not match the trust-root public key: $PathValue"
+    }
+    $keys = @($payload.keys)
+    if ($keys.Count -le 0) {
+        throw "Trusted release key store contains no signing keys: $PathValue"
+    }
+    return $payload
+}
+
 function New-RsaProviderFromXml {
     param([Parameter(Mandatory = $true)][string]$XmlValue)
     $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
     $rsa.PersistKeyInCsp = $false
     $rsa.FromXmlString($XmlValue)
     return $rsa
+}
+
+function Write-TrustedReleaseKeysSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$TrustedKeysPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath
+    )
+
+    $trustRootPublicKey = Get-ReleaseTrustRootPublicKeyPayload -PathValue $releaseTrustRootPublicKeySourcePath
+    $privateKeyPath = Resolve-ReleaseTrustRootPrivateKeyPath
+    Require-Path $privateKeyPath "Release trust-root private key"
+    $privateKeyXml = Get-Content -LiteralPath $privateKeyPath -Raw
+    $payloadBytes = [System.IO.File]::ReadAllBytes($TrustedKeysPath)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue $privateKeyXml
+    try {
+        $signatureBytes = $rsa.SignData($payloadBytes, $sha256)
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+
+    $payload = [ordered]@{
+        schema = "mole_trusted_release_keys_signature_v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        key_id = [string]$trustRootPublicKey.key_id
+        algorithm = "RSA-SHA256"
+        trusted_keys_path = [System.IO.Path]::GetFileName($TrustedKeysPath)
+        trust_root_public_key_path = [System.IO.Path]::GetFileName($releaseTrustRootPublicKeySourcePath)
+        trust_root_public_key_sha256 = [string]$trustRootPublicKey.public_key_sha256
+        trusted_keys_sha256 = Get-FileHashValue $TrustedKeysPath
+        signature_base64 = [Convert]::ToBase64String($signatureBytes)
+    }
+
+    [System.IO.File]::WriteAllText(
+        $SignaturePath,
+        ($payload | ConvertTo-Json -Depth 6),
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+}
+
+function Assert-TrustedReleaseKeysSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$TrustedKeysPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath,
+        [Parameter(Mandatory = $true)][string]$TrustRootPublicKeyPath
+    )
+
+    Require-Path $TrustedKeysPath "Trusted release key store"
+    Require-Path $SignaturePath "Trusted release key store signature"
+    $trustRootPublicKey = Get-ReleaseTrustRootPublicKeyPayload -PathValue $TrustRootPublicKeyPath
+    $signature = Get-Content -LiteralPath $SignaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_trusted_release_keys_signature_v1") {
+        throw "Trusted release key store signature schema is invalid: $SignaturePath"
+    }
+    if ([string]$signature.algorithm -ne "RSA-SHA256") {
+        throw "Trusted release key store signature algorithm is invalid: $SignaturePath"
+    }
+    if ([string]$signature.key_id -ne [string]$trustRootPublicKey.key_id) {
+        throw "Trusted release key store signature key_id does not match the trust-root public key: $SignaturePath"
+    }
+    if ([string]$signature.trust_root_public_key_sha256 -and [string]$signature.trust_root_public_key_sha256 -ne [string]$trustRootPublicKey.public_key_sha256) {
+        throw "Trusted release key store trust-root public key SHA256 mismatch: $TrustRootPublicKeyPath"
+    }
+    $actualTrustedKeysHash = Get-FileHashValue $TrustedKeysPath
+    if (-not $actualTrustedKeysHash) {
+        throw "Trusted release key store SHA256 could not be computed: $TrustedKeysPath"
+    }
+    if ($actualTrustedKeysHash -ne [string]$signature.trusted_keys_sha256) {
+        throw "Trusted release key store SHA256 mismatch. Expected $([string]$signature.trusted_keys_sha256), got $actualTrustedKeysHash."
+    }
+    $payloadBytes = [System.IO.File]::ReadAllBytes($TrustedKeysPath)
+    $signatureBytes = [Convert]::FromBase64String([string]$signature.signature_base64)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue ([string]$trustRootPublicKey.public_key_xml)
+    try {
+        if (-not $rsa.VerifyData($payloadBytes, $sha256, $signatureBytes)) {
+            throw "Trusted release key store signature check failed: $SignaturePath"
+        }
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+}
+
+function Get-TrustedReleaseKeyEntry {
+    param(
+        [Parameter(Mandatory = $true)][object]$TrustedKeysPayload,
+        [Parameter(Mandatory = $true)][object]$SigningPublicKeyPayload,
+        [string]$ExpectedKeyId = ""
+    )
+
+    $keys = @($TrustedKeysPayload.keys)
+    $match = $null
+    foreach ($candidate in $keys) {
+        if (-not $candidate) {
+            continue
+        }
+        if ($ExpectedKeyId -and [string]$candidate.key_id -ne $ExpectedKeyId) {
+            continue
+        }
+        if ([string]$candidate.public_key_sha256 -ne [string]$SigningPublicKeyPayload.public_key_sha256) {
+            continue
+        }
+        $match = $candidate
+        break
+    }
+    if (-not $match) {
+        throw "Package signing public key is not present in the trusted release key store."
+    }
+    if ([string]$match.algorithm -ne "RSA-SHA256") {
+        throw "Trusted release key entry algorithm is invalid for key_id $([string]$match.key_id)."
+    }
+    if ([string]$match.public_key_xml -and [string]$match.public_key_xml -ne [string]$SigningPublicKeyPayload.public_key_xml) {
+        throw "Trusted release key entry XML does not match the packaged release signing public key for key_id $([string]$match.key_id)."
+    }
+    $status = ([string]$match.status).ToUpperInvariant()
+    if ($status -ne "ACTIVE") {
+        $reason = [string]$match.revocation_reason
+        if (-not $reason) {
+            $reason = "status=$status"
+        }
+        throw "Trusted release signing key $([string]$match.key_id) is not ACTIVE: $reason"
+    }
+    $now = [datetime]::UtcNow
+    $validFrom = Convert-ToUtcDateOrNull -Value ([string]$match.valid_from)
+    if ($validFrom -and $validFrom -gt $now) {
+        throw "Trusted release signing key $([string]$match.key_id) is not yet valid."
+    }
+    $expiresAt = Convert-ToUtcDateOrNull -Value ([string]$match.expires_at)
+    if ($expiresAt -and $expiresAt -le $now) {
+        throw "Trusted release signing key $([string]$match.key_id) has expired."
+    }
+    $revokedAt = Convert-ToUtcDateOrNull -Value ([string]$match.revoked_at)
+    if ($revokedAt) {
+        $reason = [string]$match.revocation_reason
+        throw "Trusted release signing key $([string]$match.key_id) was revoked at $([string]$match.revoked_at). $reason".Trim()
+    }
+    return $match
+}
+
+function Resolve-TrustedReleaseTrustArtifacts {
+    param([Parameter(Mandatory = $true)][string]$PackageRoot)
+
+    $search = @()
+    try {
+        $parentRoot = Split-Path -Parent $PackageRoot
+        if ($parentRoot) {
+            $search += [pscustomobject]@{ source = "external_channel"; root = $parentRoot }
+        }
+    }
+    catch {}
+    $search += [pscustomobject]@{ source = "package_root"; root = $PackageRoot }
+
+    foreach ($candidate in $search) {
+        $root = [string]$candidate.root
+        if (-not $root) {
+            continue
+        }
+        $trustedKeysPath = Join-Path $root $trustedReleaseKeysName
+        $trustedKeysSignaturePath = Join-Path $root $trustedReleaseKeysSignatureName
+        $trustRootPublicKeyPath = Join-Path $root $releaseTrustRootPublicKeyName
+        if (
+            (Test-Path -LiteralPath $trustedKeysPath) -and
+            (Test-Path -LiteralPath $trustedKeysSignaturePath) -and
+            (Test-Path -LiteralPath $trustRootPublicKeyPath)
+        ) {
+            return [ordered]@{
+                trust_source = [string]$candidate.source
+                trust_root = $root
+                trusted_keys_path = $trustedKeysPath
+                trusted_keys_signature_path = $trustedKeysSignaturePath
+                trust_root_public_key_path = $trustRootPublicKeyPath
+            }
+        }
+    }
+
+    throw "Trusted release key store artifacts were not found for package root: $PackageRoot"
+}
+
+function Resolve-VerifiedReleaseTrustContext {
+    param([Parameter(Mandatory = $true)][string]$PackageRoot)
+
+    $manifestPath = Join-Path $PackageRoot $verifiedReleaseManifestName
+    $signaturePath = Join-Path $PackageRoot $verifiedReleaseSignatureName
+    $publicKeyPath = Join-Path $PackageRoot $releaseSigningPublicKeyName
+    Require-Path $manifestPath "Verified release manifest"
+    Require-Path $signaturePath "Verified release signature"
+    Require-Path $publicKeyPath "Packaged release signing public key"
+
+    $trustArtifacts = Resolve-TrustedReleaseTrustArtifacts -PackageRoot $PackageRoot
+    $trustRootPublicKey = Get-ReleaseTrustRootPublicKeyPayload -PathValue ([string]$trustArtifacts.trust_root_public_key_path)
+    Assert-TrustedReleaseKeysSignature `
+        -TrustedKeysPath ([string]$trustArtifacts.trusted_keys_path) `
+        -SignaturePath ([string]$trustArtifacts.trusted_keys_signature_path) `
+        -TrustRootPublicKeyPath ([string]$trustArtifacts.trust_root_public_key_path)
+    $trustedKeys = Get-TrustedReleaseKeysPayload `
+        -PathValue ([string]$trustArtifacts.trusted_keys_path) `
+        -ExpectedTrustRootKeyId ([string]$trustRootPublicKey.key_id)
+    $signingPublicKey = Get-ReleaseSigningPublicKeyPayload -PathValue $publicKeyPath
+    $signature = Get-Content -LiteralPath $signaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_release_signature_v1") {
+        throw "Verified release signature schema is invalid: $signaturePath"
+    }
+    $trustedKey = Get-TrustedReleaseKeyEntry `
+        -TrustedKeysPayload $trustedKeys `
+        -SigningPublicKeyPayload $signingPublicKey `
+        -ExpectedKeyId ([string]$signature.key_id)
+
+    return [ordered]@{
+        manifest_path = $manifestPath
+        signature_path = $signaturePath
+        public_key_path = $publicKeyPath
+        trust_source = [string]$trustArtifacts.trust_source
+        trusted_keys_path = [string]$trustArtifacts.trusted_keys_path
+        trusted_keys_signature_path = [string]$trustArtifacts.trusted_keys_signature_path
+        trust_root_public_key_path = [string]$trustArtifacts.trust_root_public_key_path
+        trust_root_public_key_sha256 = [string]$trustRootPublicKey.public_key_sha256
+        trusted_key_id = [string]$trustedKey.key_id
+        trusted_key_status = [string]$trustedKey.status
+        trusted_key_valid_from = [string]$trustedKey.valid_from
+        trusted_key_expires_at = [string]$trustedKey.expires_at
+        trusted_key_revoked_at = [string]$trustedKey.revoked_at
+        trusted_key_revocation_reason = [string]$trustedKey.revocation_reason
+    }
 }
 
 function Write-VerifiedReleaseSignature {
@@ -450,12 +756,10 @@ function Assert-ImmutablePackageAuditPass {
 
 function Assert-VerifiedReleasePackage {
     param([string]$PackageRoot)
-    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
-    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
-    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
-    if (-not (Test-Path -LiteralPath $manifestPath)) {
-        throw "Verified release manifest not found: $manifestPath"
-    }
+    $trustContext = Resolve-VerifiedReleaseTrustContext -PackageRoot $PackageRoot
+    $manifestPath = [string]$trustContext.manifest_path
+    $signaturePath = [string]$trustContext.signature_path
+    $publicKeyPath = [string]$trustContext.public_key_path
     Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if (-not $manifest -or [string]$manifest.schema -ne "mole_latest_verified_release_v1") {
@@ -478,6 +782,11 @@ function Assert-VerifiedReleasePackage {
 
     $hashes = $manifest.hashes
     $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
+    $verifiedReleaseSignaturePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.signature_path)
+    $signingPublicKeyPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.public_key_path)
+    $trustedKeysPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trusted_keys_path)
+    $trustedKeysSignaturePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trusted_keys_signature_path)
+    $trustRootPublicKeyPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trust_root_public_key_path)
     $acceptanceTextPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_path)
     $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
     $upgradeReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_path)
@@ -492,6 +801,11 @@ function Assert-VerifiedReleasePackage {
 
     $targets = @(
         @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
+        @{ Label = "Verified release signature"; Path = $verifiedReleaseSignaturePath; Hash = [string]$hashes.verified_release_signature_sha256 }
+        @{ Label = "Packaged release signing public key"; Path = $signingPublicKeyPath; Hash = [string]$hashes.public_key_sha256 }
+        @{ Label = "Trusted release key store"; Path = $trustedKeysPath; Hash = [string]$hashes.trusted_keys_sha256 }
+        @{ Label = "Trusted release key store signature"; Path = $trustedKeysSignaturePath; Hash = [string]$hashes.trusted_keys_signature_sha256 }
+        @{ Label = "Release trust-root public key"; Path = $trustRootPublicKeyPath; Hash = [string]$hashes.trust_root_public_key_sha256 }
         @{ Label = "Packaged acceptance summary"; Path = $acceptanceTextPath; Hash = [string]$hashes.acceptance_summary_txt_sha256 }
         @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
         @{ Label = "Upgrade report preview"; Path = $upgradeReportPreviewTxtPath; Hash = [string]$hashes.upgrade_report_preview_txt_sha256 }
@@ -731,6 +1045,9 @@ function Write-VerifiedReleaseManifest {
         build_identity_path = "runtime\\config\\mole_build_identity_v1.json"
         signature_path = $verifiedReleaseSignatureName
         public_key_path = $releaseSigningPublicKeyName
+        trusted_keys_path = $trustedReleaseKeysName
+        trusted_keys_signature_path = $trustedReleaseKeysSignatureName
+        trust_root_public_key_path = $releaseTrustRootPublicKeyName
         acceptance_status = [string]($acceptanceSummary.status)
         acceptance_generated_at = [string]($acceptanceSummary.generated_at)
         acceptance_summary_path = $publishedAcceptanceTxtName
@@ -750,6 +1067,11 @@ function Write-VerifiedReleaseManifest {
         portable_bundle_path = ""
         hashes = [ordered]@{
             build_identity_sha256 = Get-FileHashValue $buildIdentityPath
+            verified_release_signature_sha256 = Get-FileHashValue $verifiedReleaseSignaturePath
+            public_key_sha256 = Get-FileHashValue $releaseSigningPublicKeyOutputPath
+            trusted_keys_sha256 = Get-FileHashValue $trustedReleaseKeysOutputPath
+            trusted_keys_signature_sha256 = Get-FileHashValue $trustedReleaseKeysSignaturePath
+            trust_root_public_key_sha256 = Get-FileHashValue $releaseTrustRootPublicKeyOutputPath
             acceptance_summary_txt_sha256 = Get-FileHashValue $acceptanceSummaryTxt
             acceptance_summary_json_sha256 = Get-FileHashValue $acceptanceSummaryJson
             upgrade_report_preview_txt_sha256 = Get-FileHashValue (Join-Path $OutputRoot $publishedUpgradeReportTxtName)
@@ -1175,6 +1497,20 @@ function Get-FileHashValue {
     return (Get-FileHash -LiteralPath $PathValue -Algorithm SHA256).Hash
 }
 
+function Convert-ToUtcDateOrNull {
+    param([string]$Value)
+    $text = [string]$Value
+    if (-not $text) {
+        return $null
+    }
+    try {
+        return ([datetimeoffset]::Parse($text)).UtcDateTime
+    }
+    catch {
+        return $null
+    }
+}
+
 function Get-ReleaseSigningPublicKeyPayload {
     param([Parameter(Mandatory = $true)][string]$PathValue)
     if (-not (Test-Path -LiteralPath $PathValue)) {
@@ -1193,12 +1529,242 @@ function Get-ReleaseSigningPublicKeyPayload {
     return $payload
 }
 
+function Get-ReleaseTrustRootPublicKeyPayload {
+    param([Parameter(Mandatory = $true)][string]$PathValue)
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        throw "Release trust-root public key not found: $PathValue"
+    }
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_release_trust_root_public_key_v1") {
+        throw "Release trust-root public key schema is invalid: $PathValue"
+    }
+    if ([string]$payload.algorithm -ne "RSA-SHA256") {
+        throw "Release trust-root public key algorithm is invalid: $PathValue"
+    }
+    if (-not [string]$payload.public_key_xml) {
+        throw "Release trust-root public key XML is missing: $PathValue"
+    }
+    return $payload
+}
+
+function Get-TrustedReleaseKeysPayload {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [string]$ExpectedTrustRootKeyId = ""
+    )
+    if (-not (Test-Path -LiteralPath $PathValue)) {
+        throw "Trusted release key store not found: $PathValue"
+    }
+    $payload = Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+    if (-not $payload -or [string]$payload.schema -ne "mole_trusted_release_keys_v1") {
+        throw "Trusted release key store schema is invalid: $PathValue"
+    }
+    if ($ExpectedTrustRootKeyId -and [string]$payload.trust_root_key_id -ne $ExpectedTrustRootKeyId) {
+        throw "Trusted release key store trust_root_key_id does not match the trust-root public key: $PathValue"
+    }
+    $keys = @($payload.keys)
+    if ($keys.Count -le 0) {
+        throw "Trusted release key store contains no signing keys: $PathValue"
+    }
+    return $payload
+}
+
 function New-RsaProviderFromXml {
     param([Parameter(Mandatory = $true)][string]$XmlValue)
     $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
     $rsa.PersistKeyInCsp = $false
     $rsa.FromXmlString($XmlValue)
     return $rsa
+}
+
+function Assert-TrustedReleaseKeysSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$TrustedKeysPath,
+        [Parameter(Mandatory = $true)][string]$SignaturePath,
+        [Parameter(Mandatory = $true)][string]$TrustRootPublicKeyPath
+    )
+
+    if (-not (Test-Path -LiteralPath $SignaturePath)) {
+        throw "Trusted release key store signature not found: $SignaturePath"
+    }
+    $trustRootPublicKey = Get-ReleaseTrustRootPublicKeyPayload -PathValue $TrustRootPublicKeyPath
+    $signature = Get-Content -LiteralPath $SignaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_trusted_release_keys_signature_v1") {
+        throw "Trusted release key store signature schema is invalid: $SignaturePath"
+    }
+    if ([string]$signature.algorithm -ne "RSA-SHA256") {
+        throw "Trusted release key store signature algorithm is invalid: $SignaturePath"
+    }
+    if ([string]$signature.key_id -ne [string]$trustRootPublicKey.key_id) {
+        throw "Trusted release key store signature key_id does not match the trust-root public key: $SignaturePath"
+    }
+    if ([string]$signature.trust_root_public_key_sha256 -and [string]$signature.trust_root_public_key_sha256 -ne [string]$trustRootPublicKey.public_key_sha256) {
+        throw "Trusted release key store trust-root public key SHA256 mismatch: $TrustRootPublicKeyPath"
+    }
+    $actualTrustedKeysHash = Get-FileHashValue -PathValue $TrustedKeysPath
+    if (-not $actualTrustedKeysHash) {
+        throw "Trusted release key store SHA256 could not be computed: $TrustedKeysPath"
+    }
+    if ($actualTrustedKeysHash -ne [string]$signature.trusted_keys_sha256) {
+        throw "Trusted release key store SHA256 mismatch. Expected $([string]$signature.trusted_keys_sha256), got $actualTrustedKeysHash."
+    }
+    $payloadBytes = [System.IO.File]::ReadAllBytes($TrustedKeysPath)
+    $signatureBytes = [Convert]::FromBase64String([string]$signature.signature_base64)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $rsa = New-RsaProviderFromXml -XmlValue ([string]$trustRootPublicKey.public_key_xml)
+    try {
+        if (-not $rsa.VerifyData($payloadBytes, $sha256, $signatureBytes)) {
+            throw "Trusted release key store signature check failed: $SignaturePath"
+        }
+    }
+    finally {
+        $rsa.Dispose()
+        $sha256.Dispose()
+    }
+}
+
+function Get-TrustedReleaseKeyEntry {
+    param(
+        [Parameter(Mandatory = $true)][object]$TrustedKeysPayload,
+        [Parameter(Mandatory = $true)][object]$SigningPublicKeyPayload,
+        [string]$ExpectedKeyId = ""
+    )
+
+    $keys = @($TrustedKeysPayload.keys)
+    $match = $null
+    foreach ($candidate in $keys) {
+        if (-not $candidate) {
+            continue
+        }
+        if ($ExpectedKeyId -and [string]$candidate.key_id -ne $ExpectedKeyId) {
+            continue
+        }
+        if ([string]$candidate.public_key_sha256 -ne [string]$SigningPublicKeyPayload.public_key_sha256) {
+            continue
+        }
+        $match = $candidate
+        break
+    }
+    if (-not $match) {
+        throw "Package signing public key is not present in the trusted release key store."
+    }
+    if ([string]$match.algorithm -ne "RSA-SHA256") {
+        throw "Trusted release key entry algorithm is invalid for key_id $([string]$match.key_id)."
+    }
+    if ([string]$match.public_key_xml -and [string]$match.public_key_xml -ne [string]$SigningPublicKeyPayload.public_key_xml) {
+        throw "Trusted release key entry XML does not match the packaged release signing public key for key_id $([string]$match.key_id)."
+    }
+    $status = ([string]$match.status).ToUpperInvariant()
+    if ($status -ne "ACTIVE") {
+        $reason = [string]$match.revocation_reason
+        if (-not $reason) {
+            $reason = "status=$status"
+        }
+        throw "Trusted release signing key $([string]$match.key_id) is not ACTIVE: $reason"
+    }
+    $now = [datetime]::UtcNow
+    $validFrom = Convert-ToUtcDateOrNull -Value ([string]$match.valid_from)
+    if ($validFrom -and $validFrom -gt $now) {
+        throw "Trusted release signing key $([string]$match.key_id) is not yet valid."
+    }
+    $expiresAt = Convert-ToUtcDateOrNull -Value ([string]$match.expires_at)
+    if ($expiresAt -and $expiresAt -le $now) {
+        throw "Trusted release signing key $([string]$match.key_id) has expired."
+    }
+    $revokedAt = Convert-ToUtcDateOrNull -Value ([string]$match.revoked_at)
+    if ($revokedAt) {
+        $reason = [string]$match.revocation_reason
+        throw "Trusted release signing key $([string]$match.key_id) was revoked at $([string]$match.revoked_at). $reason".Trim()
+    }
+    return $match
+}
+
+function Resolve-TrustedReleaseTrustArtifacts {
+    param([Parameter(Mandatory = $true)][string]$PackageRoot)
+
+    $search = @()
+    try {
+        $parentRoot = Split-Path -Parent $PackageRoot
+        if ($parentRoot) {
+            $search += [pscustomobject]@{ source = "external_channel"; root = $parentRoot }
+        }
+    }
+    catch {}
+    $search += [pscustomobject]@{ source = "package_root"; root = $PackageRoot }
+
+    foreach ($candidate in $search) {
+        $root = [string]$candidate.root
+        if (-not $root) {
+            continue
+        }
+        $trustedKeysPath = Join-Path $root "trusted_release_keys_v1.json"
+        $trustedKeysSignaturePath = Join-Path $root "trusted_release_keys_v1.signature.json"
+        $trustRootPublicKeyPath = Join-Path $root "mole_release_trust_root_public_key_v1.json"
+        if (
+            (Test-Path -LiteralPath $trustedKeysPath) -and
+            (Test-Path -LiteralPath $trustedKeysSignaturePath) -and
+            (Test-Path -LiteralPath $trustRootPublicKeyPath)
+        ) {
+            return [ordered]@{
+                trust_source = [string]$candidate.source
+                trusted_keys_path = $trustedKeysPath
+                trusted_keys_signature_path = $trustedKeysSignaturePath
+                trust_root_public_key_path = $trustRootPublicKeyPath
+            }
+        }
+    }
+
+    throw "Trusted release key store artifacts were not found for package root: $PackageRoot"
+}
+
+function Resolve-VerifiedReleaseTrustContext {
+    param([Parameter(Mandatory = $true)][string]$PackageRoot)
+
+    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
+    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
+    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        throw "Verified release manifest not found: $manifestPath"
+    }
+    if (-not (Test-Path -LiteralPath $publicKeyPath)) {
+        throw "Packaged release signing public key not found: $publicKeyPath"
+    }
+
+    $trustArtifacts = Resolve-TrustedReleaseTrustArtifacts -PackageRoot $PackageRoot
+    $trustRootPublicKey = Get-ReleaseTrustRootPublicKeyPayload -PathValue ([string]$trustArtifacts.trust_root_public_key_path)
+    Assert-TrustedReleaseKeysSignature `
+        -TrustedKeysPath ([string]$trustArtifacts.trusted_keys_path) `
+        -SignaturePath ([string]$trustArtifacts.trusted_keys_signature_path) `
+        -TrustRootPublicKeyPath ([string]$trustArtifacts.trust_root_public_key_path)
+    $trustedKeys = Get-TrustedReleaseKeysPayload `
+        -PathValue ([string]$trustArtifacts.trusted_keys_path) `
+        -ExpectedTrustRootKeyId ([string]$trustRootPublicKey.key_id)
+    $signingPublicKey = Get-ReleaseSigningPublicKeyPayload -PathValue $publicKeyPath
+    $signature = Get-Content -LiteralPath $signaturePath -Raw | ConvertFrom-Json
+    if (-not $signature -or [string]$signature.schema -ne "mole_release_signature_v1") {
+        throw "Verified release signature schema is invalid: $signaturePath"
+    }
+    $trustedKey = Get-TrustedReleaseKeyEntry `
+        -TrustedKeysPayload $trustedKeys `
+        -SigningPublicKeyPayload $signingPublicKey `
+        -ExpectedKeyId ([string]$signature.key_id)
+
+    return [ordered]@{
+        manifest_path = $manifestPath
+        signature_path = $signaturePath
+        public_key_path = $publicKeyPath
+        trust_source = [string]$trustArtifacts.trust_source
+        trusted_keys_path = [string]$trustArtifacts.trusted_keys_path
+        trusted_keys_signature_path = [string]$trustArtifacts.trusted_keys_signature_path
+        trust_root_public_key_path = [string]$trustArtifacts.trust_root_public_key_path
+        trust_root_public_key_sha256 = [string]$trustRootPublicKey.public_key_sha256
+        trusted_key_id = [string]$trustedKey.key_id
+        trusted_key_status = [string]$trustedKey.status
+        trusted_key_valid_from = [string]$trustedKey.valid_from
+        trusted_key_expires_at = [string]$trustedKey.expires_at
+        trusted_key_revoked_at = [string]$trustedKey.revoked_at
+        trusted_key_revocation_reason = [string]$trustedKey.revocation_reason
+    }
 }
 
 function Assert-VerifiedReleaseSignature {
@@ -1294,12 +1860,10 @@ function Assert-ImmutablePackageAuditPass {
 
 function Assert-VerifiedReleasePackage {
     param([string]$PackageRoot)
-    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
-    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
-    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
-    if (-not (Test-Path -LiteralPath $manifestPath)) {
-        throw "Verified release manifest not found: $manifestPath"
-    }
+    $trustContext = Resolve-VerifiedReleaseTrustContext -PackageRoot $PackageRoot
+    $manifestPath = [string]$trustContext.manifest_path
+    $signaturePath = [string]$trustContext.signature_path
+    $publicKeyPath = [string]$trustContext.public_key_path
     Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if (-not $manifest -or [string]$manifest.schema -ne "mole_latest_verified_release_v1") {
@@ -1322,6 +1886,11 @@ function Assert-VerifiedReleasePackage {
 
     $hashes = $manifest.hashes
     $buildIdentityPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.build_identity_path)
+    $verifiedReleaseSignaturePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.signature_path)
+    $signingPublicKeyPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.public_key_path)
+    $trustedKeysPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trusted_keys_path)
+    $trustedKeysSignaturePath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trusted_keys_signature_path)
+    $trustRootPublicKeyPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.trust_root_public_key_path)
     $acceptanceTextPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_path)
     $acceptanceJsonPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.acceptance_summary_json_path)
     $upgradeReportPreviewTxtPath = Resolve-ManifestPath -BaseRoot $packageBase -PathValue ([string]$manifest.upgrade_report_preview_path)
@@ -1336,6 +1905,11 @@ function Assert-VerifiedReleasePackage {
 
     $targets = @(
         @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
+        @{ Label = "Verified release signature"; Path = $verifiedReleaseSignaturePath; Hash = [string]$hashes.verified_release_signature_sha256 }
+        @{ Label = "Packaged release signing public key"; Path = $signingPublicKeyPath; Hash = [string]$hashes.public_key_sha256 }
+        @{ Label = "Trusted release key store"; Path = $trustedKeysPath; Hash = [string]$hashes.trusted_keys_sha256 }
+        @{ Label = "Trusted release key store signature"; Path = $trustedKeysSignaturePath; Hash = [string]$hashes.trusted_keys_signature_sha256 }
+        @{ Label = "Release trust-root public key"; Path = $trustRootPublicKeyPath; Hash = [string]$hashes.trust_root_public_key_sha256 }
         @{ Label = "Packaged acceptance summary"; Path = $acceptanceTextPath; Hash = [string]$hashes.acceptance_summary_txt_sha256 }
         @{ Label = "Packaged acceptance summary JSON"; Path = $acceptanceJsonPath; Hash = [string]$hashes.acceptance_summary_json_sha256 }
         @{ Label = "Upgrade report preview"; Path = $upgradeReportPreviewTxtPath; Hash = [string]$hashes.upgrade_report_preview_txt_sha256 }
@@ -1401,6 +1975,9 @@ $SourceSupportFiles = @(
     "latest_verified_release_v1.json",
     "latest_verified_release_v1.signature.json",
     "mole_release_signing_public_key_v1.json",
+    "trusted_release_keys_v1.json",
+    "trusted_release_keys_v1.signature.json",
+    "mole_release_trust_root_public_key_v1.json",
     "PACKAGE_VERSION_AUDIT.json",
     "PACKAGE_VERSION_AUDIT.txt",
     "IMMUTABLE_PACKAGE_AUDIT.json",
@@ -1435,13 +2012,14 @@ $InstalledDataRoot = Join-Path $InstallRoot "data"
 $InstalledDataRootManifestPath = Join-Path $InstalledDataRoot "data_root_manifest_v1.json"
 
 if ($VerifyPackageOnly) {
-    $manifestPath = Join-Path $PackageRoot "latest_verified_release_v1.json"
-    $signaturePath = Join-Path $PackageRoot "latest_verified_release_v1.signature.json"
-    $publicKeyPath = Join-Path $PackageRoot "mole_release_signing_public_key_v1.json"
+    $trustContext = Resolve-VerifiedReleaseTrustContext -PackageRoot $PackageRoot
+    $manifestPath = [string]$trustContext.manifest_path
+    $signaturePath = [string]$trustContext.signature_path
+    $publicKeyPath = [string]$trustContext.public_key_path
     $verificationMode = "full_verified_release"
     if ($BootstrapPackageVerification) {
         Assert-VerifiedReleaseSignature -ManifestPath $manifestPath -SignaturePath $signaturePath -PublicKeyPath $publicKeyPath
-        $verificationMode = "bootstrap_signature_only"
+        $verificationMode = "bootstrap_trusted_signature_only"
     }
     else {
         Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
@@ -1459,6 +2037,17 @@ if ($VerifyPackageOnly) {
         git_branch = [string]$buildIdentity.git_branch
         signature_path = $signaturePath
         public_key_path = $publicKeyPath
+        trusted_keys_path = [string]$trustContext.trusted_keys_path
+        trusted_keys_signature_path = [string]$trustContext.trusted_keys_signature_path
+        trust_root_public_key_path = [string]$trustContext.trust_root_public_key_path
+        trust_source = [string]$trustContext.trust_source
+        trust_root_public_key_sha256 = [string]$trustContext.trust_root_public_key_sha256
+        trusted_key_id = [string]$trustContext.trusted_key_id
+        trusted_key_status = [string]$trustContext.trusted_key_status
+        trusted_key_valid_from = [string]$trustContext.trusted_key_valid_from
+        trusted_key_expires_at = [string]$trustContext.trusted_key_expires_at
+        trusted_key_revoked_at = [string]$trustContext.trusted_key_revoked_at
+        trusted_key_revocation_reason = [string]$trustContext.trusted_key_revocation_reason
         key_id = [string]$signature.key_id
         manifest_sha256 = [string]$signature.manifest_sha256
     } | ConvertTo-Json -Depth 5
@@ -1471,10 +2060,11 @@ Write-Status "  Package root: $PackageRoot"
 Write-Status "  Install root: $InstallRoot"
 
 if ($BootstrapPackageVerification) {
+    $trustContext = Resolve-VerifiedReleaseTrustContext -PackageRoot $PackageRoot
     Assert-VerifiedReleaseSignature `
-        -ManifestPath (Join-Path $PackageRoot "latest_verified_release_v1.json") `
-        -SignaturePath (Join-Path $PackageRoot "latest_verified_release_v1.signature.json") `
-        -PublicKeyPath (Join-Path $PackageRoot "mole_release_signing_public_key_v1.json")
+        -ManifestPath ([string]$trustContext.manifest_path) `
+        -SignaturePath ([string]$trustContext.signature_path) `
+        -PublicKeyPath ([string]$trustContext.public_key_path)
 }
 else {
     Assert-VerifiedReleasePackage -PackageRoot $PackageRoot
@@ -1804,10 +2394,25 @@ else:
 ) -WorkingDirectory $RepoRoot
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $installRoot "MOLE_DAS.ico") -Force
 Require-Path $releaseSigningPublicKeySourcePath "Release signing public key"
+Require-Path $trustedReleaseKeysSourcePath "Trusted release key store"
+Require-Path $releaseTrustRootPublicKeySourcePath "Release trust-root public key"
 Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $releaseSigningPublicKeyOutputPath -Force
 Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $releaseSigningPublicKeySharePath -Force
+Copy-Item -LiteralPath $trustedReleaseKeysSourcePath -Destination $trustedReleaseKeysOutputPath -Force
+Copy-Item -LiteralPath $trustedReleaseKeysSourcePath -Destination $trustedReleaseKeysSharePath -Force
+Copy-Item -LiteralPath $releaseTrustRootPublicKeySourcePath -Destination $releaseTrustRootPublicKeyOutputPath -Force
+Copy-Item -LiteralPath $releaseTrustRootPublicKeySourcePath -Destination $releaseTrustRootPublicKeySharePath -Force
+Write-TrustedReleaseKeysSignature -TrustedKeysPath $trustedReleaseKeysOutputPath -SignaturePath $trustedReleaseKeysSignaturePath
+Write-TrustedReleaseKeysSignature -TrustedKeysPath $trustedReleaseKeysSharePath -SignaturePath $trustedReleaseKeysShareSignaturePath
 if ($stableChannelPublicKeyPath) {
     Copy-Item -LiteralPath $releaseSigningPublicKeySourcePath -Destination $stableChannelPublicKeyPath -Force
+}
+if ($stableChannelTrustedKeysPath) {
+    Copy-Item -LiteralPath $trustedReleaseKeysSourcePath -Destination $stableChannelTrustedKeysPath -Force
+    Write-TrustedReleaseKeysSignature -TrustedKeysPath $stableChannelTrustedKeysPath -SignaturePath $stableChannelTrustedKeysSignaturePath
+}
+if ($stableChannelTrustRootPublicKeyPath) {
+    Copy-Item -LiteralPath $releaseTrustRootPublicKeySourcePath -Destination $stableChannelTrustRootPublicKeyPath -Force
 }
 
 $shell = New-Object -ComObject WScript.Shell
@@ -1884,6 +2489,9 @@ Copy-VariantPaths -SourceRoot $installRoot -DestinationRoot $portableStageRoot -
     $verifiedReleaseManifestName,
     $verifiedReleaseSignatureName,
     $releaseSigningPublicKeyName,
+    $trustedReleaseKeysName,
+    $trustedReleaseKeysSignatureName,
+    $releaseTrustRootPublicKeyName,
     $versionAuditJsonName,
     $versionAuditTxtName,
     $immutableAuditJsonName,

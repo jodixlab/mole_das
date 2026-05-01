@@ -1,0 +1,8 @@
+{
+  "schema": "mole_release_trust_root_public_key_v1",
+  "key_id": "mole_release_trust_root_key_v1",
+  "algorithm": "RSA-SHA256",
+  "created_at": "2026-05-01T00:00:00Z",
+  "public_key_sha256": "E39F7561AC5AFE8353EB47F0BC4FFFB2693AE8177CE15D63F2AE85D162911737",
+  "public_key_xml": "<RSAKeyValue><Modulus>y/l1qcRfWWW0CcqcqtasfNcWD4F+G+tMtxCplkq3qzzMKFAFLmLlvRlW6nsNRweDYas4jxvWcLSKWRmdkVZiQj7kJldEcXqioFmJ8s3EgHU4efBk6eZKzTz2VhSKVynYwMUJGeD8lDuttnG2eWyC/QUb9+1MHKKqIIXRxuKZ83F6guiVpldFirD3XuoF2WFFD85EHKjIJrZIGzgC7CXleuhne6aAVozHDp7zIBsTU87YeTYHdOxPyRcXMfwSJ0K3K8XqSg0u7IDJzdU9mSZyw1GkuIa384j470iErnW1bQypSikOIug2MI9YCz0dsyNJlQFB9XRWJdWuBlELw2LJkiYUn318g+yhtIuyqpXWpC8kiPlqGeadoEIhbF7mFJafPFFeumRk9hcadeynNU56h1fv4TpH+6W1Dn5v4ybd9eyyOEmCMP+PZ1Ght3DHrM6EXQaLJwB33byYRoXDySwZ1qn1kvnO/XL7/3w6ia/YbE2+AA9zoCd6l9cxClmSvwaYclhFFTl/de1BdG4ZEtpMV4fYksUWoQwQqtdEYZ0VzaKe3uTURBYbvgowaRkDmfysTj6/I885HhEmNGpCUTKI10UX7KVRUbe+PRO+UcVjxXM2wmceji55XMVQZzYb3zGNOyAp6hBM3iwx5dJykm0h/PjEPW3nFmfotqd/1Vdi/qk=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue>"
+}

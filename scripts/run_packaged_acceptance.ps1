@@ -278,6 +278,65 @@ $wizardProc = $null
 $runnerProc = $null
 
 try {
+    $trustedReleaseKeysPath = $null
+    foreach ($candidateRoot in @((Split-Path -Parent $PackageRoot), $PackageRoot)) {
+        if (-not $candidateRoot) {
+            continue
+        }
+        $candidateTrustedKeysPath = Join-Path $candidateRoot "trusted_release_keys_v1.json"
+        $candidateTrustedKeysSignaturePath = Join-Path $candidateRoot "trusted_release_keys_v1.signature.json"
+        $candidateTrustRootPublicKeyPath = Join-Path $candidateRoot "mole_release_trust_root_public_key_v1.json"
+        if (
+            (Test-Path -LiteralPath $candidateTrustedKeysPath) -and
+            (Test-Path -LiteralPath $candidateTrustedKeysSignaturePath) -and
+            (Test-Path -LiteralPath $candidateTrustRootPublicKeyPath)
+        ) {
+            $trustedReleaseKeysPath = $candidateTrustedKeysPath
+            break
+        }
+    }
+    Require-Path -PathValue $trustedReleaseKeysPath -Label "Trusted release key store"
+    $trustedReleaseKeysBackupPath = Join-Path $ArtifactOutDir "trusted_release_keys_v1.original.json"
+    Copy-Item -LiteralPath $trustedReleaseKeysPath -Destination $trustedReleaseKeysBackupPath -Force
+    try {
+        $trustedReleaseKeys = Get-Content -LiteralPath $trustedReleaseKeysPath -Raw | ConvertFrom-Json
+        if (-not $trustedReleaseKeys) {
+            throw "Trusted release key store could not be parsed: $trustedReleaseKeysPath"
+        }
+        $trustedReleaseKeys.channel_name = "TAMPERED_ACCEPTANCE_CHANNEL"
+        Write-JsonUtf8 -PathValue $trustedReleaseKeysPath -Payload $trustedReleaseKeys
+        $tamperResult = Invoke-CapturedProcess `
+            -Label "reject_tampered_trusted_key_store" `
+            -FilePath "powershell.exe" `
+            -ArgumentList @(
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", $installerPs1,
+                "-BootstrapPackageVerification",
+                "-VerifyPackageOnly",
+                "-Quiet"
+            ) `
+            -WorkingDirectory $PackageRoot `
+            -AllowNonZeroExit
+        if ($tamperResult.exit_code -eq 0) {
+            throw "Tampered trusted release key store unexpectedly passed package verification."
+        }
+        $tamperOutput = (($tamperResult.stdout | Out-String) + "`n" + ($tamperResult.stderr | Out-String))
+        if ($tamperOutput -notmatch "Trusted release key store|signature|trusted release") {
+            throw "Tampered package verification failed for an unexpected reason.`nSTDOUT:`n$($tamperResult.stdout)`nSTDERR:`n$($tamperResult.stderr)"
+        }
+        Add-StepResult -Name "reject_tampered_trusted_key_store" -Status "PASS" -Detail "Package verification rejected a tampered trusted release key store before install." -Extra @{
+            stdout_path = $tamperResult.stdout_path
+            stderr_path = $tamperResult.stderr_path
+            trusted_release_keys_path = $trustedReleaseKeysPath
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $trustedReleaseKeysBackupPath) {
+            Copy-Item -LiteralPath $trustedReleaseKeysBackupPath -Destination $trustedReleaseKeysPath -Force
+        }
+    }
+
     if (Test-Path -LiteralPath $InstallRoot) {
         Remove-TreeRobust -PathValue $InstallRoot
     }

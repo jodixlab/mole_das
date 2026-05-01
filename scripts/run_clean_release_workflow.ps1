@@ -180,6 +180,9 @@ try {
         $verifiedReleaseManifest = Join-Path $bundleRoot "latest_verified_release_v1.json"
         $verifiedReleaseSignature = Join-Path $bundleRoot "latest_verified_release_v1.signature.json"
         $releaseSigningPublicKey = Join-Path $bundleRoot "mole_release_signing_public_key_v1.json"
+        $trustedReleaseKeys = Join-Path $bundleRoot "trusted_release_keys_v1.json"
+        $trustedReleaseKeysSignature = Join-Path $bundleRoot "trusted_release_keys_v1.signature.json"
+        $releaseTrustRootPublicKey = Join-Path $bundleRoot "mole_release_trust_root_public_key_v1.json"
         $versionAuditJson = Join-Path $bundleRoot "PACKAGE_VERSION_AUDIT.json"
         $versionAuditTxt = Join-Path $bundleRoot "PACKAGE_VERSION_AUDIT.txt"
         $upgradeReportPreviewJson = Join-Path $bundleRoot "UPGRADE_REPORT_PREVIEW.json"
@@ -200,6 +203,15 @@ try {
         }
         if (-not (Test-Path -LiteralPath $releaseSigningPublicKey)) {
             throw "Release signing public key missing after bundle build: $releaseSigningPublicKey"
+        }
+        if (-not (Test-Path -LiteralPath $trustedReleaseKeys)) {
+            throw "Trusted release key store missing after bundle build: $trustedReleaseKeys"
+        }
+        if (-not (Test-Path -LiteralPath $trustedReleaseKeysSignature)) {
+            throw "Trusted release key store signature missing after bundle build: $trustedReleaseKeysSignature"
+        }
+        if (-not (Test-Path -LiteralPath $releaseTrustRootPublicKey)) {
+            throw "Release trust-root public key missing after bundle build: $releaseTrustRootPublicKey"
         }
         if (-not (Test-Path -LiteralPath $versionAuditJson)) {
             throw "Package version audit JSON missing after bundle build: $versionAuditJson"
@@ -236,6 +248,9 @@ try {
         Copy-Item -LiteralPath $verifiedReleaseManifest -Destination (Join-Path $releaseOutDir "latest_verified_release_v1.json") -Force
         Copy-Item -LiteralPath $verifiedReleaseSignature -Destination (Join-Path $releaseOutDir "latest_verified_release_v1.signature.json") -Force
         Copy-Item -LiteralPath $releaseSigningPublicKey -Destination (Join-Path $releaseOutDir "mole_release_signing_public_key_v1.json") -Force
+        Copy-Item -LiteralPath $trustedReleaseKeys -Destination (Join-Path $releaseOutDir "trusted_release_keys_v1.json") -Force
+        Copy-Item -LiteralPath $trustedReleaseKeysSignature -Destination (Join-Path $releaseOutDir "trusted_release_keys_v1.signature.json") -Force
+        Copy-Item -LiteralPath $releaseTrustRootPublicKey -Destination (Join-Path $releaseOutDir "mole_release_trust_root_public_key_v1.json") -Force
         Copy-Item -LiteralPath $versionAuditJson -Destination (Join-Path $releaseOutDir "PACKAGE_VERSION_AUDIT.json") -Force
         Copy-Item -LiteralPath $versionAuditTxt -Destination (Join-Path $releaseOutDir "PACKAGE_VERSION_AUDIT.txt") -Force
         Copy-Item -LiteralPath $upgradeReportPreviewJson -Destination (Join-Path $releaseOutDir "UPGRADE_REPORT_PREVIEW.json") -Force

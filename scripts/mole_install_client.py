@@ -931,6 +931,9 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
     verified_release_path = package_root / "latest_verified_release_v1.json"
     verified_release_signature_path = package_root / "latest_verified_release_v1.signature.json"
     signing_public_key_path = package_root / "mole_release_signing_public_key_v1.json"
+    trusted_release_keys_path = package_root / "trusted_release_keys_v1.json"
+    trusted_release_keys_signature_path = package_root / "trusted_release_keys_v1.signature.json"
+    trust_root_public_key_path = package_root / "mole_release_trust_root_public_key_v1.json"
     acceptance_json_path = package_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
     version_audit_path = package_root / "PACKAGE_VERSION_AUDIT.json"
     immutable_audit_path = package_root / "IMMUTABLE_PACKAGE_AUDIT.json"
@@ -941,6 +944,9 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
     verified_release = _load_json(verified_release_path)
     verified_release_signature = _load_json(verified_release_signature_path)
     signing_public_key = _load_json(signing_public_key_path)
+    trusted_release_keys = _load_json(trusted_release_keys_path)
+    trusted_release_keys_signature = _load_json(trusted_release_keys_signature_path)
+    trust_root_public_key = _load_json(trust_root_public_key_path)
     acceptance = _load_json(acceptance_json_path)
     version_audit = _load_json(version_audit_path)
     immutable_audit = _load_json(immutable_audit_path)
@@ -951,6 +957,9 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
         "verified_release_path": str(verified_release_path),
         "verified_release_signature_path": str(verified_release_signature_path),
         "signing_public_key_path": str(signing_public_key_path),
+        "trusted_release_keys_path": str(trusted_release_keys_path),
+        "trusted_release_keys_signature_path": str(trusted_release_keys_signature_path),
+        "trust_root_public_key_path": str(trust_root_public_key_path),
         "acceptance_json_path": str(acceptance_json_path),
         "version_audit_path": str(version_audit_path),
         "immutable_audit_path": str(immutable_audit_path),
@@ -966,12 +975,18 @@ def _package_summary(package_root: Path) -> Dict[str, Any]:
         "verified_release_channel": str(verified_release.get("channel_name") or ""),
         "signature_key_id": str(verified_release_signature.get("key_id") or signing_public_key.get("key_id") or ""),
         "signature_status": str(verified_release_signature.get("schema") or ""),
+        "trust_root_key_id": str(trust_root_public_key.get("key_id") or ""),
+        "trusted_release_key_count": len(trusted_release_keys.get("keys") or []),
+        "trusted_release_keys_signature_status": str(trusted_release_keys_signature.get("schema") or ""),
         "data_schema_version_expected": _extract_runtime_constant(package_root, "DATA_ROOT_SCHEMA_VERSION"),
         "data_manifest_schema_expected": _extract_runtime_constant(package_root, "DATA_ROOT_MANIFEST_SCHEMA"),
         "build_identity": build_identity,
         "verified_release": verified_release,
         "verified_release_signature": verified_release_signature,
         "signing_public_key": signing_public_key,
+        "trusted_release_keys": trusted_release_keys,
+        "trusted_release_keys_signature": trusted_release_keys_signature,
+        "trust_root_public_key": trust_root_public_key,
         "acceptance": acceptance,
         "version_audit": version_audit,
         "immutable_audit": immutable_audit,
@@ -1247,9 +1262,14 @@ class InstallClient(tk.Tk):
             f"Verified channel: {self.package['verified_release_channel'] or '(none)'}",
             f"Signing key: {self.package['signature_key_id'] or '(missing)'}",
             f"Signature schema: {self.package['signature_status'] or '(missing)'}",
+            f"Trust-root key: {self.package['trust_root_key_id'] or '(missing)'}",
+            f"Trusted release keys: {self.package['trusted_release_key_count']}",
+            f"Trusted release key store signature: {self.package['trusted_release_keys_signature_status'] or '(missing)'}",
             f"Expected data schema: {self.package['data_schema_version_expected'] or '(unknown)'}",
             f"Package root: {self.package['package_root']}",
             f"Runtime root: {self.package['runtime_root']}",
+            f"Trusted release keys path: {self.package['trusted_release_keys_path']}",
+            f"Trust-root public key path: {self.package['trust_root_public_key_path']}",
             f"Portable data payload present: {'yes' if self.package['has_data_payload'] else 'no'}",
         ]
         install_lines = [
