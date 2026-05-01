@@ -1724,7 +1724,6 @@ def verify_verified_release_reference(
             _append_release_verification_issue(details, "Packaged acceptance package label does not match the verified release label.")
 
     _verify_release_hash(details, label="Build identity manifest", path=build_identity_path, expected_hash=hashes.get("build_identity_sha256", ""), required=True)
-    _verify_release_hash(details, label="Verified release signature", path=signature_path, expected_hash=hashes.get("verified_release_signature_sha256", ""), required=True)
     _verify_release_hash(details, label="Packaged release signing public key", path=public_key_path, expected_hash=hashes.get("public_key_sha256", ""), required=True)
     _verify_release_hash(details, label="Trusted release key store", path=trusted_keys_path, expected_hash=hashes.get("trusted_keys_sha256", ""), required=True)
     _verify_release_hash(details, label="Trusted release key store signature", path=trusted_keys_signature_path, expected_hash=hashes.get("trusted_keys_signature_sha256", ""), required=True)

@@ -801,7 +801,6 @@ function Assert-VerifiedReleasePackage {
 
     $targets = @(
         @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
-        @{ Label = "Verified release signature"; Path = $verifiedReleaseSignaturePath; Hash = [string]$hashes.verified_release_signature_sha256 }
         @{ Label = "Packaged release signing public key"; Path = $signingPublicKeyPath; Hash = [string]$hashes.public_key_sha256 }
         @{ Label = "Trusted release key store"; Path = $trustedKeysPath; Hash = [string]$hashes.trusted_keys_sha256 }
         @{ Label = "Trusted release key store signature"; Path = $trustedKeysSignaturePath; Hash = [string]$hashes.trusted_keys_signature_sha256 }
@@ -1067,7 +1066,6 @@ function Write-VerifiedReleaseManifest {
         portable_bundle_path = ""
         hashes = [ordered]@{
             build_identity_sha256 = Get-FileHashValue $buildIdentityPath
-            verified_release_signature_sha256 = Get-FileHashValue $verifiedReleaseSignaturePath
             public_key_sha256 = Get-FileHashValue $releaseSigningPublicKeyOutputPath
             trusted_keys_sha256 = Get-FileHashValue $trustedReleaseKeysOutputPath
             trusted_keys_signature_sha256 = Get-FileHashValue $trustedReleaseKeysSignaturePath
@@ -1905,7 +1903,6 @@ function Assert-VerifiedReleasePackage {
 
     $targets = @(
         @{ Label = "Build identity manifest"; Path = $buildIdentityPath; Hash = [string]$hashes.build_identity_sha256 }
-        @{ Label = "Verified release signature"; Path = $verifiedReleaseSignaturePath; Hash = [string]$hashes.verified_release_signature_sha256 }
         @{ Label = "Packaged release signing public key"; Path = $signingPublicKeyPath; Hash = [string]$hashes.public_key_sha256 }
         @{ Label = "Trusted release key store"; Path = $trustedKeysPath; Hash = [string]$hashes.trusted_keys_sha256 }
         @{ Label = "Trusted release key store signature"; Path = $trustedKeysSignaturePath; Hash = [string]$hashes.trusted_keys_signature_sha256 }
