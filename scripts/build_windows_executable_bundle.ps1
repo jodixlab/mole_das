@@ -1242,22 +1242,30 @@ function Build-Executable {
     $exeInnerWorkRoot = Join-Path $exeWorkRoot $Name
     New-Item -ItemType Directory -Path $distRoot, $exeWorkRoot, $exeSpecRoot, $exeInnerWorkRoot -Force | Out-Null
 
-    $excludedModules = @(
-        "numpy.tests",
-        "numpy.f2py.tests",
-        "numpy.fft.tests",
-        "numpy.lib.tests",
-        "numpy.linalg.tests",
-        "numpy.ma.tests",
-        "numpy.matrixlib.tests",
-        "numpy.polynomial.tests",
-        "numpy.random.tests",
-        "numpy.testing.tests",
-        "numpy.typing.tests",
-        "pandas.tests",
-        "pygame.examples",
-        "pygame.tests",
-        "reportlab.graphics.samples"
+    $runtimeHiddenImports = @(
+        "PIL.Image",
+        "PIL.ImageDraw",
+        "PIL.ImageEnhance",
+        "PIL.ImageFont",
+        "PIL.ImageGrab",
+        "PIL.ImageOps",
+        "PIL.ImageSequence",
+        "PIL.ImageTk",
+        "openpyxl",
+        "openpyxl.styles",
+        "openpyxl.utils",
+        "pygame",
+        "pygame.mixer",
+        "reportlab.lib",
+        "reportlab.lib.colors",
+        "reportlab.lib.pagesizes",
+        "reportlab.lib.styles",
+        "reportlab.lib.units",
+        "reportlab.pdfgen",
+        "reportlab.pdfgen.canvas",
+        "reportlab.platypus",
+        "serial",
+        "serial.tools.list_ports"
     )
 
     $args = @(
@@ -1275,15 +1283,10 @@ function Build-Executable {
         "--hidden-import", "tkinter.ttk",
         "--hidden-import", "tkinter.filedialog",
         "--hidden-import", "tkinter.messagebox",
-        "--collect-submodules", "numpy",
-        "--collect-submodules", "pandas",
-        "--collect-submodules", "openpyxl",
-        "--collect-submodules", "reportlab",
-        "--collect-submodules", "pygame",
         $EntryScript
     )
-    foreach ($moduleName in $excludedModules) {
-        $args = @($args[0..($args.Length - 2)] + @("--exclude-module", $moduleName) + $args[($args.Length - 1)])
+    foreach ($moduleName in $runtimeHiddenImports) {
+        $args = @($args[0..($args.Length - 2)] + @("--hidden-import", $moduleName) + $args[($args.Length - 1)])
     }
     if ($Windowed) {
         $args = @($args[0..1] + @("--windowed") + $args[2..($args.Length - 1)])
