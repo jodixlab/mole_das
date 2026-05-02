@@ -32,6 +32,8 @@ mole_das_data/training/exports/
 mole_das_data/training/logs/
 mole_das_data/training/sessions/
 mole_das_data/training/validation/
+mole_das_data/data_root_manifest_v1.json
+mole_das_data/training/data_root_manifest_v1.json
 
 mole_das_data/db/*.sqlite-shm
 mole_das_data/db/*.sqlite-wal

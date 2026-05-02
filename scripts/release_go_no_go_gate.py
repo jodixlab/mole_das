@@ -10,15 +10,53 @@ def _read_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def _missing_artifacts_report(artifact_dir: Path, missing: List[str], allow_pending_operator: bool) -> Dict[str, Any]:
+    return {
+        "schema": "mole_release_go_no_go_decision_v1",
+        "status": "MISSING_ARTIFACTS",
+        "overall_decision": "NO-GO",
+        "allow_pending_operator": allow_pending_operator,
+        "artifact_dir": str(artifact_dir),
+        "clean_workflow_status": None,
+        "bundle_status": None,
+        "release_cert_status": None,
+        "package_hygiene_status": None,
+        "blocking_manual_pending": [],
+        "blocking_manual_fail": [],
+        "conditional_manual_fail": [],
+        "final_release_decision": {},
+        "missing_artifacts": missing,
+        "findings": [
+            "release decision artifacts are missing",
+            "run RUN_CLEAN_RELEASE_WORKFLOW.bat before RUN_RELEASE_DECISION_GATE.bat",
+        ],
+    }
+
+
 def _decision_upper(value: Any) -> str:
     return str(value or "").strip().upper()
 
 
 def _evaluate(artifact_dir: Path, allow_pending_operator: bool) -> Dict[str, Any]:
+    cert_paths = sorted(artifact_dir.glob("RELEASE_CERT_*.json"))
+    hygiene_paths = sorted(artifact_dir.glob("RELEASE_HYGIENE_*.json"))
+    required_paths = [
+        artifact_dir / "clean_release_summary.json",
+        artifact_dir / "release_bundle_summary.json",
+        artifact_dir / "operator_go_no_go_checklist.json",
+    ]
+    missing = [str(path) for path in required_paths if not path.exists()]
+    if not cert_paths:
+        missing.append(str(artifact_dir / "RELEASE_CERT_*.json"))
+    if not hygiene_paths:
+        missing.append(str(artifact_dir / "RELEASE_HYGIENE_*.json"))
+    if missing:
+        return _missing_artifacts_report(artifact_dir, missing, allow_pending_operator)
+
     summary = _read_json(artifact_dir / "clean_release_summary.json")
     bundle = _read_json(artifact_dir / "release_bundle_summary.json")
-    cert = _read_json(next(iter(sorted(artifact_dir.glob("RELEASE_CERT_*.json")))))
-    hygiene = _read_json(next(iter(sorted(artifact_dir.glob("RELEASE_HYGIENE_*.json")))))
+    cert = _read_json(cert_paths[0])
+    hygiene = _read_json(hygiene_paths[0])
     checklist = _read_json(artifact_dir / "operator_go_no_go_checklist.json")
 
     findings: List[str] = []
@@ -122,6 +160,11 @@ def _render_md(report: Dict[str, Any]) -> str:
         for item in report.get("findings") or []:
             lines.append(f"- {item}")
         lines.append("")
+    if report.get("missing_artifacts"):
+        lines.append("## Missing Artifacts")
+        for item in report.get("missing_artifacts") or []:
+            lines.append(f"- `{item}`")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -132,6 +175,7 @@ def main() -> int:
     args = ap.parse_args()
 
     artifact_dir = Path(args.artifact_dir).resolve()
+    artifact_dir.mkdir(parents=True, exist_ok=True)
     report = _evaluate(artifact_dir, allow_pending_operator=bool(args.allow_pending_operator))
 
     json_path = artifact_dir / "release_go_no_go_decision.json"
