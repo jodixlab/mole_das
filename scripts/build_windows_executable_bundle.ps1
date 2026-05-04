@@ -1188,8 +1188,8 @@ $buildIdentity = [ordered]@{
     git_commit = $gitCommit
     git_branch = $gitBranch
     build_manifest_generated_at = $buildManifestGeneratedAt
-    runtime_root = $runtimeRoot
-    runtime_code_root = $runtimeCodeRoot
+    runtime_root = "runtime"
+    runtime_code_root = "runtime\MOLE_code"
 }
 [System.IO.File]::WriteAllText(
     $buildIdentityPath,

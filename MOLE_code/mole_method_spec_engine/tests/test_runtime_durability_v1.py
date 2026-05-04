@@ -209,6 +209,61 @@ class RuntimeDurabilityTests(unittest.TestCase):
             self.assertEqual(result["install_root_path"], str(install_root.resolve()))
             self.assertEqual(result["local_accepted_package_marker_path"], str(acceptance_path.resolve()))
 
+    def test_package_status_current_with_relative_build_identity_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            install_root = root / "installed"
+            runtime_root = install_root / "runtime"
+            (runtime_root / "config").mkdir(parents=True, exist_ok=True)
+            acceptance_path = install_root / "PACKAGED_ACCEPTANCE_SUMMARY.json"
+            install_manifest_path = install_root / "mole_install_manifest_v1.json"
+
+            install_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_install_manifest_v1",
+                        "install_root": str(install_root),
+                        "runtime_root": str(runtime_root),
+                        "bundle_label": "MOLE_DAS_2026_04_23_v3",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            acceptance_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_packaged_acceptance_v1",
+                        "status": "PASS",
+                        "package_label": "MOLE_DAS_2026_04_23_v3",
+                        "generated_at": "2026-04-23T18:37:43Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            original = durability.load_uninstall_registration
+            durability.load_uninstall_registration = lambda: {
+                "install_location": str(install_root),
+                "display_version": "MOLE_DAS_2026_04_23_v3",
+            }
+            try:
+                with self._patched_trust_check(self._passing_trust_check()):
+                    result = evaluate_runtime_package_status(
+                        current_runtime_root=runtime_root,
+                        current_build_identity={
+                            "bundle_label": "MOLE_DAS_2026_04_23_v3",
+                            "built_at": "2026-04-23T18:26:02Z",
+                            "runtime_root": "runtime",
+                            "runtime_code_root": "runtime\\MOLE_code",
+                        },
+                        current_acceptance_summary_path=acceptance_path,
+                    )
+            finally:
+                durability.load_uninstall_registration = original
+
+            self.assertEqual(result["package_status"], "CURRENT")
+            self.assertFalse(result["build_identity_runtime_mismatch"])
+
     def test_package_status_current_for_installed_runtime_without_registry_entry(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

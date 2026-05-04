@@ -295,6 +295,25 @@ def _safe_path(path_value: Any) -> Optional[Path]:
             return None
 
 
+def _safe_path_from_package(path_value: Any, package_root: Path) -> Optional[Path]:
+    text = str(path_value or "").strip()
+    if not text:
+        return None
+    try:
+        path = Path(text).expanduser()
+        if not path.is_absolute():
+            path = Path(package_root) / path
+        return path.resolve()
+    except Exception:
+        try:
+            path = Path(text).expanduser()
+            if not path.is_absolute():
+                path = Path(package_root) / path
+            return path
+        except Exception:
+            return None
+
+
 def _load_json_dict(path_value: Any) -> Dict[str, Any]:
     path = path_value if isinstance(path_value, Path) else _safe_path(path_value)
     if not isinstance(path, Path) or not path.exists() or not path.is_file():
@@ -1348,7 +1367,10 @@ def evaluate_runtime_package_status(
         or ""
     ).strip()
     current_built_at = _parse_iso_datetime(build_identity.get("built_at"))
-    current_identity_runtime_root = _safe_path(build_identity.get("runtime_root"))
+    current_identity_runtime_root = _safe_path_from_package(
+        build_identity.get("runtime_root"),
+        current_package_root,
+    )
 
     current_install_manifest_path = runtime_root.parent / "mole_install_manifest_v1.json"
     current_install_manifest = _load_json_dict(
