@@ -1407,6 +1407,47 @@ function Copy-TreeRobust {
     }
 }
 
+function Move-DirectoryRobust {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination,
+        [int]$Retries = 10,
+        [int]$DelayMilliseconds = 500
+    )
+
+    $sourceFull = [System.IO.Path]::GetFullPath($Source)
+    $destinationFull = [System.IO.Path]::GetFullPath($Destination)
+
+    if (-not (Test-Path -LiteralPath $sourceFull -PathType Container)) {
+        throw "Move source directory not found: $sourceFull"
+    }
+    if (Test-Path -LiteralPath $destinationFull) {
+        throw "Move destination already exists: $destinationFull"
+    }
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le $Retries; $attempt++) {
+        try {
+            [System.IO.Directory]::Move($sourceFull, $destinationFull)
+            return
+        }
+        catch {
+            $lastError = $_
+            if ((-not (Test-Path -LiteralPath $sourceFull)) -and (Test-Path -LiteralPath $destinationFull -PathType Container)) {
+                return
+            }
+            if ($attempt -ge $Retries) {
+                break
+            }
+            [GC]::Collect()
+            [GC]::WaitForPendingFinalizers()
+            Start-Sleep -Milliseconds ($DelayMilliseconds * $attempt)
+        }
+    }
+
+    throw "Failed to move directory from $sourceFull to $destinationFull after $Retries attempts. Last error: $($lastError.Exception.Message)"
+}
+
 function Assert-ProcessesClosed {
     param([string]$TargetRoot)
     $names = @("MOLE_DAS_Wizard", "MOLE_DAQ_Runner", "MOLE_ScriptRunner")
@@ -2149,18 +2190,21 @@ $swapped = $false
 try {
     if (Test-Path -LiteralPath $ActiveRuntime) {
         Write-Status "Archiving previous runtime..."
-        Move-Item -LiteralPath $ActiveRuntime -Destination $PreviousRuntime -Force
+        Move-DirectoryRobust -Source $ActiveRuntime -Destination $PreviousRuntime
     }
     Write-Status "Promoting staged runtime..."
-    Move-Item -LiteralPath $IncomingRuntime -Destination $ActiveRuntime -Force
+    Move-DirectoryRobust -Source $IncomingRuntime -Destination $ActiveRuntime
     $swapped = $true
 }
 catch {
-    if ($swapped -and (Test-Path -LiteralPath $ActiveRuntime)) {
-        Remove-Item -LiteralPath $ActiveRuntime -Recurse -Force -ErrorAction SilentlyContinue
-    }
     if (Test-Path -LiteralPath $PreviousRuntime) {
-        Move-Item -LiteralPath $PreviousRuntime -Destination $ActiveRuntime -Force
+        if (Test-Path -LiteralPath $ActiveRuntime) {
+            Remove-Item -LiteralPath $ActiveRuntime -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Move-DirectoryRobust -Source $PreviousRuntime -Destination $ActiveRuntime
+    }
+    elseif ($swapped -and (Test-Path -LiteralPath $ActiveRuntime)) {
+        Remove-Item -LiteralPath $ActiveRuntime -Recurse -Force -ErrorAction SilentlyContinue
     }
     throw
 }

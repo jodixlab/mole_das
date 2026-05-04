@@ -65,6 +65,15 @@ class RuntimeDurabilityTests(unittest.TestCase):
         finally:
             durability._verified_release_check = original
 
+    def test_installer_template_uses_retryable_runtime_rotation(self) -> None:
+        build_script = ROOT.parent / "scripts" / "build_windows_executable_bundle.ps1"
+        script_text = build_script.read_text(encoding="utf-8")
+
+        self.assertIn("function Move-DirectoryRobust", script_text)
+        self.assertIn("Move-DirectoryRobust -Source $ActiveRuntime -Destination $PreviousRuntime", script_text)
+        self.assertIn("Move-DirectoryRobust -Source $IncomingRuntime -Destination $ActiveRuntime", script_text)
+        self.assertIn("Move-DirectoryRobust -Source $PreviousRuntime -Destination $ActiveRuntime", script_text)
+
     def test_packaged_runtime_layout_uses_external_data_root_and_seeds(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             install_root = Path(td) / "MOLE_DAS_2026_04_28_v5"
