@@ -74,6 +74,15 @@ class RuntimeDurabilityTests(unittest.TestCase):
         self.assertIn("Move-DirectoryRobust -Source $IncomingRuntime -Destination $ActiveRuntime", script_text)
         self.assertIn("Move-DirectoryRobust -Source $PreviousRuntime -Destination $ActiveRuntime", script_text)
 
+    def test_exe_bundle_packages_install_client_as_executable(self) -> None:
+        build_script = ROOT.parent / "scripts" / "build_windows_executable_bundle.ps1"
+        script_text = build_script.read_text(encoding="utf-8")
+
+        self.assertIn('Build-Executable -Name "MOLE_DAS_Install_Client"', script_text)
+        self.assertIn("MOLE_DAS_Install_Client.exe", script_text)
+        self.assertIn("install_client_exe_sha256", script_text)
+        self.assertNotIn(r'runtime\MOLE_code\.venv\Scripts\python.exe" "%~dp0MOLE_DAS_INSTALL_CLIENT.py"', script_text)
+
     def test_packaged_runtime_layout_uses_external_data_root_and_seeds(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             install_root = Path(td) / "MOLE_DAS_2026_04_28_v5"

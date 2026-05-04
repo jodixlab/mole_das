@@ -1051,6 +1051,7 @@ function Write-VerifiedReleaseManifest {
     $hashWizardExePath = Join-Path $hashRuntimeCodeRoot "MOLE_DAS_Wizard.exe"
     $hashRunnerExePath = Join-Path $hashRuntimeCodeRoot "MOLE_DAQ_Runner.exe"
     $hashScriptRunnerExePath = Join-Path $hashRuntimeCodeRoot "MOLE_ScriptRunner.exe"
+    $hashInstallClientExePath = Join-Path $hashRuntimeCodeRoot "MOLE_DAS_Install_Client.exe"
 
     $payload = [ordered]@{
         schema = "mole_latest_verified_release_v1"
@@ -1085,6 +1086,7 @@ function Write-VerifiedReleaseManifest {
         wizard_exe_path = "runtime\\MOLE_code\\MOLE_DAS_Wizard.exe"
         runner_exe_path = "runtime\\MOLE_code\\MOLE_DAQ_Runner.exe"
         script_runner_exe_path = "runtime\\MOLE_code\\MOLE_ScriptRunner.exe"
+        install_client_exe_path = "runtime\\MOLE_code\\MOLE_DAS_Install_Client.exe"
         installer_bundle_path = ""
         portable_bundle_path = ""
         hashes = [ordered]@{
@@ -1104,6 +1106,7 @@ function Write-VerifiedReleaseManifest {
             wizard_exe_sha256 = Get-FileHashValue $hashWizardExePath
             runner_exe_sha256 = Get-FileHashValue $hashRunnerExePath
             script_runner_exe_sha256 = Get-FileHashValue $hashScriptRunnerExePath
+            install_client_exe_sha256 = Get-FileHashValue $hashInstallClientExePath
             installer_bundle_sha256 = ""
             portable_bundle_sha256 = ""
         }
@@ -1312,6 +1315,10 @@ Write-Host "==> Build ScriptRunner executable"
 Build-Executable -Name "MOLE_ScriptRunner" -EntryScript $scriptRunnerEntry -ContentsDirectory "script_runner_internal"
 
 Write-Host ""
+Write-Host "==> Build Install Client executable"
+Build-Executable -Name "MOLE_DAS_Install_Client" -EntryScript $installClientSource -ContentsDirectory "install_client_internal" -Windowed
+
+Write-Host ""
 Write-Host "==> Prepare trimmed distributable"
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
 $shareRuntimeRoot = Join-Path $installRoot "runtime"
@@ -1337,7 +1344,14 @@ start "" /D "%ROOT%" "%ROOT%\MOLE_DAS_Wizard.exe"
 $installClientBatch = @'
 @echo off
 setlocal
-"%~dp0runtime\MOLE_code\.venv\Scripts\python.exe" "%~dp0MOLE_DAS_INSTALL_CLIENT.py" %*
+set "ROOT=%~dp0runtime\MOLE_code"
+set "CLIENT=%ROOT%\MOLE_DAS_Install_Client.exe"
+if not exist "%CLIENT%" (
+  echo Missing installation client executable at %CLIENT%
+  pause
+  exit /b 1
+)
+"%CLIENT%" --package-root "%~dp0" %*
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" pause
 exit /b %RC%
@@ -1450,7 +1464,7 @@ function Move-DirectoryRobust {
 
 function Assert-ProcessesClosed {
     param([string]$TargetRoot)
-    $names = @("MOLE_DAS_Wizard", "MOLE_DAQ_Runner", "MOLE_ScriptRunner")
+    $names = @("MOLE_DAS_Wizard", "MOLE_DAQ_Runner", "MOLE_ScriptRunner", "MOLE_DAS_Install_Client")
     $running = foreach ($name in $names) {
         Get-Process -Name $name -ErrorAction SilentlyContinue
     }
@@ -2315,7 +2329,7 @@ function Write-Status {
 
 function Assert-ProcessesClosed {
     param([string]$TargetRoot)
-    $names = @("MOLE_DAS_Wizard", "MOLE_DAQ_Runner", "MOLE_ScriptRunner")
+    $names = @("MOLE_DAS_Wizard", "MOLE_DAQ_Runner", "MOLE_ScriptRunner", "MOLE_DAS_Install_Client")
     $running = foreach ($name in $names) {
         Get-Process -Name $name -ErrorAction SilentlyContinue
     }
@@ -2461,6 +2475,7 @@ Included executables:
 - MOLE_DAS_Wizard.exe
 - MOLE_DAQ_Runner.exe
 - MOLE_ScriptRunner.exe
+- MOLE_DAS_Install_Client.exe
 
 Packaged acceptance:
 - PACKAGED_ACCEPTANCE_SUMMARY.txt
