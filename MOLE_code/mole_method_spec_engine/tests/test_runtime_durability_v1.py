@@ -81,6 +81,7 @@ class RuntimeDurabilityTests(unittest.TestCase):
         self.assertIn('Build-Executable -Name "MOLE_DAS_Install_Client"', script_text)
         self.assertIn("MOLE_DAS_Install_Client.exe", script_text)
         self.assertIn("install_client_exe_sha256", script_text)
+        self.assertIn('"%CLIENT%" --package-root "%~dp0." %*', script_text)
         self.assertNotIn('Build-Executable -Name "MOLE_DAS_Install_Client" -EntryScript $installClientSource -ContentsDirectory "install_client_internal" -Windowed', script_text)
         self.assertNotIn(r'runtime\MOLE_code\.venv\Scripts\python.exe" "%~dp0MOLE_DAS_INSTALL_CLIENT.py"', script_text)
 

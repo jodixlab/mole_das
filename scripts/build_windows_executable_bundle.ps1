@@ -1351,7 +1351,7 @@ if not exist "%CLIENT%" (
   pause
   exit /b 1
 )
-"%CLIENT%" --package-root "%~dp0" %*
+"%CLIENT%" --package-root "%~dp0." %*
 set "RC=%ERRORLEVEL%"
 if not "%RC%"=="0" pause
 exit /b %RC%
