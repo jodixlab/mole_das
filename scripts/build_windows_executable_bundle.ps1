@@ -1316,7 +1316,7 @@ Build-Executable -Name "MOLE_ScriptRunner" -EntryScript $scriptRunnerEntry -Cont
 
 Write-Host ""
 Write-Host "==> Build Install Client executable"
-Build-Executable -Name "MOLE_DAS_Install_Client" -EntryScript $installClientSource -ContentsDirectory "install_client_internal" -Windowed
+Build-Executable -Name "MOLE_DAS_Install_Client" -EntryScript $installClientSource -ContentsDirectory "install_client_internal"
 
 Write-Host ""
 Write-Host "==> Prepare trimmed distributable"
