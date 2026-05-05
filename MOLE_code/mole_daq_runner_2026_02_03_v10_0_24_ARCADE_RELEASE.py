@@ -4541,6 +4541,271 @@ def _write_manifest(outputs: ExecOutputs, session: Dict[str, Any]) -> None:
         return
 
 
+def _ensure_headless_diagnostics_session(session: Dict[str, Any]) -> Dict[str, Any]:
+    session = ensure_session_schema(session, actor="runner_diagnostics_headless")
+    sm = session.get("session_mode")
+    if not isinstance(sm, dict):
+        sm = {}
+        session["session_mode"] = sm
+    env_training = _mole_env_mode(session) == "TRAINING"
+    sm["diagnostic_only"] = True
+    sm["may_support_compliance"] = False
+    sm["mode"] = "DIAGNOSTICS_TRAINING_SESSION" if env_training else "DIAGNOSTICS_SESSION"
+    sm.setdefault("record_data", True)
+    sm["tokenize"] = False
+
+    daq = session.get("daq_runner")
+    if not isinstance(daq, dict):
+        daq = {}
+        session["daq_runner"] = daq
+    daq["ui_mode"] = "DIAGNOSTICS"
+    daq["report_pack_enabled"] = False
+    daq["formal_report_enabled"] = False
+    daq["diagnostics_export_enabled"] = True
+    diag_verify = daq.get("diagnostics_verification")
+    if not isinstance(diag_verify, dict):
+        diag_verify = {}
+        daq["diagnostics_verification"] = diag_verify
+    for key in ("technician", "worksheet_ref", "gas_ids", "attachment_path", "notes"):
+        diag_verify.setdefault(key, "")
+    for stage_key in ("pretest", "posttest"):
+        stage = diag_verify.get(stage_key)
+        if not isinstance(stage, dict):
+            stage = {}
+            diag_verify[stage_key] = stage
+        stage.setdefault("completed", False)
+        stage.setdefault("timestamp_iso", "")
+        stage.setdefault("by", "")
+        stage.setdefault("worksheet_ref", "")
+        stage.setdefault("gas_ids", "")
+        stage.setdefault("attachment_path", "")
+        stage.setdefault("notes", "")
+    return session
+
+
+def _headless_diagnostics_pollutants(session: Dict[str, Any]) -> Tuple[List[str], Dict[str, Dict[str, Any]]]:
+    poll = session.get("pollutants") if isinstance(session.get("pollutants"), dict) else {}
+    selected = [
+        str(code or "").strip().upper()
+        for code in list((poll or {}).get("selected") or [])
+        if str(code or "").strip()
+    ]
+    if not selected:
+        selected = ["NOX", "CO", "O2", "CO2", "CH4"]
+    prescriptions = (poll or {}).get("prescriptions")
+    if not isinstance(prescriptions, dict):
+        prescriptions = {}
+    normalized_prescriptions: Dict[str, Dict[str, Any]] = {}
+    for key, value in prescriptions.items():
+        if isinstance(value, dict):
+            normalized_prescriptions[str(key).strip().upper()] = value
+    return selected, normalized_prescriptions
+
+
+def _headless_diagnostics_collect_samples(
+    session: Dict[str, Any],
+    outputs: ExecOutputs,
+    sample_count: int,
+) -> Tuple[List[Dict[str, Any]], str]:
+    codes, prescriptions = _headless_diagnostics_pollutants(session)
+    count = max(1, min(int(sample_count or 1), 25))
+    driver = build_driver(session, ui=False, poll_codes=codes, prescriptions=prescriptions)
+    driver_name = str(getattr(driver, "name", "") or driver.__class__.__name__)
+    samples: List[Dict[str, Any]] = []
+    src_meta = {"producer": "DAQ_RUNNER_DIAGNOSTICS_HEADLESS", "driver": driver_name}
+    try:
+        driver.connect()
+        with outputs.raw_samples_path.open("a", encoding="utf-8") as raw_fh, outputs.comm_health_path.open("a", encoding="utf-8") as comm_fh, outputs.raw_events_path.open("a", encoding="utf-8") as event_fh:
+            _write_raw_event(event_fh, session, outputs, "DIAGNOSTICS_HEADLESS_CAPTURE_START", {"driver": driver_name, "sample_count": count})
+            for _idx in range(count):
+                frame = dict(driver.read_all() or {})
+                if "ts_iso" not in frame:
+                    frame["ts_iso"] = _now_iso_z()
+                if "comm_ok" not in frame:
+                    frame["comm_ok"] = True
+                samples.append(frame)
+                _write_raw_samples_from_frame(raw_fh, frame, session, outputs, src_meta)
+                _write_comm_health(comm_fh, session, outputs, bool(frame.get("comm_ok", True)), "diagnostics_headless_capture")
+            _write_raw_event(event_fh, session, outputs, "DIAGNOSTICS_HEADLESS_CAPTURE_DONE", {"driver": driver_name, "samples_captured": len(samples)})
+    finally:
+        try:
+            driver.close()
+        except Exception:
+            pass
+    return samples, driver_name
+
+
+def _headless_diagnostics_sample_summary(sample: Dict[str, Any]) -> List[Tuple[str, str]]:
+    rows: List[Tuple[str, str]] = []
+    for key in sorted(sample.keys()):
+        if key in ("ts_iso", "comm_ok"):
+            continue
+        value = sample.get(key)
+        if isinstance(value, (dict, list, tuple)):
+            continue
+        rows.append((str(key), str(value)))
+    return rows[:24]
+
+
+def _headless_diagnostics_render(snapshot: Dict[str, Any]) -> str:
+    project = snapshot.get("project") if isinstance(snapshot.get("project"), dict) else {}
+    source = snapshot.get("source") if isinstance(snapshot.get("source"), dict) else {}
+    fuel = snapshot.get("fuel") if isinstance(snapshot.get("fuel"), dict) else {}
+    latest_sample = snapshot.get("latest_sample") if isinstance(snapshot.get("latest_sample"), dict) else {}
+    lines: List[str] = []
+    lines.append("MOLE DAS DIAGNOSTICS SNAPSHOT")
+    lines.append(str(snapshot.get("mode_label") or TEXT_DIAGNOSTICS_ONLY_UPPER))
+    lines.append(TEXT_DIAG_NOT_FOR_RECORD_NOTICE)
+    lines.append(TEXT_DIAG_NON_COMPLIANCE_NOTICE)
+    lines.append("")
+    lines.append(f"Generated: {snapshot.get('generated') or '(n/a)'}")
+    lines.append(f"Config: {snapshot.get('config_path') or '(n/a)'}")
+    lines.append(f"Session directory: {snapshot.get('session_dir') or '(n/a)'}")
+    lines.append("")
+    lines.append("PROJECT")
+    lines.append(f"  Job ID: {project.get('job_id') or '(n/a)'}")
+    lines.append(f"  Project Name: {project.get('project_name') or '(n/a)'}")
+    lines.append(f"  Site / Facility: {project.get('site_facility') or project.get('site') or '(n/a)'}")
+    lines.append(f"  Operator: {project.get('operator') or '(n/a)'}")
+    lines.append(f"  Asset / Unit ID: {project.get('asset_unit_id') or '(n/a)'}")
+    lines.append("")
+    lines.append("DIAGNOSTICS MODE CONTROLS")
+    lines.append("  Diagnostic only: YES")
+    lines.append("  Compliance support: DISABLED")
+    lines.append("  Formal report pack: DISABLED")
+    lines.append("  Tokenization: DISABLED")
+    lines.append(f"  Environment: {snapshot.get('environment') or '(n/a)'}")
+    lines.append(f"  Driver: {snapshot.get('driver') or '(n/a)'}")
+    lines.append("")
+    lines.append("SOURCE / FUEL")
+    lines.append(f"  Source Category: {source.get('source_category') or '(n/a)'}")
+    lines.append(f"  Source ID: {source.get('source_id') or source.get('source_name') or '(n/a)'}")
+    lines.append(f"  Fuel Category: {fuel.get('fuel_category') or fuel.get('category') or '(n/a)'}")
+    lines.append(f"  Fuel Code: {fuel.get('fuel_button_code') or fuel.get('code') or '(n/a)'}")
+    lines.append("")
+    lines.append("CAPTURE PROOF")
+    lines.append(f"  Samples captured: {snapshot.get('samples_captured') or 0}")
+    lines.append(f"  Latest timestamp: {latest_sample.get('ts_iso') or '(n/a)'}")
+    lines.append(f"  Communications OK: {'YES' if bool(latest_sample.get('comm_ok', False)) else 'NO'}")
+    sample_rows = _headless_diagnostics_sample_summary(latest_sample)
+    if sample_rows:
+        lines.append("  Latest sample channels:")
+        for key, value in sample_rows:
+            lines.append(f"    {key}: {value}")
+    else:
+        lines.append("  Latest sample channels: (none)")
+    lines.append("")
+    lines.append("ARTIFACT POSITION")
+    lines.append("  This artifact is operator-guidance diagnostics output only.")
+    lines.append("  It does not claim EPA compliance support, QA/QC trending support, or institutional record status.")
+    return "\n".join(lines) + "\n"
+
+
+def _headless_diagnostics_write_sidecars(base_path: Path, snapshot: Dict[str, Any]) -> Tuple[Path, Path]:
+    json_path = base_path.parent / f"{base_path.stem}_calc_audit.json"
+    csv_path = base_path.parent / f"{base_path.stem}_calc_audit.csv"
+    audit_payload = {
+        "schema": "mole_diagnostics_headless_calc_audit_v1",
+        "generated": snapshot.get("generated"),
+        "mode_label": snapshot.get("mode_label"),
+        "job_id": ((snapshot.get("project") or {}).get("job_id") if isinstance(snapshot.get("project"), dict) else ""),
+        "driver": snapshot.get("driver"),
+        "samples_captured": snapshot.get("samples_captured"),
+        "diagnostic_only": True,
+        "may_support_compliance": False,
+        "report_pack_enabled": False,
+        "formal_report_enabled": False,
+        "latest_sample": snapshot.get("latest_sample") if isinstance(snapshot.get("latest_sample"), dict) else {},
+    }
+    json_path.write_text(json.dumps(audit_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    fieldnames = ["section", "label", "value"]
+    with csv_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({"section": "mode", "label": "Diagnostic only", "value": "YES"})
+        writer.writerow({"section": "mode", "label": "Compliance support", "value": "DISABLED"})
+        writer.writerow({"section": "mode", "label": "Formal report pack", "value": "DISABLED"})
+        writer.writerow({"section": "capture", "label": "Samples captured", "value": str(snapshot.get("samples_captured") or 0)})
+        latest_sample = snapshot.get("latest_sample") if isinstance(snapshot.get("latest_sample"), dict) else {}
+        for key, value in _headless_diagnostics_sample_summary(latest_sample):
+            writer.writerow({"section": "latest_sample", "label": key, "value": value})
+    return json_path, csv_path
+
+
+def export_headless_diagnostics_snapshot(
+    session: Dict[str, Any],
+    cfg_path: Path,
+    outdir_arg: Optional[str],
+    *,
+    sample_count: int = 4,
+) -> Dict[str, Any]:
+    session = _ensure_headless_diagnostics_session(session)
+    outputs = init_outputs(session, cfg_path, outdir_arg)
+    session.setdefault("paths", {})
+    session["paths"]["session_dir"] = str(outputs.out_dir)
+    session["paths"]["daq_run_dir"] = str(outputs.out_dir)
+    try:
+        _write_build_meta(outputs, session, cfg_path, status="DIAGNOSTICS_HEADLESS_START")
+    except Exception:
+        pass
+
+    samples, driver_name = _headless_diagnostics_collect_samples(session, outputs, sample_count)
+    generated = now_iso()
+    snapshot_dir = outputs.exports_dir / "diagnostic_snapshots"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    project = session.get("project") if isinstance(session.get("project"), dict) else {}
+    raw_job = str((project or {}).get("job_id") or "diagnostics").strip()
+    safe_job = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in raw_job).strip("_") or "diagnostics"
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_path = snapshot_dir / f"{safe_job}_diag_headless_{stamp}.txt"
+    snapshot = {
+        "schema": "mole_diagnostics_headless_snapshot_v1",
+        "generated": generated,
+        "mode_label": diag_mode_label(_mole_env_mode(session) == "TRAINING"),
+        "config_path": str(cfg_path),
+        "session_dir": str(outputs.out_dir),
+        "environment": _mole_env_mode(session),
+        "driver": driver_name,
+        "samples_captured": len(samples),
+        "latest_sample": dict(samples[-1]) if samples else {},
+        "project": dict(session.get("project") or {}),
+        "source": dict(session.get("source") or {}),
+        "fuel": dict(session.get("fuel") or {}),
+    }
+    rendered = _headless_diagnostics_render(snapshot)
+    base_path.write_text(rendered, encoding="utf-8")
+    audit_json_path, audit_csv_path = _headless_diagnostics_write_sidecars(base_path, snapshot)
+    manifest_path = snapshot_dir / "diagnostics_snapshot_manifest.json"
+    manifest = {
+        "schema": "mole_diagnostics_headless_manifest_v1",
+        "status": "PASS",
+        "generated": generated,
+        "diagnostic_only": True,
+        "may_support_compliance": False,
+        "report_pack_enabled": False,
+        "formal_report_enabled": False,
+        "tokenize": False,
+        "compliance_claimed": False,
+        "samples_captured": len(samples),
+        "driver": driver_name,
+        "snapshot_path": str(base_path),
+        "calc_audit_json_path": str(audit_json_path),
+        "calc_audit_csv_path": str(audit_csv_path),
+        "config_path": str(cfg_path),
+        "session_dir": str(outputs.out_dir),
+        "not_for_record_notice": TEXT_DIAG_NOT_FOR_RECORD_NOTICE,
+        "non_compliance_notice": TEXT_DIAG_NON_COMPLIANCE_NOTICE,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    try:
+        _write_build_meta(outputs, session, cfg_path, status="DIAGNOSTICS_HEADLESS_DONE", extra={"diagnostics_manifest_path": str(manifest_path)})
+        _write_manifest(outputs, session)
+    except Exception:
+        pass
+    manifest["manifest_path"] = str(manifest_path)
+    return manifest
+
+
 def acquire_loop(
     session: Dict[str, Any],
     cfg_path: Path,
@@ -4869,6 +5134,8 @@ def main() -> None:
     ap.add_argument("--sample-period", type=float, default=1.0, help="Acquisition sample period (seconds)")
     ap.add_argument("--site-refresh", type=float, default=300.0, help="Site conditions refresh period (seconds)")
     ap.add_argument("--outdir", default=None, help="Output run folder (default: use session_profile.paths.daq_run_dir or create under config folder)")
+    ap.add_argument("--diagnostics-export-snapshot", action="store_true", help="Headless diagnostics-only capture and print artifact export")
+    ap.add_argument("--diagnostics-sample-count", type=int, default=4, help="Number of SIM/headless diagnostics samples to capture")
     args = ap.parse_args()
 
     session_profile = None
@@ -5158,6 +5425,16 @@ def main() -> None:
                 args.outdir = str(od)
         except Exception:
             pass
+
+    if bool(getattr(args, "diagnostics_export_snapshot", False)):
+        manifest = export_headless_diagnostics_snapshot(
+            session,
+            cfg_path,
+            getattr(args, "outdir", None),
+            sample_count=int(getattr(args, "diagnostics_sample_count", 4) or 4),
+        )
+        print(json.dumps(manifest, indent=2, ensure_ascii=False))
+        return
 
     if bool(getattr(args, 'ui', False)):
         # UI controller mode (no console prompts here).

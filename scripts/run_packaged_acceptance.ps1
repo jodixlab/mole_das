@@ -266,6 +266,12 @@ $summary = [ordered]@{
     report_pack_summary_path = ""
     final_report_path = ""
     final_report_index_path = ""
+    diagnostics_config_path = ""
+    diagnostics_session_dir = ""
+    diagnostics_snapshot_path = ""
+    diagnostics_manifest_path = ""
+    diagnostics_calc_audit_json_path = ""
+    diagnostics_calc_audit_csv_path = ""
     upgrade_report_txt_path = ""
     upgrade_report_json_path = ""
     rollback_report_txt_path = ""
@@ -553,6 +559,111 @@ print(json.dumps(payload))
         summary_path = $reportSummaryPath
     }
 
+    $diagInfo = Invoke-EmbeddedPythonJson `
+        -Label "seed_diagnostics_config" `
+        -PythonExe $installedPython `
+        -WorkingDirectory $codeRoot `
+        -Source @"
+import json
+from pathlib import Path
+
+base_config = Path(r'''$($summary.runner_config_path)''')
+data_root = Path(r'''$dataRoot''')
+diag_session_dir = data_root / "training" / "sessions" / "packaged_acceptance_diagnostics"
+diag_session_dir.mkdir(parents=True, exist_ok=True)
+diag_config_path = diag_session_dir / "runner_config_diag_training.json"
+diag_profile_path = diag_session_dir / "session_profile.json"
+cfg = json.loads(base_config.read_text(encoding="utf-8-sig"))
+cfg["environment"] = "TRAINING"
+cfg["run_id"] = "packaged_acceptance_diagnostics"
+cfg["run_day"] = "packaged_acceptance"
+sm = cfg.setdefault("session_mode", {})
+sm["diagnostic_only"] = True
+sm["may_support_compliance"] = False
+sm["record_data"] = True
+sm["tokenize"] = False
+sm["mode"] = "DIAGNOSTICS_TRAINING_SESSION"
+daq = cfg.setdefault("daq_runner", {})
+daq["ui_mode"] = "DIAGNOSTICS"
+daq["report_pack_enabled"] = False
+daq["formal_report_enabled"] = False
+daq["diagnostics_export_enabled"] = True
+paths = cfg.setdefault("paths", {})
+paths["session_dir"] = str(diag_session_dir)
+paths["daq_run_dir"] = str(diag_session_dir)
+paths["runner_config_path"] = str(diag_config_path)
+paths["session_profile_path"] = str(diag_profile_path)
+diag_config_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+profile = {
+    "schema": "mole_session_profile_v1",
+    "run_id": cfg["run_id"],
+    "paths": dict(paths),
+}
+diag_profile_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+print(json.dumps({
+    "diagnostics_session_dir": str(diag_session_dir),
+    "diagnostics_config_path": str(diag_config_path),
+    "diagnostics_profile_path": str(diag_profile_path),
+}))
+"@
+    $summary.diagnostics_config_path = [string]$diagInfo.diagnostics_config_path
+    $summary.diagnostics_session_dir = [string]$diagInfo.diagnostics_session_dir
+    Require-Path -PathValue $summary.diagnostics_config_path -Label "Diagnostics runner config"
+    Require-Path -PathValue $summary.diagnostics_session_dir -Label "Diagnostics session directory"
+
+    $diagResult = Invoke-CapturedProcess `
+        -Label "diagnostics_only_flow" `
+        -FilePath $installedRunner `
+        -ArgumentList @("--config", $summary.diagnostics_config_path, "--driver", "SIM", "--diagnostics-export-snapshot", "--diagnostics-sample-count", "4", "--outdir", $summary.diagnostics_session_dir) `
+        -WorkingDirectory $codeRoot
+    $expectedDiagManifestPath = Join-Path $summary.diagnostics_session_dir "exports\\diagnostic_snapshots\\diagnostics_snapshot_manifest.json"
+    $diagExportInfo = $null
+    try {
+        $diagExportInfo = $diagResult.stdout | ConvertFrom-Json
+    }
+    catch {
+        if (-not (Test-Path -LiteralPath $expectedDiagManifestPath)) {
+            throw "Failed to parse diagnostics export output and expected manifest was not written.`nExpected: $expectedDiagManifestPath`nSTDOUT:`n$($diagResult.stdout)`nSTDERR:`n$($diagResult.stderr)"
+        }
+    }
+    $summary.diagnostics_manifest_path = [string]$(if ($diagExportInfo -and $diagExportInfo.manifest_path) { $diagExportInfo.manifest_path } else { $expectedDiagManifestPath })
+    Require-Path -PathValue $summary.diagnostics_manifest_path -Label "Diagnostics snapshot manifest"
+    $diagManifest = Get-Content -LiteralPath $summary.diagnostics_manifest_path -Raw | ConvertFrom-Json
+    $summary.diagnostics_snapshot_path = [string]$(if ($diagExportInfo -and $diagExportInfo.snapshot_path) { $diagExportInfo.snapshot_path } else { $diagManifest.snapshot_path })
+    $summary.diagnostics_calc_audit_json_path = [string]$(if ($diagExportInfo -and $diagExportInfo.calc_audit_json_path) { $diagExportInfo.calc_audit_json_path } else { $diagManifest.calc_audit_json_path })
+    $summary.diagnostics_calc_audit_csv_path = [string]$(if ($diagExportInfo -and $diagExportInfo.calc_audit_csv_path) { $diagExportInfo.calc_audit_csv_path } else { $diagManifest.calc_audit_csv_path })
+    Require-Path -PathValue $summary.diagnostics_snapshot_path -Label "Diagnostics snapshot text"
+    Require-Path -PathValue $summary.diagnostics_calc_audit_json_path -Label "Diagnostics calculation audit JSON"
+    Require-Path -PathValue $summary.diagnostics_calc_audit_csv_path -Label "Diagnostics calculation audit CSV"
+    if ([string]$diagManifest.status -ne "PASS") {
+        throw "Diagnostics manifest status was not PASS."
+    }
+    if (-not [bool]$diagManifest.diagnostic_only) {
+        throw "Diagnostics manifest did not assert diagnostic_only=true."
+    }
+    if ([bool]$diagManifest.may_support_compliance -or [bool]$diagManifest.report_pack_enabled -or [bool]$diagManifest.formal_report_enabled -or [bool]$diagManifest.compliance_claimed) {
+        throw "Diagnostics manifest claimed compliance or report-pack support."
+    }
+    if ([int]$diagManifest.samples_captured -lt 1) {
+        throw "Diagnostics export did not capture a sample."
+    }
+    $diagSnapshotText = Get-Content -LiteralPath $summary.diagnostics_snapshot_path -Raw
+    if ($diagSnapshotText -notmatch "MOLE DAS DIAGNOSTICS SNAPSHOT" -or $diagSnapshotText -notmatch "Compliance support: DISABLED" -or $diagSnapshotText -notmatch "Formal report pack: DISABLED") {
+        throw "Diagnostics snapshot text is missing the required non-compliance positioning."
+    }
+    Copy-Item -LiteralPath $summary.diagnostics_snapshot_path -Destination (Join-Path $ArtifactOutDir "diagnostics_snapshot.txt") -Force
+    Copy-Item -LiteralPath $summary.diagnostics_manifest_path -Destination (Join-Path $ArtifactOutDir "diagnostics_snapshot_manifest.json") -Force
+    Copy-Item -LiteralPath $summary.diagnostics_calc_audit_json_path -Destination (Join-Path $ArtifactOutDir "diagnostics_calc_audit.json") -Force
+    Copy-Item -LiteralPath $summary.diagnostics_calc_audit_csv_path -Destination (Join-Path $ArtifactOutDir "diagnostics_calc_audit.csv") -Force
+    Add-StepResult -Name "diagnostics_only_flow" -Status "PASS" -Detail "Installed Runner exported a diagnostics-only snapshot from a SIM capture without claiming compliance support." -Extra @{
+        stdout_path = $diagResult.stdout_path
+        stderr_path = $diagResult.stderr_path
+        diagnostics_snapshot_path = $summary.diagnostics_snapshot_path
+        diagnostics_manifest_path = $summary.diagnostics_manifest_path
+        diagnostics_calc_audit_json_path = $summary.diagnostics_calc_audit_json_path
+        diagnostics_calc_audit_csv_path = $summary.diagnostics_calc_audit_csv_path
+    }
+
     $upgradeReportDir = Join-Path $dataRoot "backups\\upgrade_reviews"
     $upgradeReportArtifactDir = Join-Path $ArtifactOutDir "upgrade_reports"
     New-Item -ItemType Directory -Path $upgradeReportArtifactDir -Force | Out-Null
@@ -711,6 +822,10 @@ artifacts = {
     "report_pack_summary": Path(r'''$reportSummaryPath'''),
     "final_report_markdown": Path(r'''$finalReportPath'''),
     "final_report_index": Path(r'''$finalReportIndexPath'''),
+    "diagnostics_snapshot": Path(r'''$($summary.diagnostics_snapshot_path)'''),
+    "diagnostics_manifest": Path(r'''$($summary.diagnostics_manifest_path)'''),
+    "diagnostics_calc_audit_json": Path(r'''$($summary.diagnostics_calc_audit_json_path)'''),
+    "diagnostics_calc_audit_csv": Path(r'''$($summary.diagnostics_calc_audit_csv_path)'''),
     "upgrade_report_txt": Path(r'''$($summary.upgrade_report_txt_path)'''),
     "upgrade_report_json": Path(r'''$($summary.upgrade_report_json_path)'''),
     "rollback_report_txt": Path(r'''$($summary.rollback_report_txt_path)'''),

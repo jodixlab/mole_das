@@ -29,6 +29,18 @@ PACKAGED_EVIDENCE_RULES: Dict[str, Dict[str, Any]] = {
         "requires_final_report_render": True,
         "summary": "Packaged acceptance generated the final report artifacts from the seeded session.",
     },
+    "diagnostics_only_flow": {
+        "steps": ["diagnostics_only_flow"],
+        "fields": [
+            "diagnostics_config_path",
+            "diagnostics_snapshot_path",
+            "diagnostics_manifest_path",
+            "diagnostics_calc_audit_json_path",
+            "diagnostics_calc_audit_csv_path",
+        ],
+        "requires_diagnostics_manifest": True,
+        "summary": "Packaged acceptance exported a diagnostics-only snapshot from SIM capture without compliance support.",
+    },
 }
 
 
@@ -85,6 +97,42 @@ def _final_report_render_pass(report_summary: Dict[str, Any]) -> Tuple[bool, str
     return False, f"final report render status is docx={docx_status or '(missing)'}, pdf={pdf_status or '(missing)'}"
 
 
+def _load_diagnostics_manifest(output_dir: Path, packaged: Dict[str, Any]) -> Dict[str, Any]:
+    candidates = [output_dir / "diagnostics_snapshot_manifest.json"]
+    packaged_manifest_path = str(packaged.get("diagnostics_manifest_path") or "").strip()
+    if packaged_manifest_path:
+        candidates.append(Path(packaged_manifest_path))
+    for candidate in candidates:
+        if candidate.is_file():
+            return _read_json_optional(candidate)
+    return {}
+
+
+def _diagnostics_manifest_pass(manifest: Dict[str, Any]) -> Tuple[bool, str]:
+    if not manifest:
+        return False, "diagnostics_snapshot_manifest.json is unavailable"
+    if str(manifest.get("status") or "").strip().upper() != "PASS":
+        return False, "diagnostics manifest status is not PASS"
+    if not bool(manifest.get("diagnostic_only")):
+        return False, "diagnostics manifest does not assert diagnostic_only=true"
+    blocked_flags = [
+        "may_support_compliance",
+        "report_pack_enabled",
+        "formal_report_enabled",
+        "compliance_claimed",
+    ]
+    claimed = [name for name in blocked_flags if bool(manifest.get(name))]
+    if claimed:
+        return False, "diagnostics manifest claimed forbidden support: " + ", ".join(claimed)
+    try:
+        samples = int(manifest.get("samples_captured") or 0)
+    except Exception:
+        samples = 0
+    if samples < 1:
+        return False, "diagnostics manifest did not prove sample capture"
+    return True, f"diagnostics manifest proves diagnostic-only capture with {samples} sample(s)"
+
+
 def _evidence_paths_for_rule(rule: Dict[str, Any], packaged: Dict[str, Any], output_dir: Path) -> List[str]:
     paths: List[str] = []
     for field in list(rule.get("fields") or []):
@@ -97,6 +145,10 @@ def _evidence_paths_for_rule(rule: Dict[str, Any], packaged: Dict[str, Any], out
         "report_pack_summary.json",
         "final_test_report_v1.md",
         "final_report_index.json",
+        "diagnostics_snapshot.txt",
+        "diagnostics_snapshot_manifest.json",
+        "diagnostics_calc_audit.json",
+        "diagnostics_calc_audit.csv",
     ]:
         local_path = output_dir / local_name
         if local_path.exists():
@@ -134,6 +186,11 @@ def _packaged_evidence_status(item_id: str, packaged: Dict[str, Any], output_dir
         render_ok, render_detail = _final_report_render_pass(_load_report_pack_summary(output_dir, packaged))
         if not render_ok:
             return "PENDING_OPERATOR", render_detail, _evidence_paths_for_rule(rule, packaged, output_dir)
+
+    if bool(rule.get("requires_diagnostics_manifest")):
+        diagnostics_ok, diagnostics_detail = _diagnostics_manifest_pass(_load_diagnostics_manifest(output_dir, packaged))
+        if not diagnostics_ok:
+            return "PENDING_OPERATOR", diagnostics_detail, _evidence_paths_for_rule(rule, packaged, output_dir)
 
     evidence_paths = _evidence_paths_for_rule(rule, packaged, output_dir)
     return "PASS", str(rule.get("summary") or "packaged acceptance evidence passed"), evidence_paths

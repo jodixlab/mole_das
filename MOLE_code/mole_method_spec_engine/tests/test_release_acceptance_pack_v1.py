@@ -49,11 +49,17 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
                         "report_pack_summary_path": str(output_dir / "report_pack_summary.json"),
                         "final_report_path": str(output_dir / "final_test_report_v1.md"),
                         "final_report_index_path": str(output_dir / "final_report_index.json"),
+                        "diagnostics_config_path": str(output_dir / "session" / "runner_config_diag_training.json"),
+                        "diagnostics_snapshot_path": str(output_dir / "diagnostics_snapshot.txt"),
+                        "diagnostics_manifest_path": str(output_dir / "diagnostics_snapshot_manifest.json"),
+                        "diagnostics_calc_audit_json_path": str(output_dir / "diagnostics_calc_audit.json"),
+                        "diagnostics_calc_audit_csv_path": str(output_dir / "diagnostics_calc_audit.csv"),
                         "steps": [
                             {"name": "launch_wizard", "status": "PASS"},
                             {"name": "seed_session", "status": "PASS"},
                             {"name": "launch_runner", "status": "PASS"},
                             {"name": "export_report_pack", "status": "PASS"},
+                            {"name": "diagnostics_only_flow", "status": "PASS"},
                         ],
                     }
                 ),
@@ -68,6 +74,21 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
                                 "pdf": {"status": "generated"},
                             }
                         }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (output_dir / "diagnostics_snapshot_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_diagnostics_headless_manifest_v1",
+                        "status": "PASS",
+                        "diagnostic_only": True,
+                        "may_support_compliance": False,
+                        "report_pack_enabled": False,
+                        "formal_report_enabled": False,
+                        "compliance_claimed": False,
+                        "samples_captured": 4,
                     }
                 ),
                 encoding="utf-8",
@@ -95,9 +116,10 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
             self.assertEqual(decisions["runner_launch_test"], "PASS")
             self.assertEqual(decisions["standard_recorded_test_flow"], "PASS")
             self.assertEqual(decisions["final_report_export"], "PASS")
-            self.assertIsNone(decisions["diagnostics_only_flow"])
+            self.assertEqual(decisions["diagnostics_only_flow"], "PASS")
             self.assertIsNone(decisions["package_review_signoff"])
             self.assertEqual(sources["wizard_launch"], "packaged_acceptance")
+            self.assertEqual(sources["diagnostics_only_flow"], "packaged_acceptance")
             self.assertTrue((output_dir / "operator_validation_evidence.json").exists())
 
 

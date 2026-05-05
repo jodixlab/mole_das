@@ -264,7 +264,11 @@ try {
             @{ Source = "runner_startup__latest.json"; Destination = "runner_startup__latest.json" },
             @{ Source = "report_pack_summary.json"; Destination = "report_pack_summary.json" },
             @{ Source = "final_test_report_v1.md"; Destination = "final_test_report_v1.md" },
-            @{ Source = "index.json"; Destination = "final_report_index.json" }
+            @{ Source = "index.json"; Destination = "final_report_index.json" },
+            @{ Source = "diagnostics_snapshot.txt"; Destination = "diagnostics_snapshot.txt" },
+            @{ Source = "diagnostics_snapshot_manifest.json"; Destination = "diagnostics_snapshot_manifest.json" },
+            @{ Source = "diagnostics_calc_audit.json"; Destination = "diagnostics_calc_audit.json" },
+            @{ Source = "diagnostics_calc_audit.csv"; Destination = "diagnostics_calc_audit.csv" }
         )
         foreach ($evidenceFile in $acceptanceEvidenceFiles) {
             $sourceEvidencePath = Join-Path $acceptanceArtifacts ([string]$evidenceFile.Source)
