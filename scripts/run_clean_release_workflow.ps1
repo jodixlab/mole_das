@@ -259,6 +259,19 @@ try {
         Copy-Item -LiteralPath $rollbackReportPreviewTxt -Destination (Join-Path $releaseOutDir "ROLLBACK_REPORT_PREVIEW.txt") -Force
         Copy-Item -LiteralPath $acceptanceJson -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.json") -Force
         Copy-Item -LiteralPath $acceptanceTxt -Destination (Join-Path $releaseOutDir "packaged_acceptance_summary.txt") -Force
+        $acceptanceEvidenceFiles = @(
+            @{ Source = "wizard_startup__latest.json"; Destination = "wizard_startup__latest.json" },
+            @{ Source = "runner_startup__latest.json"; Destination = "runner_startup__latest.json" },
+            @{ Source = "report_pack_summary.json"; Destination = "report_pack_summary.json" },
+            @{ Source = "final_test_report_v1.md"; Destination = "final_test_report_v1.md" },
+            @{ Source = "index.json"; Destination = "final_report_index.json" }
+        )
+        foreach ($evidenceFile in $acceptanceEvidenceFiles) {
+            $sourceEvidencePath = Join-Path $acceptanceArtifacts ([string]$evidenceFile.Source)
+            if (Test-Path -LiteralPath $sourceEvidencePath) {
+                Copy-Item -LiteralPath $sourceEvidencePath -Destination (Join-Path $releaseOutDir ([string]$evidenceFile.Destination)) -Force
+            }
+        }
         $supportBundleDir = Join-Path $acceptanceArtifacts "support_bundles"
         if (Test-Path -LiteralPath $supportBundleDir) {
             Get-ChildItem -LiteralPath $supportBundleDir -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object {
