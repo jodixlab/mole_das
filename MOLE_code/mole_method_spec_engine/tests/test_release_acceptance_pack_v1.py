@@ -78,6 +78,14 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (output_dir / "wizard_startup__latest.json").write_text("{}", encoding="utf-8")
+            (output_dir / "runner_startup__latest.json").write_text("{}", encoding="utf-8")
+            (output_dir / "diagnostics_snapshot.txt").write_text(
+                "MOLE DAS DIAGNOSTICS SNAPSHOT\nCompliance support: DISABLED\n",
+                encoding="utf-8",
+            )
+            (output_dir / "diagnostics_calc_audit.json").write_text("{}", encoding="utf-8")
+            (output_dir / "diagnostics_calc_audit.csv").write_text("section,label,value\n", encoding="utf-8")
             (output_dir / "diagnostics_snapshot_manifest.json").write_text(
                 json.dumps(
                     {
@@ -106,6 +114,9 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
                     str(summary_json),
                 ],
                 check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
 
             checklist = json.loads((output_dir / "operator_go_no_go_checklist.json").read_text(encoding="utf-8"))
@@ -120,7 +131,103 @@ class ReleaseAcceptancePackTests(unittest.TestCase):
             self.assertIsNone(decisions["package_review_signoff"])
             self.assertEqual(sources["wizard_launch"], "packaged_acceptance")
             self.assertEqual(sources["diagnostics_only_flow"], "packaged_acceptance")
+            evidence_paths = {
+                item["id"]: [Path(path).name for path in item.get("evidence_paths") or []]
+                for item in checklist["items"]
+            }
+            self.assertIn("wizard_startup__latest.json", evidence_paths["wizard_launch"])
+            self.assertNotIn("diagnostics_snapshot_manifest.json", evidence_paths["wizard_launch"])
+            self.assertIn("diagnostics_snapshot_manifest.json", evidence_paths["diagnostics_only_flow"])
             self.assertTrue((output_dir / "operator_validation_evidence.json").exists())
+
+    def test_operator_signoff_script_closes_final_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            artifact_dir = Path(td)
+            (artifact_dir / "clean_release_summary.json").write_text(
+                json.dumps({"status": "PASS"}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "release_bundle_summary.json").write_text(
+                json.dumps({"overall_status": "PASS"}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "RELEASE_CERT_TEST.json").write_text(
+                json.dumps({"status": "PASS"}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "RELEASE_HYGIENE_TEST.json").write_text(
+                json.dumps({"status": "PASS"}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "packaged_acceptance_summary.json").write_text(
+                json.dumps(
+                    {
+                        "package_label": "MOLE_DAS_REL_TEST",
+                        "git_commit": "abc1234",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (artifact_dir / "operator_go_no_go_checklist.json").write_text(
+                json.dumps(
+                    {
+                        "schema": "mole_release_go_no_go_checklist_v1",
+                        "items": [
+                            {
+                                "id": "clean_release_gate",
+                                "gate": "BLOCKING",
+                                "decision": "PASS",
+                                "decision_source": "clean_workflow",
+                            },
+                            {
+                                "id": "package_review_signoff",
+                                "gate": "BLOCKING",
+                                "decision": None,
+                                "decision_source": "operator_pending",
+                            },
+                        ],
+                        "final_decision": {
+                            "decision": "",
+                            "approved_by": "",
+                            "approval_basis": "",
+                            "date": "",
+                            "notes": "",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "apply_release_operator_signoff.py"),
+                    "--artifact-dir",
+                    str(artifact_dir),
+                    "--approved-by",
+                    "QA Reviewer",
+                    "--approval-basis",
+                    "Reviewed packaged acceptance evidence and release hashes.",
+                    "--date",
+                    "2026-05-05",
+                    "--notes",
+                    "Unit test signoff.",
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            decision = json.loads((artifact_dir / "release_go_no_go_decision.json").read_text(encoding="utf-8"))
+            checklist = json.loads((artifact_dir / "operator_go_no_go_checklist.json").read_text(encoding="utf-8"))
+            package_item = next(item for item in checklist["items"] if item["id"] == "package_review_signoff")
+
+            self.assertEqual(decision["status"], "PASS")
+            self.assertEqual(decision["overall_decision"], "GO")
+            self.assertEqual(package_item["decision"], "GO")
+            self.assertEqual(package_item["decision_source"], "operator_signoff")
+            self.assertTrue((artifact_dir / "operator_release_signoff.json").exists())
 
 
 if __name__ == "__main__":

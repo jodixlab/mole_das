@@ -11,21 +11,25 @@ PACKAGED_EVIDENCE_RULES: Dict[str, Dict[str, Any]] = {
     "wizard_launch": {
         "steps": ["launch_wizard"],
         "fields": ["wizard_startup_path"],
+        "local_evidence": ["wizard_startup__latest.json"],
         "summary": "Packaged acceptance launched the installed Wizard and captured startup diagnostics.",
     },
     "runner_launch_test": {
         "steps": ["launch_runner"],
         "fields": ["runner_startup_path", "runner_config_path"],
+        "local_evidence": ["runner_startup__latest.json"],
         "summary": "Packaged acceptance launched the installed Runner in SIM UI mode and captured startup diagnostics.",
     },
     "standard_recorded_test_flow": {
         "steps": ["seed_session", "launch_runner", "export_report_pack"],
         "fields": ["session_dir", "runner_config_path", "report_pack_summary_path"],
+        "local_evidence": ["runner_startup__latest.json", "report_pack_summary.json"],
         "summary": "Packaged acceptance seeded a deterministic session, launched Runner, and exported the report pack.",
     },
     "final_report_export": {
         "steps": ["export_report_pack"],
         "fields": ["final_report_path", "final_report_index_path"],
+        "local_evidence": ["report_pack_summary.json", "final_test_report_v1.md", "final_report_index.json"],
         "requires_final_report_render": True,
         "summary": "Packaged acceptance generated the final report artifacts from the seeded session.",
     },
@@ -37,6 +41,12 @@ PACKAGED_EVIDENCE_RULES: Dict[str, Dict[str, Any]] = {
             "diagnostics_manifest_path",
             "diagnostics_calc_audit_json_path",
             "diagnostics_calc_audit_csv_path",
+        ],
+        "local_evidence": [
+            "diagnostics_snapshot.txt",
+            "diagnostics_snapshot_manifest.json",
+            "diagnostics_calc_audit.json",
+            "diagnostics_calc_audit.csv",
         ],
         "requires_diagnostics_manifest": True,
         "summary": "Packaged acceptance exported a diagnostics-only snapshot from SIM capture without compliance support.",
@@ -139,17 +149,7 @@ def _evidence_paths_for_rule(rule: Dict[str, Any], packaged: Dict[str, Any], out
         value = str(packaged.get(field) or "").strip()
         if value:
             paths.append(value)
-    for local_name in [
-        "wizard_startup__latest.json",
-        "runner_startup__latest.json",
-        "report_pack_summary.json",
-        "final_test_report_v1.md",
-        "final_report_index.json",
-        "diagnostics_snapshot.txt",
-        "diagnostics_snapshot_manifest.json",
-        "diagnostics_calc_audit.json",
-        "diagnostics_calc_audit.csv",
-    ]:
+    for local_name in list(rule.get("local_evidence") or []):
         local_path = output_dir / local_name
         if local_path.exists():
             paths.append(str(local_path))
