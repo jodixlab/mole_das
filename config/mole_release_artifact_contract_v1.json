@@ -79,6 +79,41 @@
       "description": "Human-readable installed-package acceptance summary for the executable bundle."
     },
     {
+      "id": "recipient_validation_summary_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "RECIPIENT_VALIDATION_FROM_INSTALLER.json",
+      "description": "Structured recipient-side installer validation summary generated from the built installer ZIP."
+    },
+    {
+      "id": "recipient_validation_summary_md",
+      "required": true,
+      "match": "exact",
+      "pattern": "RECIPIENT_VALIDATION_FROM_INSTALLER.md",
+      "description": "Human-readable recipient-side installer validation summary generated from the built installer ZIP."
+    },
+    {
+      "id": "recipient_wizard_startup_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "recipient_wizard_startup__latest.json",
+      "description": "Wizard startup stamp captured from the isolated recipient validation install."
+    },
+    {
+      "id": "recipient_runner_startup_json",
+      "required": false,
+      "match": "exact",
+      "pattern": "recipient_runner_startup__latest.json",
+      "description": "Optional Runner startup stamp captured from the isolated recipient validation install when the headless Runner path emits it."
+    },
+    {
+      "id": "recipient_diagnostics_snapshot_manifest_json",
+      "required": true,
+      "match": "exact",
+      "pattern": "recipient_diagnostics_snapshot_manifest.json",
+      "description": "Diagnostics-only snapshot manifest captured from the isolated recipient validation install."
+    },
+    {
       "id": "latest_verified_release_manifest_json",
       "required": true,
       "match": "exact",

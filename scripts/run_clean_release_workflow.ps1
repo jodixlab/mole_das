@@ -286,6 +286,40 @@ try {
         Add-StepResult -Name "build_windows_executable_bundle" -Status "PASS" -Detail "Windows executable bundle built and packaged acceptance passed in clean workspace."
     }
 
+    Invoke-Step "Run recipient installer validation" {
+        $recipientValidationScript = Join-Path $workspace "scripts\run_recipient_installer_validation.ps1"
+        $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")
+        $gitCommit = (git -C $repo rev-parse --short HEAD | Select-Object -First 1).Trim()
+        $recipientValidationRoot = Join-Path $scratch "recipient_validation"
+        if (-not (Test-Path -LiteralPath $recipientValidationScript)) {
+            throw "Recipient installer validation script missing: $recipientValidationScript"
+        }
+        if (-not (Test-Path -LiteralPath $installerZip)) {
+            throw "Installer ZIP missing before recipient validation: $installerZip"
+        }
+        Invoke-Native -FilePath "powershell.exe" -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $recipientValidationScript,
+            "-InstallerZip", $installerZip,
+            "-ValidationRoot", $recipientValidationRoot,
+            "-ArtifactOutDir", $releaseOutDir,
+            "-ExpectedPackageLabel", $bundleLabel,
+            "-ExpectedGitCommit", $gitCommit,
+            "-TimeoutSeconds", "120",
+            "-DiagnosticsSampleCount", "2"
+        ) -WorkingDirectory $workspace
+        $recipientValidationJson = Join-Path $releaseOutDir "RECIPIENT_VALIDATION_FROM_INSTALLER.json"
+        $recipientValidationMd = Join-Path $releaseOutDir "RECIPIENT_VALIDATION_FROM_INSTALLER.md"
+        if (-not (Test-Path -LiteralPath $recipientValidationJson)) {
+            throw "Recipient validation JSON missing after validation: $recipientValidationJson"
+        }
+        if (-not (Test-Path -LiteralPath $recipientValidationMd)) {
+            throw "Recipient validation markdown missing after validation: $recipientValidationMd"
+        }
+        Add-StepResult -Name "recipient_installer_validation" -Status "PASS" -Detail "Recipient-side installer validation passed from the built installer ZIP."
+    }
+
     Invoke-Step "Collect release artifacts" {
         $sourceArtifacts = $releaseOutDir
         if (-not (Test-Path $sourceArtifacts)) {

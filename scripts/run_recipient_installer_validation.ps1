@@ -100,6 +100,27 @@ function Assert-Path {
     }
 }
 
+function Copy-EvidenceArtifact {
+    param(
+        [string]$Source,
+        [Parameter(Mandatory = $true)][string]$DestinationName
+    )
+
+    if (-not $Source) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $Source)) {
+        return $null
+    }
+    $destination = Join-Path $ArtifactOutDir $DestinationName
+    Copy-Item -LiteralPath $Source -Destination $destination -Force
+    return [ordered]@{
+        source = $Source
+        destination = $destination
+        sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $destination).Hash
+    }
+}
+
 $installerPath = (Resolve-Path -LiteralPath $InstallerZip).Path
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 if (-not $ValidationRoot) {
@@ -351,6 +372,22 @@ try {
         package_status = if ($null -ne $runnerStartup) { $runnerStartup.package_status } else { "" }
         trust_check_status = if ($null -ne $runnerStartup) { $runnerStartup.current_trust_check_status } else { "" }
     }
+    $evidenceArtifacts = @()
+    foreach ($artifact in @(
+        (Copy-EvidenceArtifact -Source $wizardStamp -DestinationName "recipient_wizard_startup__latest.json"),
+        (Copy-EvidenceArtifact -Source $runnerStamp -DestinationName "recipient_runner_startup__latest.json"),
+        (Copy-EvidenceArtifact -Source $diagManifestPath -DestinationName "recipient_diagnostics_snapshot_manifest.json"),
+        (Copy-EvidenceArtifact -Source $stdoutPath -DestinationName "recipient_runner_stdout.txt"),
+        (Copy-EvidenceArtifact -Source $stderrPath -DestinationName "recipient_runner_stderr.txt"),
+        (Copy-EvidenceArtifact -Source $diagManifest.snapshot_path -DestinationName "recipient_diagnostics_snapshot.txt"),
+        (Copy-EvidenceArtifact -Source $diagManifest.calc_audit_json_path -DestinationName "recipient_diagnostics_calc_audit.json"),
+        (Copy-EvidenceArtifact -Source $diagManifest.calc_audit_csv_path -DestinationName "recipient_diagnostics_calc_audit.csv")
+    )) {
+        if ($null -ne $artifact) {
+            $evidenceArtifacts += $artifact
+        }
+    }
+    $summary.evidence_artifacts = $evidenceArtifacts
     Add-Step -Name "runner_diagnostics_smoke" -Status "PASS" -Detail $diagManifestPath
 
     $summary.status = "PASS"
@@ -362,6 +399,11 @@ catch {
 }
 finally {
     $summary.completed_at = (Get-Date).ToUniversalTime().ToString("o")
+    $artifactInstallerZip = Join-Path $ArtifactOutDir ([System.IO.Path]::GetFileName($installerPath))
+    if (Test-Path -LiteralPath $artifactInstallerZip) {
+        $summary.artifact_installer_zip = $artifactInstallerZip
+        $summary.artifact_installer_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifactInstallerZip).Hash
+    }
     $json = $summary | ConvertTo-Json -Depth 30
     Write-Utf8NoBom -Path $summaryJson -Text $json
 
@@ -371,6 +413,8 @@ finally {
         "- Status: ``$($summary.status)``",
         "- Installer ZIP: ``$installerPath``",
         "- Installer SHA256: ``$($summary.installer_sha256)``",
+        "- Artifact installer ZIP: ``$($summary.artifact_installer_zip)``",
+        "- Artifact installer SHA256: ``$($summary.artifact_installer_sha256)``",
         "- Validation root: ``$validationRootPath``",
         "- Install root: ``$installRoot``",
         "- Expected package: ``$ExpectedPackageLabel``",
@@ -390,6 +434,14 @@ finally {
         $lines += "- Manifest: ``$($r.manifest_path)``"
         $lines += "- Flags: diagnostic_only=``$($r.diagnostic_only)``, may_support_compliance=``$($r.may_support_compliance)``, report_pack_enabled=``$($r.report_pack_enabled)``, formal_report_enabled=``$($r.formal_report_enabled)``"
         $lines += "- Samples captured: ``$($r.samples_captured)``"
+    }
+    if ($summary.evidence_artifacts) {
+        $lines += ""
+        $lines += "## Durable Evidence Copies"
+        $lines += ""
+        foreach ($artifact in $summary.evidence_artifacts) {
+            $lines += "- ``$($artifact.destination)`` SHA256=``$($artifact.sha256)``"
+        }
     }
     if ($summary.error) {
         $lines += ""
