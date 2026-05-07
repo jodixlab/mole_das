@@ -12785,8 +12785,16 @@ def _build_intake(self) -> None:
             _load_profile_into_vars(var_sel.get())
 
         def _build_from_hw():
-            # If nothing selected, use current default or a safe key
-            k = (var_sel.get() or "").strip() or (str(hw.get("profile_id") or "").strip() or "P8_RS485_MODBUS_TCP_4X2")
+            # If the portable combustion profile is selected, do not overwrite it
+            # with the generic cfg.hardware/P8 builder.
+            selected_key = (var_sel.get() or "").strip()
+            selected_profile = _get_profile(selected_key) if selected_key else None
+            selected_desc = str((selected_profile or {}).get("description") or "").lower()
+            if selected_key in PORTABLE_COMBUSTION_PROFILE_KEY_HINTS or "portable combustion" in selected_desc:
+                k = "P8_RS485_MODBUS_TCP_4X2"
+            else:
+                # If nothing selected, use current default or a safe key.
+                k = selected_key or (str(hw.get("profile_id") or "").strip() or "P8_RS485_MODBUS_TCP_4X2")
             k = _unique_key(k) if not _get_profile(k) else k
             prof = _build_profile_from_hardware_map(k)
             existing = _get_profile(k)
