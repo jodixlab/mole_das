@@ -32,7 +32,7 @@
     "built_utc": "2026-02-17T00:00:00Z"
   },
   "hardware": {
-    "profile_id": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+    "profile_id": "PORTABLE_COMBUSTION_MONITOR",
     "enabled": true,
     "lan": {
       "subnet": "192.168.8.0/24",
@@ -118,7 +118,7 @@
   },
   "hardware_profiles": [
     {
-      "profile_key": "SA2_DUAL_SENSOR_BOARD_RTU_COM3",
+      "profile_key": "PORTABLE_COMBUSTION_MONITOR",
       "description": "Portable combustion monitor via Modbus RTU; workbook-seeded float channels for NO/NO2/CO/O2/CO2/CH4/C3H8",
       "defaults": {
         "protocol": "MODBUS_RTU",
