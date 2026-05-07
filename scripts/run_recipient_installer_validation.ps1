@@ -115,6 +115,7 @@ function Copy-EvidenceArtifact {
     $destination = Join-Path $ArtifactOutDir $DestinationName
     Copy-Item -LiteralPath $Source -Destination $destination -Force
     return [ordered]@{
+        artifact_name = $DestinationName
         source = $Source
         destination = $destination
         sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $destination).Hash
@@ -440,7 +441,7 @@ finally {
         $lines += "## Durable Evidence Copies"
         $lines += ""
         foreach ($artifact in $summary.evidence_artifacts) {
-            $lines += "- ``$($artifact.destination)`` SHA256=``$($artifact.sha256)``"
+            $lines += "- ``$($artifact.artifact_name)`` SHA256=``$($artifact.sha256)``"
         }
     }
     if ($summary.error) {

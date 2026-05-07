@@ -286,9 +286,22 @@ try {
         Add-StepResult -Name "build_windows_executable_bundle" -Status "PASS" -Detail "Windows executable bundle built and packaged acceptance passed in clean workspace."
     }
 
+    Invoke-Step "Collect release artifacts" {
+        $sourceArtifacts = $releaseOutDir
+        if (-not (Test-Path $sourceArtifacts)) {
+            throw "Expected release artifact directory not found: $sourceArtifacts"
+        }
+        Get-ChildItem -LiteralPath $artifactDir -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+        Get-ChildItem -LiteralPath $sourceArtifacts -Force | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $artifactDir -Recurse -Force
+        }
+        Add-StepResult -Name "collect_artifacts" -Status "PASS" -Detail "Release artifacts copied back from clean workspace."
+    }
+
     Invoke-Step "Run recipient installer validation" {
         $recipientValidationScript = Join-Path $workspace "scripts\run_recipient_installer_validation.ps1"
-        $installerZip = Join-Path $bundleRoot ($bundleLabel + "_installer_exe_bundle.zip")
+        $installerZip = Join-Path $artifactDir ($bundleLabel + "_installer_exe_bundle.zip")
         $gitCommit = (git -C $repo rev-parse --short HEAD | Select-Object -First 1).Trim()
         $recipientValidationRoot = Join-Path $scratch "recipient_validation"
         if (-not (Test-Path -LiteralPath $recipientValidationScript)) {
@@ -303,34 +316,21 @@ try {
             "-File", $recipientValidationScript,
             "-InstallerZip", $installerZip,
             "-ValidationRoot", $recipientValidationRoot,
-            "-ArtifactOutDir", $releaseOutDir,
+            "-ArtifactOutDir", $artifactDir,
             "-ExpectedPackageLabel", $bundleLabel,
             "-ExpectedGitCommit", $gitCommit,
             "-TimeoutSeconds", "120",
             "-DiagnosticsSampleCount", "2"
         ) -WorkingDirectory $workspace
-        $recipientValidationJson = Join-Path $releaseOutDir "RECIPIENT_VALIDATION_FROM_INSTALLER.json"
-        $recipientValidationMd = Join-Path $releaseOutDir "RECIPIENT_VALIDATION_FROM_INSTALLER.md"
+        $recipientValidationJson = Join-Path $artifactDir "RECIPIENT_VALIDATION_FROM_INSTALLER.json"
+        $recipientValidationMd = Join-Path $artifactDir "RECIPIENT_VALIDATION_FROM_INSTALLER.md"
         if (-not (Test-Path -LiteralPath $recipientValidationJson)) {
             throw "Recipient validation JSON missing after validation: $recipientValidationJson"
         }
         if (-not (Test-Path -LiteralPath $recipientValidationMd)) {
             throw "Recipient validation markdown missing after validation: $recipientValidationMd"
         }
-        Add-StepResult -Name "recipient_installer_validation" -Status "PASS" -Detail "Recipient-side installer validation passed from the built installer ZIP."
-    }
-
-    Invoke-Step "Collect release artifacts" {
-        $sourceArtifacts = $releaseOutDir
-        if (-not (Test-Path $sourceArtifacts)) {
-            throw "Expected release artifact directory not found: $sourceArtifacts"
-        }
-        Get-ChildItem -LiteralPath $artifactDir -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
-        Get-ChildItem -LiteralPath $sourceArtifacts -Force | ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination $artifactDir -Recurse -Force
-        }
-        Add-StepResult -Name "collect_artifacts" -Status "PASS" -Detail "Release artifacts copied back from clean workspace."
+        Add-StepResult -Name "recipient_installer_validation" -Status "PASS" -Detail "Recipient-side installer validation passed from the collected installer ZIP."
     }
 
     $summary.status = "PASS"
