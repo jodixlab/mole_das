@@ -2287,6 +2287,7 @@ class MoleDASWizard(tk.Tk):
     BTN_FG = "#e6edf3"
     MUTED = "#9fb0c0"
     FG_DIM = "#9fb0c0"  # alias for muted label text
+    FG_WARN = "#ffd400"
 
     # Fonts (kept as class attributes so Tkinter's __getattr__ proxy never misroutes missing
     # attributes to the underlying tkapp object).
