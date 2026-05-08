@@ -1268,7 +1268,11 @@ function Build-Executable {
         "reportlab.pdfgen.canvas",
         "reportlab.platypus",
         "serial",
-        "serial.tools.list_ports"
+        "serial.tools.list_ports",
+        "sqlite3",
+        "_sqlite3",
+        "statistics",
+        "xml.sax.saxutils"
     )
 
     $args = @(
