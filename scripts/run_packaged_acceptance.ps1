@@ -209,7 +209,7 @@ function Invoke-EmbeddedPythonJson {
     $scriptPath = Join-Path $WorkingDirectory ("_mole_acceptance_" + $Label + ".py")
     [System.IO.File]::WriteAllText($scriptPath, $Source, (New-Object System.Text.UTF8Encoding($false)))
     try {
-        $result = Invoke-CapturedProcess -Label $Label -FilePath $PythonExe -ArgumentList @($scriptPath) -WorkingDirectory $WorkingDirectory
+        $result = Invoke-PythonScript -Label $Label -PythonExe $PythonExe -ScriptPath $scriptPath -WorkingDirectory $WorkingDirectory
         try {
             return [pscustomobject](ConvertFrom-Json -InputObject ($result.stdout.Trim()))
         }
@@ -220,6 +220,24 @@ function Invoke-EmbeddedPythonJson {
     finally {
         Remove-Item -LiteralPath $scriptPath -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Invoke-PythonScript {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [string]$PythonExe = "",
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [string[]]$ScriptArgs = @(),
+        [string]$WorkingDirectory = ""
+    )
+
+    if ($PythonExe -and (Test-Path -LiteralPath $PythonExe)) {
+        return Invoke-CapturedProcess -Label $Label -FilePath $PythonExe -ArgumentList (@($ScriptPath) + $ScriptArgs) -WorkingDirectory $WorkingDirectory
+    }
+    if ($script:ScriptRunnerExe -and (Test-Path -LiteralPath $script:ScriptRunnerExe)) {
+        return Invoke-CapturedProcess -Label $Label -FilePath $script:ScriptRunnerExe -ArgumentList (@($ScriptPath) + $ScriptArgs) -WorkingDirectory $WorkingDirectory
+    }
+    throw "No Python execution host found. Missing Python '$PythonExe' and ScriptRunner '$($script:ScriptRunnerExe)'."
 }
 
 $PackageRoot = (Resolve-Path $PackageRoot).Path
@@ -377,7 +395,9 @@ try {
     $installedPython = Join-Path $codeRoot ".venv\\Scripts\\python.exe"
     $installedWizard = Join-Path $codeRoot "MOLE_DAS_Wizard.exe"
     $installedRunner = Join-Path $codeRoot "MOLE_DAQ_Runner.exe"
+    $installedScriptRunner = Join-Path $codeRoot "MOLE_ScriptRunner.exe"
     $installedInstallClient = Join-Path $InstallRoot "MOLE_DAS_INSTALL_CLIENT.py"
+    $script:ScriptRunnerExe = $installedScriptRunner
     $buildIdentityPath = Join-Path $runtimeRoot "config\\mole_build_identity_v1.json"
     $welcomeManifestPath = Join-Path $runtimeRoot "config\\mole_welcome_asset_manifest_v1.json"
     $wizardStampPath = Join-Path $logsDir "wizard_startup__latest.json"
@@ -387,9 +407,9 @@ try {
     foreach ($item in @(
         @{ path = $runtimeRoot; label = "Installed runtime root" },
         @{ path = $codeRoot; label = "Installed runtime code root" },
-        @{ path = $installedPython; label = "Installed runtime Python" },
         @{ path = $installedWizard; label = "Installed Wizard executable" },
         @{ path = $installedRunner; label = "Installed Runner executable" },
+        @{ path = $installedScriptRunner; label = "Installed ScriptRunner executable" },
         @{ path = $installedInstallClient; label = "Installed install client" },
         @{ path = $buildIdentityPath; label = "Installed build identity" },
         @{ path = $installManifestPath; label = "Installed install manifest" }
@@ -408,8 +428,10 @@ try {
         $summary.welcome_manifest_path = $welcomeManifestPath
     }
 
+    $pythonHost = if (Test-Path -LiteralPath $installedPython) { $installedPython } else { $installedScriptRunner }
     Add-StepResult -Name "validate_install_layout" -Status "PASS" -Detail "Validated installed runtime, executables, and manifests." -Extra @{
-        installed_python = $installedPython
+        python_host = $pythonHost
+        script_runner = $installedScriptRunner
         build_identity_path = $buildIdentityPath
         install_manifest_path = $installManifestPath
     }
@@ -536,7 +558,7 @@ print(json.dumps(payload))
 
     $reportResult = Invoke-CapturedProcess `
         -Label "report_pack_export" `
-        -FilePath $installedPython `
+        -FilePath $installedScriptRunner `
         -ArgumentList @((Join-Path $codeRoot "mole_report_pack_v1.py"), "--session-dir", $summary.session_dir) `
         -WorkingDirectory $codeRoot
 
@@ -669,7 +691,7 @@ print(json.dumps({
     New-Item -ItemType Directory -Path $upgradeReportArtifactDir -Force | Out-Null
     $upgradeReportResult = Invoke-CapturedProcess `
         -Label "export_upgrade_report" `
-        -FilePath $installedPython `
+        -FilePath $installedScriptRunner `
         -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-export-upgrade-report", $upgradeReportDir) `
         -WorkingDirectory $InstallRoot
     try {
@@ -745,7 +767,7 @@ print(json.dumps({
     New-Item -ItemType Directory -Path $rollbackReportArtifactDir -Force | Out-Null
     $rollbackReportResult = Invoke-CapturedProcess `
         -Label "export_rollback_report" `
-        -FilePath $installedPython `
+        -FilePath $installedScriptRunner `
         -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-export-rollback-report", $rollbackReportDir) `
         -WorkingDirectory $InstallRoot
     try {
@@ -769,7 +791,7 @@ print(json.dumps({
 
     $rollbackApplyResult = Invoke-CapturedProcess `
         -Label "apply_rollback_restore" `
-        -FilePath $installedPython `
+        -FilePath $installedScriptRunner `
         -ArgumentList @($installedInstallClient, "--package-root", $InstallRoot, "--install-root", $InstallRoot, "--headless-apply-rollback", "--bootstrap-package-verification") `
         -WorkingDirectory $InstallRoot
     try {
