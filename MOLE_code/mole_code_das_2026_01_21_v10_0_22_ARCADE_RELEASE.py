@@ -2516,6 +2516,34 @@ class MoleDASWizard(tk.Tk):
         self.runtime_layout = runtime_layout
         self.mole_cfg = mole_cfg_load_or_create(self.base_dir)
         resolved = mole_cfg_resolve_paths(self.mole_cfg, self.base_dir)
+        try:
+            packaged_layout = bool(runtime_layout.get("packaged_layout"))
+            immutable_data_root = Path(runtime_layout["immutable_runtime_data_root"]).resolve()
+            resolved_data_root = resolved.get("data_root")
+            if packaged_layout and isinstance(resolved_data_root, Path):
+                try:
+                    legacy_data_root = resolved_data_root.resolve()
+                    legacy_rel = legacy_data_root.relative_to(immutable_data_root)
+                    uses_legacy_runtime_data = legacy_rel == Path(".") or str(legacy_rel) != ""
+                except Exception:
+                    uses_legacy_runtime_data = False
+                if uses_legacy_runtime_data:
+                    for key in (
+                        "data_root",
+                        "logs_dir",
+                        "backups_dir",
+                        "sessions_dir",
+                        "daq_runs_dir",
+                        "rule_packs_dir",
+                        "packages_inbox_dir",
+                        "packages_archive_dir",
+                        "db_path",
+                        "package_index_db_path",
+                    ):
+                        if key in runtime_layout:
+                            resolved[key] = Path(runtime_layout[key]).resolve()
+        except Exception:
+            pass
 
         # Canonical roots
         self.mole_home = self.base_dir.parent
@@ -12790,6 +12818,24 @@ def _build_intake(self) -> None:
             selected_key = (var_sel.get() or "").strip()
             selected_profile = _get_profile(selected_key) if selected_key else None
             selected_desc = str((selected_profile or {}).get("description") or "").lower()
+            selected_defaults = (selected_profile or {}).get("defaults") or {}
+            selected_channels = (selected_profile or {}).get("channels") or []
+            selected_sources = {
+                str(ch.get("source") or "").strip()
+                for ch in selected_channels
+                if isinstance(ch, dict)
+            }
+            if (
+                selected_key == "P8_RS485_MODBUS_TCP_4X2"
+                and str(selected_defaults.get("protocol") or "").strip().upper() == "MODBUS_RTU"
+                and str(selected_defaults.get("serial_port") or "").strip().upper() == "COM7"
+                and "user_default_session_2026_03_02_2316" in selected_sources
+            ):
+                messagebox.showinfo(
+                    "Build",
+                    "User default P8/RTU profile is already active. Build/Update skipped to avoid overwriting COM7 field settings.",
+                )
+                return
             if selected_key in PORTABLE_COMBUSTION_PROFILE_KEY_HINTS or "portable combustion" in selected_desc:
                 k = "P8_RS485_MODBUS_TCP_4X2"
             else:
