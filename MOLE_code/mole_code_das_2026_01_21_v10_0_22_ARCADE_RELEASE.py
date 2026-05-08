@@ -1411,6 +1411,142 @@ def _mole_env_mode() -> str:
     return "PRODUCTION"
 
 
+def _user_default_p8_rtu_channels() -> List[Dict[str, Any]]:
+    specs = [
+        ("B01_S01", "NO", "Portable Combustion Monitor NO", 102, 500.0, "ppm"),
+        ("B01_S02", "NO2", "Portable Combustion Monitor NO2", 202, 500.0, "ppm"),
+        ("B02_S01", "CO", "Portable Combustion Monitor CO", 302, 1000.0, "ppm"),
+        ("B02_S02", "O2", "Portable Combustion Monitor O2", 402, 25.0, "% Vol"),
+        ("B03_S01", "CO2", "Portable Combustion Monitor CO2", 502, 20.0, "% Vol"),
+        ("B03_S02", "CH4", "Portable Combustion Monitor CH4", 602, 50000.0, "ppm"),
+        ("B04_S01", "VOC", "Portable Combustion Monitor VOC", 702, 10000.0, "ppm"),
+    ]
+    rows: List[Dict[str, Any]] = []
+    for channel_id, gas, description, register, eng_max, units in specs:
+        board_id, sensor_id = channel_id.split("_", 1)
+        rows.append({
+            "channel_id": channel_id,
+            "description": description,
+            "gas": gas,
+            "protocol": "MODBUS_RTU",
+            "host": "",
+            "port": 502,
+            "serial_port": "COM7",
+            "baud": 115200,
+            "parity": "N",
+            "stopbits": "1",
+            "unit_id": 1,
+            "function_code": 3,
+            "register": register,
+            "quantity": 2,
+            "scale": 1.0,
+            "offset": 0.0,
+            "units": units,
+            "dtype": "float32_be",
+            "timeout_s": 1.5,
+            "eng_min": 0.0,
+            "eng_max": eng_max,
+            "reference_register": 40000 + register,
+            "board_id": board_id,
+            "sensor_index": int(sensor_id.replace("S", "") or "1"),
+            "source": "user_default_session_2026_03_02_2316",
+        })
+    rows.append({
+        "channel_id": "B04_S02",
+        "description": "Spare / unmapped sensor slot",
+        "gas": "",
+        "protocol": "MODBUS_RTU",
+        "host": "",
+        "port": 502,
+        "serial_port": "COM7",
+        "baud": 115200,
+        "parity": "N",
+        "stopbits": "1",
+        "unit_id": 1,
+        "function_code": 3,
+        "register": 802,
+        "quantity": 2,
+        "scale": 1.0,
+        "offset": 0.0,
+        "units": "raw",
+        "dtype": "float32_be",
+        "timeout_s": 1.5,
+        "eng_min": 0.0,
+        "eng_max": None,
+        "reference_register": 40802,
+        "board_id": "B04",
+        "sensor_index": 2,
+        "enabled": False,
+        "source": "user_default_session_2026_03_02_2316",
+    })
+    return rows
+
+
+def _user_default_hardware_config() -> Dict[str, Any]:
+    return {
+        "profile_id": "P8_RS485_MODBUS_TCP_4X2",
+        "enabled": True,
+        "lan": {
+            "subnet": "192.168.8.0/24",
+            "router_lan": "192.168.8.1",
+            "p8_host": "192.168.8.20",
+            "technician_laptop": "192.168.8.30",
+            "gateways": [{"name": "GW1", "host": "", "port": 502}],
+        },
+        "rs485": {
+            "protocol": "MODBUS_RTU",
+            "baud": 115200,
+            "parity": "N",
+            "stopbits": 1,
+            "unit_ids": {"B01": 1, "B02": 1, "B03": 1, "B04": 1},
+        },
+        "register_map": {
+            "register_type": "HOLDING_REGISTER",
+            "sensor1": 102,
+            "sensor2": 202,
+            "dtype": "float32_be",
+        },
+        "scaling": {"default": {"scale": 1.0, "offset": 0.0}},
+        "channel_map": [
+            {"channel_id": "B01_S01", "board": "B01", "sensor_index": 1},
+            {"channel_id": "B01_S02", "board": "B01", "sensor_index": 2},
+            {"channel_id": "B02_S01", "board": "B02", "sensor_index": 1},
+            {"channel_id": "B02_S02", "board": "B02", "sensor_index": 2},
+            {"channel_id": "B03_S01", "board": "B03", "sensor_index": 1},
+            {"channel_id": "B03_S02", "board": "B03", "sensor_index": 2},
+            {"channel_id": "B04_S01", "board": "B04", "sensor_index": 1},
+            {"channel_id": "B04_S02", "board": "B04", "sensor_index": 2},
+        ],
+    }
+
+
+def _user_default_hardware_profiles() -> List[Dict[str, Any]]:
+    return [{
+        "profile_key": "P8_RS485_MODBUS_TCP_4X2",
+        "description": "User default portable combustion monitor via Modbus RTU on COM7 (P8 channel layout).",
+        "defaults": {
+            "protocol": "MODBUS_RTU",
+            "host": "",
+            "port": 502,
+            "timeout_s": 1.5,
+            "serial_port": "COM7",
+            "baud": 115200,
+            "parity": "N",
+            "stopbits": "1",
+            "retries": 2,
+            "inter_request_delay_s": 0.02,
+            "open_settle_s": 0.02,
+            "dtype": "float32_be",
+        },
+        "channels": _user_default_p8_rtu_channels(),
+        "notes": {
+            "source": "E:/new_dev/data/configs/mole_session_2026_03_02_2316.json",
+            "register_basis": "User-confirmed Modbus RTU COM7 reads; one-based register values from portable monitor sheet.",
+            "spare_slot": "B04_S02 intentionally disabled/unmapped.",
+        },
+    }]
+
+
 
 def mole_cfg_default(base_dir: Path) -> Dict[str, Any]:
     # base_dir is MOLE_code
@@ -1443,6 +1579,8 @@ def mole_cfg_default(base_dir: Path) -> Dict[str, Any]:
             "journal_mode": "WAL",
             "busy_timeout_ms": 2500
         },
+        "hardware": _user_default_hardware_config(),
+        "hardware_profiles": _user_default_hardware_profiles(),
         # UI preferences are optional. If missing, the app falls back to safe defaults.
         "ui": {
             "date_picker": {
